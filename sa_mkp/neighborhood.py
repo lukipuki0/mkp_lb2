@@ -51,11 +51,57 @@ def flip_bits(
     return vecino, valor
 
 
+def swap_bits(
+    solucion: list[int],
+    inst: MKPInstance,
+    num_flip: int = 1,
+) -> tuple[list[int], float]:
+    """Genera un vecino intercambiando num_flip pares de (1 y 0) aleatorios y reparando."""
+    vecino = solucion.copy()
+    ones = [i for i, v in enumerate(vecino) if v == 1]
+    zeros = [i for i, v in enumerate(vecino) if v == 0]
+    
+    if not ones or not zeros:
+        return vecino, inst.evaluar(vecino)
+        
+    for _ in range(min(num_flip, len(ones), len(zeros))):
+        i = random.choice(ones)
+        j = random.choice(zeros)
+        vecino[i] = 0
+        vecino[j] = 1
+        ones.remove(i)
+        zeros.remove(j)
+        
+    vecino, valor = reparar_solucion(vecino, inst)
+    return vecino, valor
+
+def block_flip(
+    solucion: list[int],
+    inst: MKPInstance,
+    num_flip: int = 3,
+) -> tuple[list[int], float]:
+    """Voltea un bloque contiguo de tamaño num_flip."""
+    vecino = solucion.copy()
+    n = len(vecino)
+    if n == 0:
+        return vecino, inst.evaluar(vecino)
+    
+    start_idx = random.randint(0, n - 1)
+    for i in range(num_flip):
+        idx = (start_idx + i) % n
+        vecino[idx] = 1 - vecino[idx]
+        
+    vecino, valor = reparar_solucion(vecino, inst)
+    return vecino, valor
+
+
 # ── Registro de operadores ────────────────────────────────────────────────────
 # Permite seleccionar el operador por nombre desde config o CLI.
 
 OPERATORS: dict[str, callable] = {
     "flip_bits": flip_bits,
+    "swap_bits": swap_bits,
+    "block_flip": block_flip,
 }
 
 

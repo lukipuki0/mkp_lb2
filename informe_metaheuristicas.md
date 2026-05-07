@@ -36,7 +36,11 @@ El sistema calcula una "distancia DTW" contra la línea constante ($D_2$) y cont
 ### 3.1. Recocido Simulado / Simulated Annealing (`sa_mkp`)
 **Estrategia:** Un algoritmo de búsqueda local probabilística que simula el enfriamiento de un material. A altas temperaturas, acepta peores soluciones con frecuencia, reduciendo esa probabilidad a medida que el sistema "se enfría".
 
-- **Vecindario:** Se basa en invertir (*flip*) un número pequeño de bits en la solución actual (por defecto 3 bits). Una vez volteados, la solución pasa por la reparación.
+- **Vecindario Dinámico:** Soporta múltiples operadores de perturbación:
+  - `flip_bits` (por defecto): Invierte un número pequeño de bits al azar.
+  - `swap_bits`: Intercambia un objeto que está en la mochila por uno que está fuera, manteniendo la cantidad de objetos antes de reparar.
+  - `block_flip`: Invierte un bloque contiguo de ítems, explorando cambios estructurales.
+  Todos los movimientos pasan invariablemente por la función determinista de reparación. **Nota sobre DTW:** Cuando el monitor de estancamiento se activa, sobrescribe dinámicamente la magnitud de estos operadores (ej. cambiando el tamaño del bloque o la cantidad de intercambios de 3 a 1 para explotar, o a 10 para explorar masivamente).
 - **Enfriamiento:** Utiliza un decaimiento geométrico clásico: $T_{nueva} = T_{actual} \times \alpha$.
 - **Comportamiento Base de Rescate:** Si el monitor DTW detecta estancamiento y estamos en el comportamiento normal (estrategia *reheat*), se reinicia bruscamente la temperatura a un gran porcentaje de la temperatura inicial, para forzar el rechazo e "hervir" el espacio de búsqueda nuevamente.
 

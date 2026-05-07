@@ -18,7 +18,7 @@ import math
 import random
 from dataclasses import dataclass, field
 
-from sa_mkp.neighborhood import flip_bits
+from sa_mkp.neighborhood import get_operator
 from mkp_core.problem import MKPInstance
 from mkp_core.repair import reparar_solucion
 from dtw_stagnation import StagnationConfig, StagnationMonitor
@@ -38,6 +38,7 @@ class SAParams:
     iter_por_T: int   = 50
     num_flip:   int   = 3
     epochs:     int   = 10
+    neighborhood_op: str = "flip_bits"
 
     # Stagnation monitor
     use_stagnation:   bool  = True
@@ -124,6 +125,7 @@ def ejecutar_epoch(
     tabu_list = []
     
     current_num_flip = params.num_flip
+    fn_vecindad = get_operator(params.neighborhood_op)
 
     # Inicializar monitor
     monitor: StagnationMonitor | None = None
@@ -133,7 +135,7 @@ def ejecutar_epoch(
     while T > params.T_final:
         for _ in range(params.iter_por_T):
             # ── Vecino ────────────────────────────────────────────────────
-            vecino, val_vecino = flip_bits(sol_actual, inst, current_num_flip)
+            vecino, val_vecino = fn_vecindad(sol_actual, inst, current_num_flip)
 
             delta = val_vecino - val_actual
 
