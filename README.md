@@ -13,11 +13,14 @@ El código está modularizado para facilitar la experimentación y la adición d
 
 - **`dtw_stagnation.py`**: Implementación del monitor de estancamiento. Utiliza DTW para analizar la serie de tiempo de los valores objetivos recientes y detectar mesetas de estancamiento, disparando estrategias de rescate de forma dinámica.
 
+- **`lb2/`**: Framework de binarización compartida (LB2). Implementa las funciones de transferencia L1/L2 vectorizadas, esenciales para convertir posiciones continuas a binarias en algoritmos como GWO y PSO, garantizando una equivalencia estricta con el diseño original.
+
 - **Implementaciones de Metaheurísticas**:
   - **`sa_mkp/`** y `sa_benchmark_variants.py`: Recocido Simulado (Simulated Annealing).
   - **`ga_mkp/`** y `ga_benchmark_variants.py`: Algoritmo Genético (Genetic Algorithm).
   - **`ts_mkp/`** y `ts_benchmark_variants.py`: Búsqueda Tabú (Tabu Search).
-  - *(Otras metaheurísticas como PSO están contempladas en el flujo de trabajo).*
+  - **`gwo_mkp/`** y `gwo_benchmark_variants.py`: Grey Wolf Optimizer (GWO). Integra la binarización `lb2` con parámetros G dinámicos basados en la señal de estancamiento.
+  - **`pso_mkp/`** y `pso_benchmark_variants.py`: Particle Swarm Optimization (PSO). Implementación estandarizada idéntica a la hallada en los notebooks de referencia (`kirito/LB2_MKP.ipynb`), adaptada para ejecutar las 9 variantes.
 
 ## Estrategias de Escape de Estancamiento (Variantes)
 
@@ -45,6 +48,16 @@ python sa_benchmark_variants.py
 Ejemplo para Algoritmo Genético:
 ```bash
 python ga_benchmark_variants.py
+```
+
+Ejemplo para Grey Wolf Optimizer:
+```bash
+python gwo_benchmark_variants.py
+```
+
+Ejemplo para Particle Swarm Optimization:
+```bash
+python pso_benchmark_variants.py
 ```
 
 ## Archivos Ignorados (`.gitignore`)

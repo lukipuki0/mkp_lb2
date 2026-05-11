@@ -1,6 +1,6 @@
 # Informe Técnico: Metaheurísticas para el Problema de la Mochila Multidimensional (MKP)
 
-Este documento detalla todas las implementaciones algorítmicas realizadas en el proyecto para resolver el Problema de la Mochila Multidimensional (MKP). El enfoque central se basa en la aplicación de tres metaheurísticas (Recocido Simulado, Algoritmo Genético y Búsqueda Tabú) apoyadas por un monitor avanzado de estancamiento basado en *Dynamic Time Warping (DTW)* y un catálogo unificado de variantes de escape.
+Este documento detalla todas las implementaciones algorítmicas realizadas en el proyecto para resolver el Problema de la Mochila Multidimensional (MKP). El enfoque central se basa en la aplicación de cuatro metaheurísticas (Recocido Simulado, Algoritmo Genético, Búsqueda Tabú y Grey Wolf Optimizer) apoyadas por un monitor avanzado de estancamiento basado en *Dynamic Time Warping (DTW)* y un catálogo unificado de variantes de escape.
 
 ---
 
@@ -60,34 +60,51 @@ El sistema calcula una "distancia DTW" contra la línea constante ($D_2$) y cont
 - **Lista Tabú:** Cuando se voltea un ítem (cambia un bit), ese índice entra en la lista tabú por un tiempo (*tenure*, ej. 10 iteraciones). Durante ese tiempo, no se puede volver a voltear ese ítem a menos que la ganancia rompa un récord global (criterio de aspiración).
 - **Comportamiento Base de Rescate:** Ante estancamiento (estrategia *random_restart*), la lista tabú se vacía y se revierten drásticamente bits de la solución de forma aleatoria, enviando a la búsqueda a otro valle lejano.
 
+### 3.4. Grey Wolf Optimizer / Optimizador de Lobo Gris (`gwo_mkp`)
+**Estrategia:** Algoritmo de inteligencia de enjambre inspirado en la jerarquía social y estrategia de caza cooperativa de los lobos grises. A diferencia de las otras MH, el GWO opera en **espacio continuo** y requiere un mecanismo de **binarización** para resolver el MKP.
+
+- **Jerarquía Social:** La manada de lobos se organiza en Alpha (mejor solución global), Beta (segunda mejor) y Delta (tercera mejor). El resto son lobos Omega que siguen a los líderes.
+- **Actualización de Posiciones:** Cada lobo omega actualiza su posición continua acercándose al promedio ponderado de las posiciones de Alpha, Beta y Delta. El coeficiente $a$ decrece linealmente de 2 a 0, controlando la transición natural de exploración ($|A| > 1$) a explotación ($|A| < 1$).
+- **Binarización LB2:** Como el GWO produce posiciones reales ($\mathbb{R}^n$), se utiliza el framework LB2 para convertirlas en decisiones binarias. Se generan **dos soluciones candidatas** usando dos funciones de transferencia: **L1** (conservadora, tiende a mantener bits) y **L2** (agresiva, tiende a cambiar bits). La mejor candidata reparada sobrevive.
+- **Parámetros G Adaptativos:** Tres parámetros ($G_1$, $G_2$, $G_3$) controlan la forma de las funciones L1/L2. En lugar de transicionar linealmente (como en el LB2 original), el monitor DTW modula estos parámetros en **4 estados** según el Delta ($\Delta = D_1 - D_2$):
+  1. **Explorar mucho** ($\Delta > \theta_\Delta$): $G_1$ bajo, $G_3$ alto → flips cuasi-aleatorios.
+  2. **Explorar poco** ($0 \le \Delta \le \theta_\Delta$): Parámetros intermedios.
+  3. **Explotar poco** ($-\theta_\Delta \le \Delta < 0$): Equilibrio estándar.
+  4. **Explotar mucho** ($\Delta < -\theta_\Delta$): $G_1$ alto, $G_3$ nulo → flips solo por velocidad.
+- **Comportamiento Base de Rescate:** Ante estancamiento (estrategia *adapt_g*), se fuerzan los parámetros G a modo exploración máxima y se reemplaza el 30% inferior de la manada con lobos aleatorios nuevos.
+
 ---
 
 ## 4. Las 8 Variantes de Rescate (Escapes de Estancamiento)
 
 Para comparar de forma exhaustiva, todas las MH fueron programadas para cambiar *su propio comportamiento en caliente* cuando el `StagnationMonitor` detecta que ya no avanzan. Se evaluaron las siguientes estrategias (*V1* a *V8*):
 
-**Nota Importante:** Cada rescate se dispara de forma diferente dependiendo de la naturaleza de la MH, para respetar la lógica del algoritmo subyacente.
+**Nota Importante:** Cada rescate se dispara de forma diferente dependiendo de la naturaleza de la MH, para respetar la lógica del algoritmo subyacente. En el caso del GWO, los rescates actúan sobre los **parámetros G de binarización** y la **composición de la manada**.
 
 #### **V1: Exploit (Intensificación)**
 - **SA:** Baja la temperatura al 10% y reduce los cambios a 1 bit. Busca un óptimo local muy profundo inmediatamente.
 - **GA:** Quita la mutación, usa cruce local de 1 punto y aplica *Hill Climbing* a la población élite.
 - **TS:** Desactiva la memoria tabú temporalmente y amplía los saltos a 2 flips inmediatos para escarbar a fondo.
+- **GWO:** Fuerza los parámetros G a explotación máxima ($G_1=1.0$, $G_2=7.2$, $G_3=0.0$), haciendo que solo se volteen bits cuando la velocidad del lobo lo indica con total certeza.
 
 #### **V2: Cycle (Exploración / Explotación Cíclica)**
 Alterna comportamientos en cada disparo.
 - **SA:** El disparo $i$ sube mucho la temperatura y hace saltos gigantes (5 flips); el disparo $i+1$ la baja al mínimo con 1 flip.
 - **GA:** Alterna entre (Mutación alta, cruce de 2 puntos) y (Mutación baja, cruce uniforme).
 - **TS:** Alterna un *Tenure* altísimo (mucha prohibición, explora) y un *Tenure* muy bajo (explotación libre).
+- **GWO:** Alterna entre parámetros G exploratorios ($G_1$ bajo, $G_3$ alto) y G explotadores ($G_1$ alto, $G_3$ nulo) en cada disparo.
 
 #### **V3: Explore (Diversificación)**
 - **SA:** Sube mucho la temperatura y permite voltear hasta 10 ítems o 1/4 de toda la mochila.
 - **GA:** Trae "inmigrantes masivos": descarta al 50% peor de la población y los reemplaza por aleatorios totales.
 - **TS:** Vacía la lista tabú y genera una solución de cero completamente nueva.
+- **GWO:** Fuerza G a exploración máxima ($G_3 = 0.8$) y reemplaza el 50% peor de la manada con lobos completamente aleatorios.
 
 #### **V4: Nonlinear (Decaimiento Exponencial de Estrés)**
 - **SA:** Ajusta la temperatura dinámicamente: la reinicia fuerte la primera vez, pero menos intensa en disparos sucesivos (decae exponencialmente).
 - **GA:** La mutación crece matemáticamente con el exponente del estancamiento: si te estancas repetidas veces, muta muchísimo y cambia a operador *Swap*.
 - **TS:** El castigo tabú (*tenure*) se vuelve más estricto y largo según el nivel de desesperación.
+- **GWO:** El parámetro $G_3$ (piso de aleatoriedad) crece exponencialmente con cada disparo: $G_3 = G_{3i} \times e^{0.5 \times fires}$, inyectando más ruido progresivamente.
 
 #### **V5: Heuristic (Rescate Basado en Reglas)**
 Descompone la solución basada en la densidad.
