@@ -93,3 +93,13 @@ Se manda a llamar en cada ciclo pasándole el nuevo mejor valor descubierto (`ne
    **Si las 3 son ciertas al mismo tiempo**, se suma 1 al contador de alarmas internas (`trigger_streak`).
 5. **El Disparo final (`fire`)**:
    Si el contador de alarmas supera la "paciencia" definida (ej. `patience >= 3`), la variable `fire` se activa en `True`. Esto se devuelve al usuario para que sepa que debe reiniciar su metaheurística, aumentar la temperatura, hacer una perturbación de las soluciones, o cualquier técnica de evasión de óptimos locales.
+
+### Variables de Salida (Los indicios o señales de estancamiento)
+
+Al finalizar cada actualización, el monitor devuelve un diccionario con **variables clave** que sirven como señales e indicios del estado del algoritmo:
+
+- **`D1_vs_ramp` (Distancia al escenario ideal):** Distancia DTW entre cómo va tu metaheurística y una línea que sube constantemente. Si este valor es **muy grande**, significa que tu algoritmo se está alejando del comportamiento ideal y ya no mejora a buen ritmo.
+- **`D2_vs_const` (Distancia al estancamiento total):** Distancia DTW a una línea completamente plana. Si es **muy pequeño** (cercano a 0), la curva se parece muchísimo a una línea plana. Es la señal más fuerte de estar atascado en una meseta (plateau).
+- **`delta` (La diferencia):** Es la resta `D1 - D2`. Si es positivo y alto, indica que la curva tira más hacia la línea plana que a la rampa de progreso. Es una confirmación matemática del estancamiento.
+- **`theta_c`, `theta_r`, `theta_delta` (Los Umbrales):** Son los límites calculados dinámicamente utilizando el historial (percentiles). Le indican al código: *"Si D2 es menor que theta_c y D1 es mayor que theta_r, enciende la alarma"*.
+- **`fire` (La señal definitiva):** Es el resultado final (`True` o `False`). Se activa si el algoritmo cumple de manera sostenida las condiciones de estancamiento definidas por los umbrales durante las iteraciones indicadas en la "paciencia".
