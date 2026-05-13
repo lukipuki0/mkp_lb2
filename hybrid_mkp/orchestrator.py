@@ -54,6 +54,7 @@ class SwitchLog:
     t_inicio     : float  # segundos desde el inicio del pipeline
     t_fin        : float
     n_iters      : int    # iteraciones/generaciones ejecutadas
+    dtw_deltas   : list   = None  # historial de deltas DTW de este turno
 
 
 @dataclass
@@ -62,6 +63,8 @@ class PipelineResult:
     mejor_valor_global   : float
     mejor_solucion_global: list[int]
     historial_global     : list[float]   # mejor valor por iteración acumulada
+    historial_inst_global: list[float]   # fitness instantáneo
+    dtw_deltas_global    : list[float]   # delta DTW por iteración (donde hay datos)
     log_switches         : list[SwitchLog]
     valor_optimo         : float
 
@@ -106,10 +109,12 @@ def ejecutar_pipeline(
         stag_cfg = StagnationConfig()
 
     # Estado global
-    solucion_global : list[int] | None = None
-    valor_global    : float = float("-inf")
-    historial_global: list[float] = []
-    log_switches    : list[SwitchLog] = []
+    solucion_global  : list[int] | None = None
+    valor_global     : float = float("-inf")
+    historial_global : list[float] = []
+    historial_inst_global : list[float] = []
+    dtw_deltas_global: list[float] = []
+    log_switches     : list[SwitchLog] = []
 
     turno        = "poblacional"
     epoch_ctr    = 0
@@ -156,8 +161,17 @@ def ejecutar_pipeline(
             valor_global    = resultado.mejor_valor
             solucion_global = list(resultado.mejor_solucion)
 
-        # Acumular historial y registrar switch
+        # Acumular historial y deltas DTW, registrar switch
         historial_global.extend(resultado.historial)
+        historial_inst_global.extend(getattr(resultado, 'historial_inst', []) or [])
+
+        # Alinear dtw_deltas con historial: rellenar NaN al inicio (ventana no lista)
+        mh_deltas = getattr(resultado, 'dtw_deltas', []) or []
+        n_hist    = len(resultado.historial)
+        n_deltas  = len(mh_deltas)
+        padded    = [float('nan')] * (n_hist - n_deltas) + list(mh_deltas)
+        dtw_deltas_global.extend(padded)
+
         t_mh_fin = time.time() - t_inicio
         n_iters  = len(resultado.historial)
 
@@ -168,6 +182,7 @@ def ejecutar_pipeline(
             t_inicio    = t_mh_inicio,
             t_fin       = t_mh_fin,
             n_iters     = n_iters,
+            dtw_deltas  = mh_deltas,
         ))
 
         if verbose:
@@ -193,6 +208,8 @@ def ejecutar_pipeline(
         mejor_valor_global    = valor_global,
         mejor_solucion_global = solucion_global or [],
         historial_global      = historial_global,
+        historial_inst_global = historial_inst_global,
+        dtw_deltas_global     = dtw_deltas_global,
         log_switches          = log_switches,
         valor_optimo          = inst.valor_optimo,
     )

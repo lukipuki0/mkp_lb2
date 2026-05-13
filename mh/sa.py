@@ -1,4 +1,4 @@
-﻿"""
+"""
 mh/sa.py
 --------
 Simulated Annealing (SA) para el MKP.
@@ -46,6 +46,8 @@ class SAEpochResult:
     iteraciones:       int
     T_final_alcanzada: float
     stagnation_fires:  int = 0
+    dtw_deltas:        list[float] = field(default_factory=list)
+    historial_inst:    list[float] = field(default_factory=list)  # val_actual al fin de cada T
 
 
 @dataclass
@@ -90,7 +92,9 @@ def ejecutar_epoch(
     mejor_val = val_actual
 
     T = params.T_inicial
-    historial: list[float] = []
+    historial:      list[float] = []
+    historial_inst: list[float] = []
+    dtw_deltas:     list[float] = []
     iteraciones = 0
     stag_fires  = 0
 
@@ -101,59 +105,50 @@ def ejecutar_epoch(
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
+    status = {}  # estado inicial del monitor (evita NameError si monitor es None)
+
     while T > params.T_final:
+        # ── Ciclo de evaluaciones a temperatura T ─────────────────────────
         for _ in range(params.iter_por_T):
-            # ── Vecino ────────────────────────────────────────────────────
             vecino, val_vecino = fn_vecindad(sol_actual, inst, params.num_flip)
 
-            delta = val_vecino - val_actual
+            delta_sa = val_vecino - val_actual
 
             # Criterio de aceptación Metropolis
-            if delta > 0 or random.random() < math.exp(delta / T):
+            if delta_sa > 0 or random.random() < math.exp(delta_sa / T):
                 sol_actual = vecino
                 val_actual = val_vecino
 
-            # Actualizar mejor del epoch
+            # Actualizar mejor del epoch (solo tracking interno, sin reportar al DTW)
             if val_actual > mejor_val:
                 mejor_val = val_actual
                 mejor_sol = sol_actual.copy()
 
-            historial.append(mejor_val)
-            iteraciones += 1
+        # ── Al terminar el nivel de temperatura: 1 tick del historial y DTW ──
+        # 1 iteración SA = 1 nivel de temperatura = iter_por_T evaluaciones reales
+        historial.append(mejor_val)
+        historial_inst.append(val_actual)  # val_actual = última solución aceptada (puede ser peor)
+        iteraciones += 1
 
-        # ── Stagnation check (una vez por nivel de temperatura) ────────────
         if monitor is not None:
             status = monitor.update(mejor_val)
+            if status.get("ready"):
+                dtw_deltas.append(status.get("delta", 0.0))
 
             if verbose and status.get("ready"):
-                d1  = status.get("D1_vs_ramp", 0.0)
-                d2  = status.get("D2_vs_const", 0.0)
                 dlt = status.get("delta", 0.0)
                 td  = status.get("theta_delta", 0.0)
-                tc  = status.get("theta_c", 0.0)
-                tr  = status.get("theta_r", 0.0)
-                ni  = status.get("no_improve_len", 0)
-                fr  = status.get("fire", False)
-                ns  = status.get("n", 0)
-                print(
-                    f"iter={iteraciones:03d}",
-                    f"n={ns}",
-                    f"D1={d1:.3f}",
-                    f"D2={d2:.3f}",
-                    f"Delta={dlt:.3f}",
-                    f"theta={td}",
-                    f"theta_c={tc:.2f}",
-                    f"theta_r={tr:.2f}",
-                    f"no_improve={ni}",
-                    f"fire={fr}",
-                    f"best={mejor_val:.1f}",
-                )
+                if dlt > td: estado = "Explorar mucho"
+                elif 0 <= dlt <= td: estado = "Explorar poco"
+                elif -td <= dlt < 0: estado = "Explotar poco"
+                else: estado = "Explotar mucho"
+                print(f"i={iteraciones:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | d1={status.get('D1_vs_ramp', 0.0):.3f} | d2={status.get('D2_vs_const', 0.0):.3f} | best={mejor_val:.1f}")
 
             if status.get("fire"):
                 stag_fires += 1
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {iteraciones} -> ABORT")
-                break  # Sale del bucle while T > T_final
+                break  # Sale del bucle while
 
         T *= params.alpha   # Enfriamiento geométrico
 
@@ -162,9 +157,11 @@ def ejecutar_epoch(
         mejor_solucion=mejor_sol,
         mejor_valor=mejor_val,
         historial=historial,
+        historial_inst=historial_inst,
         iteraciones=iteraciones,
         T_final_alcanzada=T,
         stagnation_fires=stag_fires,
+        dtw_deltas=dtw_deltas,
     )
 
 

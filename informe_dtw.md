@@ -59,6 +59,22 @@ Es un contenedor de hiperparámetros (las "perillas" de ajuste):
 - `adapt_thresholds` (bool, default=True): Si es True, los umbrales de detección no son fijos, sino que se adaptan usando percentiles históricos.
 - `p_low` / `p_high` (float): Percentiles usados para definir los umbrales. (30% y 70% por defecto).
 
+### Equivalencia en el Orquestador (`rotating_benchmark.py`)
+Estos parámetros se configuran como constantes globales en tu script principal:
+
+```python
+# DTW Stagnation params
+STAG_WINDOW      = 30       # Tamaño de la ventana deslizante (últimas N iteraciones evaluadas)
+STAG_BAND        = 0        # Banda Sakoe-Chiba para DTW. 0 = auto (10% de la ventana)
+STAG_MIN_SLOPE   = 0.0      # Pendiente de la rampa ideal. 0.0 = auto (1% del progreso en la ventana)
+STAG_PLATEAU_MAX = 15       # Iteraciones máximas permitidas sin mejora absoluta (fitness plano)
+STAG_PATIENCE    = 3        # Alarmas consecutivas requeridas para confirmar el estancamiento (evita falsos positivos)
+STAG_USE_DDTW    = False    # Usar derivadas (DDTW) en vez de valores absolutos (DTW)
+STAG_ADAPT       = True     # Si es True, adapta los umbrales dinámicamente usando el historial
+STAG_P_LOW       = 30.0     # Percentil bajo para umbral de línea plana (qué tan estricto es D2)
+STAG_P_HIGH      = 70.0     # Percentil alto para umbral de rampa/delta (qué tan estricto es D1)
+```
+
 ---
 
 ## 4. El Motor Central: `StagnationMonitor`
@@ -103,3 +119,55 @@ Al finalizar cada actualización, el monitor devuelve un diccionario con **varia
 - **`delta` (La diferencia):** Es la resta `D1 - D2`. Si es positivo y alto, indica que la curva tira más hacia la línea plana que a la rampa de progreso. Es una confirmación matemática del estancamiento.
 - **`theta_c`, `theta_r`, `theta_delta` (Los Umbrales):** Son los límites calculados dinámicamente utilizando el historial (percentiles). Le indican al código: *"Si D2 es menor que theta_c y D1 es mayor que theta_r, enciende la alarma"*.
 - **`fire` (La señal definitiva):** Es el resultado final (`True` o `False`). Se activa si el algoritmo cumple de manera sostenida las condiciones de estancamiento definidas por los umbrales durante las iteraciones indicadas en la "paciencia".
+
+---
+
+## 5. Ejemplos Prácticos y Detalles Matemáticos
+
+### Ejemplo 1: ¿Por qué usar DDTW en lugar de DTW Normal?
+Imagina que comparamos el historial de fitness de tu algoritmo contra una curva de referencia. Creamos dos curvas que tienen **exactamente la misma forma**, pero empiezan en números distintos.
+
+*   **Curva A (Tu algoritmo):** `[10, 20, 30, 20]` *(Empieza en 10)*
+*   **Curva B (Referencia):** `[100, 110, 120, 110]` *(Empieza en 100)*
+
+**Con DTW Normal (Valores absolutos):**
+El DTW normal mide la distancia entre los números tal cual. La distancia entre 10 y 100 es 90. Al sumar el error de todos los puntos, la distancia total es **360**. El DTW concluye erróneamente que las curvas son completamente diferentes por estar a distintas "alturas".
+
+**Con DDTW (Derivadas/Diferencias):**
+El DDTW ignora la altura y mira los saltos:
+*   Saltos Curva A: `[+10, +10, -10]`
+*   Saltos Curva B: `[+10, +10, -10]`
+El DDTW compara los saltos y encuentra que la distancia es **0**. Se da cuenta de que las tendencias son idénticas. Esto es clave en MKP: nos importa si la tendencia es "plana" (estancamiento), sin importar si el fitness está trabado en 5,000 o 150,000.
+
+### Ejemplo 2: El concepto de la "Ventana Deslizante" y las Líneas Base
+Las líneas base (la rampa ideal y la línea plana) **no tienen memoria** desde la iteración 0. Se "destruyen" y se vuelven a dibujar desde cero en cada iteración, utilizando exclusivamente los datos de la ventana actual.
+
+Si llevas 10 iteraciones y tu ventana (`W`) es de 5:
+*   Historial completo: `[10, 20, 30, 40, 50, 60, 70, 80, 80, 80]`
+*   **Ventana (X):** Recorta los últimos 5 datos: `[60, 70, 80, 80, 80]`
+*   **Punto de inicio (`start_value`):** Es el primer dato de la ventana, es decir, `60`.
+
+Con este punto de inicio, se dibujan las dos líneas contra las que competirá tu ventana `X`:
+1.  **La nueva Línea Plana:** Repite el 60 cinco veces `[60, 60, 60, 60, 60]`.
+2.  **La nueva Rampa Ideal:** Empieza en 60 y le suma la pendiente calculada en cada paso.
+
+En la iteración 11, la ventana avanza un paso (ej. `[70, 80, 80, 80, 80]`), el nuevo inicio es `70`, y se vuelven a dibujar una nueva línea plana de 70s y una nueva rampa. Así, el monitor evalúa el estancamiento siempre en el "aquí y ahora".
+
+### Ejemplo 3: Cálculo Automático de la Pendiente (`s_min`)
+En el código, la pendiente de la Rampa Ideal se calcula automáticamente en cada iteración si `min_slope = 0.0`, usando la fórmula: `s_min = 0.01 * rng / W`
+
+Usando la ventana anterior (`X = [60, 70, 80, 80, 80]` con `W = 5`):
+1.  **Rango (`rng`):** Distancia entre el último y primer valor de la ventana (`abs(80 - 60) = 20`).
+2.  **Fórmula:** `s_min = 0.01 * 20 / 5 = 0.04`.
+
+La **Rampa Ideal** se construye como `y = start_value + (s_min * iteración)`:
+*   Paso 0: 60 + 0 = `60.00`
+*   Paso 1: 60 + 0.04 = `60.04`
+*   Paso 2: 60 + 0.08 = `60.08`
+*   Paso 3: 60 + 0.12 = `60.12`
+*   Paso 4: 60 + 0.16 = `60.16`
+Arreglo Final Rampa: `[60.00, 60.04, 60.08, 60.12, 60.16]`
+
+**¿El multiplicador `0.01` cambia?**
+No, es una constante ("hardcodeada"). Representa una regla del **1%** del rango. El `s_min` total sí cambia en cada iteración porque el rango (`rng`) cambia conforme la ventana avanza. Además, el código usa `max(1.0, rng)` para asegurar que el rango jamás sea 0. Si la ventana se llena de ochos (`[80, 80, 80, 80, 80]`), el rango forzado será `1.0`, generando una pendiente de `0.002`. Esto evita que la rampa sea completamente plana; siempre exigirá un mínimo avance.
+Si se desea cambiar esta regla del 1%, se debe desactivar el cálculo automático asignando un valor fijo en la configuración (ej. `min_slope = 0.5`).

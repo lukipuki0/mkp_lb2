@@ -1,4 +1,4 @@
-﻿"""
+"""
 mh/gwo.py
 ---------
 Grey Wolf Optimizer (GWO) para el MKP con binarización LB2.
@@ -48,7 +48,9 @@ class GWOEpochResult:
     iteraciones      : int
     stagnation_fires : int
     historial        : list[float] = field(default_factory=list)
+    historial_inst   : list[float] = field(default_factory=list)  # fitness del lobo Alpha
     mejor_solucion   : list[int]  = field(default_factory=list)
+    dtw_deltas       : list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -162,8 +164,10 @@ def ejecutar_epoch(
     mejor_val = fitnesses[alpha_idx]
     mejor_sol = poblacion_bin[alpha_idx].copy()
 
-    historial  = []
-    stag_fires = 0
+    historial      = []
+    historial_inst = []
+    dtw_deltas     = []
+    stag_fires     = 0
 
     # Estado dinámico de los parámetros G
     G1 = params.G1_i
@@ -232,39 +236,28 @@ def ejecutar_epoch(
         alpha_idx, beta_idx, delta_idx = _obtener_jerarquia(fitnesses)
 
         # Actualizar mejor global
-        if fitnesses[alpha_idx] > mejor_val:
-            mejor_val = fitnesses[alpha_idx]
+        fit_alpha_actual = fitnesses[alpha_idx]  # fitness del lobo Alpha esta iteracion
+        if fit_alpha_actual > mejor_val:
+            mejor_val = fit_alpha_actual
             mejor_sol = poblacion_bin[alpha_idx].copy()
 
         historial.append(mejor_val)
+        historial_inst.append(fit_alpha_actual)
 
         # ── Stagnation check ──────────────────────────────────────────────
         if monitor is not None:
             status = monitor.update(mejor_val)
+            if status.get("ready"):
+                dtw_deltas.append(status.get("delta", 0.0))
 
             if verbose and status.get("ready"):
-                d1  = status.get("D1_vs_ramp", 0.0)
-                d2  = status.get("D2_vs_const", 0.0)
                 dlt = status.get("delta", 0.0)
                 td  = status.get("theta_delta", 0.0)
-                tc  = status.get("theta_c", 0.0)
-                tr  = status.get("theta_r", 0.0)
-                ni  = status.get("no_improve_len", 0)
-                fr  = status.get("fire", False)
-                ns  = status.get("n", 0)
-                print(
-                    f"iter={it:03d}",
-                    f"n={ns}",
-                    f"D1={d1:.3f}",
-                    f"D2={d2:.3f}",
-                    f"Delta={dlt:.3f}",
-                    f"theta={td}",
-                    f"theta_c={tc:.2f}",
-                    f"theta_r={tr:.2f}",
-                    f"no_improve={ni}",
-                    f"fire={fr}",
-                    f"best={mejor_val:.1f}",
-                )
+                if dlt > td: estado = "Explorar mucho"
+                elif 0 <= dlt <= td: estado = "Explorar poco"
+                elif -td <= dlt < 0: estado = "Explotar poco"
+                else: estado = "Explotar mucho"
+                print(f"i={it:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | d1={status.get('D1_vs_ramp', 0.0):.3f} | d2={status.get('D2_vs_const', 0.0):.3f} | best={mejor_val:.1f}")
 
             if status.get("fire"):
                 stag_fires += 1
@@ -283,7 +276,9 @@ def ejecutar_epoch(
         iteraciones      = params.iterations,
         stagnation_fires = stag_fires,
         historial        = historial,
+        historial_inst   = historial_inst,
         mejor_solucion   = mejor_sol,
+        dtw_deltas       = dtw_deltas,
     )
 
 
