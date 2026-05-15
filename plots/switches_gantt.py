@@ -39,7 +39,6 @@ def grafico_switches(
 
     fig, ax = plt.subplots(figsize=(14, 4))
 
-    POOL_POBB = {"GA", "PSO", "GWO"}
     legend_patches = []
     seen = set()
     yticks = []
@@ -47,7 +46,7 @@ def grafico_switches(
 
     for i, sw in enumerate(log_switches):
         col   = colores_mh.get(sw.mh_nombre, "gray")
-        y_pos = 1 if sw.mh_nombre in POOL_POBB else 0   # 2 filas: poblacional / trayectoria
+        y_pos = 1 if sw.tipo == "poblacional" else 0   # 2 filas: poblacional / trayectoria
         duracion = sw.t_fin - sw.t_inicio
 
         ax.barh(
@@ -73,8 +72,13 @@ def grafico_switches(
             legend_patches.append(mpatches.Patch(color=col, label=sw.mh_nombre))
             seen.add(sw.mh_nombre)
 
+    pob_usadas = sorted(list({sw.mh_nombre for sw in log_switches if sw.tipo == "poblacional"}))
+    tra_usadas = sorted(list({sw.mh_nombre for sw in log_switches if sw.tipo == "trayectoria"}))
+    lbl_pob = f"Poblacional ({'/'.join(pob_usadas)})" if pob_usadas else "Poblacional"
+    lbl_tra = f"Trayectoria ({'/'.join(tra_usadas)})" if tra_usadas else "Trayectoria"
+
     ax.set_yticks([0, 1])
-    ax.set_yticklabels(["Trayectoria (SA/TS)", "Poblacional (GA/PSO/GWO)"], fontsize=10)
+    ax.set_yticklabels([lbl_tra, lbl_pob], fontsize=10)
     ax.set_xlabel("Tiempo real (segundos)", fontsize=11)
     ax.set_title("Pipeline Hibrido DTW - Diagrama de Turnos por MH", fontsize=13, fontweight="bold")
     ax.legend(handles=legend_patches, loc="upper right", fontsize=9)

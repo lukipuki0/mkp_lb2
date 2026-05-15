@@ -29,17 +29,20 @@ from mh.ts  import TSParams,  ejecutar_epoch as _ts_epoch
 from mh.ga  import GAParams,  ejecutar_epoch as _ga_epoch
 from mh.pso import PSOParams, ejecutar_epoch as _pso_epoch
 from mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
+from mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "EHO"]
 POOL_TRAYECTORIA = ["SA", "TS"]
+POOL_POBLACIONAL = ["EHO"]
 
 COLORES_MH = {
     "GA" : "#4CAF50",
     "PSO": "#2196F3",
     "GWO": "#9C27B0",
+    "EHO": "#00BCD4",
     "SA" : "#FF5722",
     "TS" : "#FF9800",
 }
@@ -253,6 +256,15 @@ def _ejecutar_mh(
             use_stagnation=True, stag_cfg=stag_cfg,
         )
         return _gwo_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "EHO":
+        params = EHOParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _eho_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
     elif mh_nombre == "SA":
