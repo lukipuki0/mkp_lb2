@@ -30,13 +30,14 @@ from mh.ga  import GAParams,  ejecutar_epoch as _ga_epoch
 from mh.pso import PSOParams, ejecutar_epoch as _pso_epoch
 from mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
 from mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
+from mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
+from mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "EHO"]
-POOL_TRAYECTORIA = ["SA", "TS"]
-POOL_POBLACIONAL = ["EHO"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "EHO", "WOA"]
+POOL_TRAYECTORIA = ["SA", "TS", "ILS"]
 
 COLORES_MH = {
     "GA" : "#4CAF50",
@@ -45,6 +46,8 @@ COLORES_MH = {
     "EHO": "#00BCD4",
     "SA" : "#FF5722",
     "TS" : "#FF9800",
+    "ILS": "#E91E63",
+    "WOA": "#E040FB",
 }
 
 
@@ -267,6 +270,15 @@ def _ejecutar_mh(
         return _eho_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
+    elif mh_nombre == "WOA":
+        params = WOAParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _woa_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
     elif mh_nombre == "SA":
         params = SAParams(
             T_inicial=5_000.0, T_final=1.0, alpha=0.97, iter_por_T=50,
@@ -281,7 +293,15 @@ def _ejecutar_mh(
             use_stagnation=True, stag_cfg=stag_cfg,
         )
         return _ts_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
-                         sol_inicial=solucion_global)
+                          sol_inicial=solucion_global)
+
+    elif mh_nombre == "ILS":
+        params = ILSParams(
+            epochs=1, iterations=2_000, perturb_size=5, ls_max_iters=50,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _ils_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inicial=solucion_global)
 
     else:
         raise ValueError(f"MH desconocida: '{mh_nombre}'")
