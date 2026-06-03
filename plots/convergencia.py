@@ -50,8 +50,8 @@ def grafico_convergencia(
         xs  = range(offset, offset + len(seg))
         col = colores_mh.get(sw.mh_nombre, "gray")
 
-        ax.plot(xs, seg, color=col, linewidth=1.6, alpha=0.85)
-        ax.axvline(x=offset, color=col, linestyle="--", linewidth=0.8, alpha=0.4)
+        ax.plot(xs, seg, color=col, linewidth=3.0, alpha=0.85)
+        ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         offset += n_seg
 
         if sw.mh_nombre not in seen:
@@ -60,15 +60,16 @@ def grafico_convergencia(
 
     if valor_optimo > 0:
         ax.axhline(y=valor_optimo, color="red", linestyle="--",
-                   linewidth=1.4)
+                   linewidth=2.0)
         legend_patches.append(
-            mpatches.Patch(color="red", label=f"Optimo ({valor_optimo:.0f})")
+            mpatches.Patch(color="red", label=f"Optimum ({valor_optimo:.0f})")
         )
 
-    ax.set_title("Pipeline Hibrido DTW - Convergencia del Fitness", fontsize=14, fontweight="bold")
-    ax.set_xlabel("Iteracion acumulada", fontsize=11)
-    ax.set_ylabel("Mejor valor (fitness)", fontsize=11)
-    ax.legend(handles=legend_patches, loc="lower right", fontsize=9)
+    ax.set_title("Hybrid DTW Pipeline - Fitness Convergence", fontsize=20, fontweight="bold")
+    ax.set_xlabel("Accumulated Iterations", fontsize=18)
+    ax.set_ylabel("Best Fitness Value", fontsize=18)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=15)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 

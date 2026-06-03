@@ -32,12 +32,13 @@ from mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
 from mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 from mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
 from mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
+from mh.vns import VNSParams, ejecutar_epoch as _vns_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "EHO", "WOA"]
-POOL_TRAYECTORIA = ["SA", "TS", "ILS"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA"]
+POOL_TRAYECTORIA = ["SA", "TS", "ILS", "VNS"]
 
 COLORES_MH = {
     "GA" : "#4CAF50",
@@ -48,6 +49,7 @@ COLORES_MH = {
     "TS" : "#FF9800",
     "ILS": "#E91E63",
     "WOA": "#E040FB",
+    "VNS": "#3F51B5",
 }
 
 
@@ -301,6 +303,14 @@ def _ejecutar_mh(
             use_stagnation=True, stag_cfg=stag_cfg,
         )
         return _ils_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inicial=solucion_global)
+
+    elif mh_nombre == "VNS":
+        params = VNSParams(
+            epochs=1, iterations=2_000, k_max=5, ls_max_iters=50,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _vns_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inicial=solucion_global)
 
     else:

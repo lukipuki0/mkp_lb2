@@ -58,8 +58,8 @@ def grafico_dtw_delta(
         xs_d  = range(offset, offset + len(seg_d))
         col   = colores_mh.get(sw.mh_nombre, "gray")
 
-        ax.plot(xs_d, seg_d, color=col, linewidth=1.2, alpha=0.85)
-        ax.axvline(x=offset, color=col, linestyle="--", linewidth=0.8, alpha=0.3)
+        ax.plot(xs_d, seg_d, color=col, linewidth=2.5, alpha=0.85)
+        ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         offset += n_seg
 
         if sw.mh_nombre not in seen:
@@ -67,15 +67,16 @@ def grafico_dtw_delta(
             seen.add(sw.mh_nombre)
 
     # Línea en cero: separación exploración/explotación
-    ax.axhline(y=0, color="black", linestyle="-", linewidth=1.0, alpha=0.6,
-               label="Umbral (Delta=0)")
-    legend_patches.append(mpatches.Patch(color="black", label="Umbral (Delta=0)"))
+    ax.axhline(y=0, color="black", linestyle="-", linewidth=2.0, alpha=0.6,
+               label="Threshold (Delta=0)")
+    legend_patches.append(mpatches.Patch(color="black", label="Threshold (Delta=0)"))
 
-    ax.set_title("Delta DTW por Iteracion  [+ = estancamiento | - = mejora activa]",
-                 fontsize=13, fontweight="bold")
-    ax.set_xlabel("Iteracion acumulada", fontsize=11)
-    ax.set_ylabel("Delta DTW", fontsize=11)
-    ax.legend(handles=legend_patches, loc="upper right", fontsize=9)
+    ax.set_title("DTW Delta per Iteration  [+ = stagnation | - = active improvement]",
+                 fontsize=20, fontweight="bold")
+    ax.set_xlabel("Accumulated Iterations", fontsize=18)
+    ax.set_ylabel("DTW Delta", fontsize=18)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.legend(handles=legend_patches, loc="upper right", fontsize=15)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 

@@ -1,12 +1,16 @@
 """
 mh – Paquete unificado de metaheurísticas para el MKP.
 
-Contiene 5 algoritmos listos para el pipeline híbrido:
+Contiene los algoritmos listos para el pipeline híbrido:
   - SA  (Simulated Annealing)
   - TS  (Tabu Search)
   - GA  (Genetic Algorithm)
   - PSO (Particle Swarm Optimization + LB2)
   - GWO (Grey Wolf Optimizer + LB2)
+  - EHO (Elk Herd Optimizer + LB2)
+  - ILS (Iterated Local Search)
+  - WOA (Whale Optimization Algorithm)
+  - VNS (Variable Neighborhood Search)
 
 Cada algoritmo expone: Params, EpochResult, Result, ejecutar_epoch().
 """
@@ -19,4 +23,6 @@ from mh.gwo import GWOParams, GWOEpochResult, GWOResult, ejecutar_epoch as gwo_e
 from mh.eho import EHOParams, EHOEpochResult, EHOResult, ejecutar_epoch as eho_epoch  # noqa: F401
 from mh.ils import ILSParams, ILSEpochResult, ILSResult, ejecutar_epoch as ils_epoch  # noqa: F401
 from mh.woa import WOAParams, WOAEpochResult, WOAResult, ejecutar_epoch as woa_epoch  # noqa: F401
+from mh.vns import VNSParams, VNSEpochResult, VNSResult, ejecutar_epoch as vns_epoch  # noqa: F401
+
 

@@ -65,7 +65,7 @@ def grafico_switches(
                 y_pos,
                 sw.mh_nombre,
                 ha="center", va="center",
-                fontsize=7, color="white", fontweight="bold",
+                fontsize=9, color="white", fontweight="bold",
             )
 
         if sw.mh_nombre not in seen:
@@ -74,14 +74,15 @@ def grafico_switches(
 
     pob_usadas = sorted(list({sw.mh_nombre for sw in log_switches if sw.tipo == "poblacional"}))
     tra_usadas = sorted(list({sw.mh_nombre for sw in log_switches if sw.tipo == "trayectoria"}))
-    lbl_pob = f"Poblacional ({'/'.join(pob_usadas)})" if pob_usadas else "Poblacional"
-    lbl_tra = f"Trayectoria ({'/'.join(tra_usadas)})" if tra_usadas else "Trayectoria"
+    lbl_pob = f"Population-based ({'/'.join(pob_usadas)})" if pob_usadas else "Population-based"
+    lbl_tra = f"Trajectory-based ({'/'.join(tra_usadas)})" if tra_usadas else "Trajectory-based"
 
     ax.set_yticks([0, 1])
-    ax.set_yticklabels([lbl_tra, lbl_pob], fontsize=10)
-    ax.set_xlabel("Tiempo real (segundos)", fontsize=11)
-    ax.set_title("Pipeline Hibrido DTW - Diagrama de Turnos por MH", fontsize=13, fontweight="bold")
-    ax.legend(handles=legend_patches, loc="upper right", fontsize=9)
+    ax.set_yticklabels([lbl_tra, lbl_pob], fontsize=12)
+    ax.set_xlabel("Real Time (seconds)", fontsize=14)
+    ax.tick_params(axis='x', which='major', labelsize=12)
+    ax.set_title("Hybrid DTW Pipeline - MH Execution Turns Gantt Chart", fontsize=16, fontweight="bold")
+    ax.legend(handles=legend_patches, loc="upper right", fontsize=12)
     ax.grid(True, axis="x", alpha=0.3)
     fig.tight_layout()
 

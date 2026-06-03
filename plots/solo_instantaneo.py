@@ -53,10 +53,10 @@ def grafico_solo_instantaneo(
         col      = colores_mh.get(sw.mh_nombre, "gray")
 
         # Línea de ruido (instantáneo) - sólida
-        ax.plot(xs, seg_inst, color=col, linewidth=1.5, alpha=0.9)
+        ax.plot(xs, seg_inst, color=col, linewidth=2.5, alpha=0.9)
         
         # Separador vertical
-        ax.axvline(x=offset, color=col, linestyle="--", linewidth=0.8, alpha=0.4)
+        ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         
         offset += n_seg
 
@@ -66,15 +66,16 @@ def grafico_solo_instantaneo(
 
     if valor_optimo > 0:
         ax.axhline(y=valor_optimo, color="red", linestyle="--",
-                   linewidth=1.4)
+                   linewidth=2.0)
         legend_patches.append(
-            mpatches.Patch(color="red", label=f"Optimo ({valor_optimo:.0f})")
+            mpatches.Patch(color="red", label=f"Optimum ({valor_optimo:.0f})")
         )
 
-    ax.set_title("Pipeline Hibrido DTW - Fitness Instantáneo por Iteración", fontsize=14, fontweight="bold")
-    ax.set_xlabel("Iteracion acumulada", fontsize=11)
-    ax.set_ylabel("Fitness de la Iteración Actual", fontsize=11)
-    ax.legend(handles=legend_patches, loc="lower right", fontsize=9)
+    ax.set_title("Hybrid DTW Pipeline - Instantaneous Fitness per Iteration", fontsize=20, fontweight="bold")
+    ax.set_xlabel("Accumulated Iterations", fontsize=18)
+    ax.set_ylabel("Current Iteration Fitness", fontsize=18)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=15)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
