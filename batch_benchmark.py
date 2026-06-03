@@ -164,6 +164,8 @@ def procesar_instancia(
 
     return {
         "nombre":      nombre,
+        "n":           inst.n,
+        "m":           inst.m,
         "mejor_valor": resultado.mejor_valor_global,
         "valor_optimo": resultado.valor_optimo,
         "gap_pct":     resultado.gap_pct,
@@ -252,11 +254,11 @@ def main() -> None:
     print(f"\n\n{banner}")
     print("  RESUMEN GLOBAL DEL BATCH")
     print(banner)
-    print(f"  {'#':<3} {'Instancia':<22} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}")
-    print("  " + "-" * 64)
+    print(f"  {'#':<3} {'Instancia':<22} {'N':>5} {'M':>3} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}")
+    print("  " + "-" * 74)
     for i, r in enumerate(resumen_global, 1):
         gap_str = f"{r['gap_pct']:.2f}" if r["gap_pct"] is not None else "N/A"
-        print(f"  {i:<3} {r['nombre']:<22} {r['mejor_valor']:>10.1f}"
+        print(f"  {i:<3} {r['nombre']:<22} {r['n']:>5} {r['m']:>3} {r['mejor_valor']:>10.1f}"
               f" {r['valor_optimo']:>10.1f} {gap_str:>8} {r['n_switches']:>9}")
     print(banner)
 
@@ -267,11 +269,11 @@ def main() -> None:
         f.write(f"Fecha       : {timestamp}\n")
         f.write(f"Instancias  : {len(instancias)}\n")
         f.write(f"Tiempo/inst : {tiempo_max}s\n\n")
-        f.write(f"{'#':<3} {'Instancia':<22} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}\n")
-        f.write("-" * 66 + "\n")
+        f.write(f"{'#':<3} {'Instancia':<22} {'N':>5} {'M':>3} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}\n")
+        f.write("-" * 76 + "\n")
         for i, r in enumerate(resumen_global, 1):
             gap_str = f"{r['gap_pct']:.2f}" if r["gap_pct"] is not None else "N/A"
-            f.write(f"{i:<3} {r['nombre']:<22} {r['mejor_valor']:>10.1f}"
+            f.write(f"{i:<3} {r['nombre']:<22} {r['n']:>5} {r['m']:>3} {r['mejor_valor']:>10.1f}"
                     f" {r['valor_optimo']:>10.1f} {gap_str:>8} {r['n_switches']:>9}\n")
     print(f"\n  [txt] Resumen batch guardado en '{resumen_path}'")
 
@@ -279,16 +281,32 @@ def main() -> None:
     csv_path = os.path.join(batch_dir, "resumen_batch.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["instancia", "mejor_valor", "valor_optimo", "gap_pct", "n_switches"])
+        writer.writerow(["instancia", "n", "m", "mejor_valor", "valor_optimo", "gap_pct", "n_switches"])
         for r in resumen_global:
             writer.writerow([
                 r["nombre"],
+                r["n"],
+                r["m"],
                 r["mejor_valor"],
                 r["valor_optimo"],
                 r["gap_pct"] if r["gap_pct"] is not None else "",
                 r["n_switches"],
             ])
     print(f"  [csv] Resumen batch guardado en '{csv_path}'")
+
+    # Guardar resumen global en Markdown (.md)
+    md_path = os.path.join(batch_dir, "resumen_batch.md")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(f"# Resumen de Ejecución por Lotes - {timestamp}\n\n")
+        f.write(f"- **Total de Instancias:** {len(instancias)}\n")
+        f.write(f"- **Tiempo Máximo por Instancia:** {tiempo_max} segundos\n\n")
+        f.write("## Características de las Instancias y Resultados\n\n")
+        f.write("| # | Instancia | N (Variables) | M (Restricciones) | Mejor Valor | Óptimo Conocido | Gap % | Switches |\n")
+        f.write("|---|-----------|---------------|-------------------|-------------|-----------------|-------|----------|\n")
+        for i, r in enumerate(resumen_global, 1):
+            gap_str = f"{r['gap_pct']:.2f}%" if r["gap_pct"] is not None else "N/A"
+            f.write(f"| {i} | `{r['nombre']}` | {r['n']} | {r['m']} | {r['mejor_valor']:.1f} | {r['valor_optimo']:.1f} | {gap_str} | {r['n_switches']} |\n")
+    print(f"  [md] Resumen batch guardado en '{md_path}'")
 
     print(f"\n  BATCH COMPLETADO. ({len(instancias)} instancias procesadas)\n")
 
