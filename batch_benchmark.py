@@ -42,18 +42,26 @@ from plots import (
 )
 
 
-# ── Ruta del archivo de configuración ─────────────────────────────────────────
+# ── Configuración y defaults ──────────────────────────────────────────────────
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__) or ".", "config_instancias.json")
+# Cambia esta variable para seleccionar qué instancia mknapcb ejecutar (1 a 9)
+MKNAPCB_NUM = 1
+
+# Parámetros de ejecución
+TIEMPO_MAX_POR_INSTANCIA = 120
+RANDOM_SEED = None
 OUTPUT_BASE = os.path.join("resultados", "batch_runs")
 
-
-# ── Funciones auxiliares ──────────────────────────────────────────────────────
-
-def cargar_config(path: str) -> dict:
-    """Lee y devuelve el contenido del archivo JSON de configuración."""
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+# Parámetros de Stagnation (DTW)
+STAG_WINDOW      = 30
+STAG_BAND        = 0
+STAG_MIN_SLOPE   = 0.1
+STAG_PLATEAU_MAX = 15
+STAG_PATIENCE    = 3
+STAG_USE_DDTW    = False
+STAG_ADAPT       = True
+STAG_P_LOW       = 30.0
+STAG_P_HIGH      = 70.0
 
 
 def procesar_instancia(
@@ -176,29 +184,40 @@ def procesar_instancia(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    # Leer configuración
-    cfg = cargar_config(CONFIG_PATH)
+    # Usar el número de instancia configurado arriba
+    mknapcb_num = MKNAPCB_NUM
+    tiempo_max = TIEMPO_MAX_POR_INSTANCIA
 
-    tiempo_max  = cfg.get("tiempo_max_por_instancia", 120)
-    seed        = cfg.get("random_seed", None)
-    stag_dict   = cfg.get("stagnation", {})
-    instancias  = cfg["instancias"]
+    # Validar que esté en el rango de 1 a 9
+    if mknapcb_num < 1 or mknapcb_num > 9:
+        print(f"\n[!] Número de mknapcb inválido ({mknapcb_num}). Debe ser de 1 a 9. Usando 1.")
+        mknapcb_num = 1
 
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed)
+    # Generar automáticamente las 10 instancias de la mknapcb seleccionada (de la carpeta 'instancias')
+    instancias = [
+        {
+            "url": f"instancias/mknapcb{mknapcb_num}.txt",
+            "index": idx,
+            "nombre": f"mknapcb{mknapcb_num}_inst{idx}"
+        }
+        for idx in range(10)
+    ]
+
+    if RANDOM_SEED is not None:
+        random.seed(RANDOM_SEED)
+        np.random.seed(RANDOM_SEED)
 
     # Configuración DTW compartida
     stag_cfg = StagnationConfig(
-        window           = stag_dict.get("window", 30),
-        band             = stag_dict.get("band", 0),
-        min_slope        = stag_dict.get("min_slope", 0.5),
-        plateau_max      = stag_dict.get("plateau_max", 15),
-        patience         = stag_dict.get("patience", 3),
-        use_ddtw         = stag_dict.get("use_ddtw", False),
-        adapt_thresholds = stag_dict.get("adapt_thresholds", True),
-        p_low            = stag_dict.get("p_low", 30.0),
-        p_high           = stag_dict.get("p_high", 70.0),
+        window           = STAG_WINDOW,
+        band             = STAG_BAND,
+        min_slope        = STAG_MIN_SLOPE,
+        plateau_max      = STAG_PLATEAU_MAX,
+        patience         = STAG_PATIENCE,
+        use_ddtw         = STAG_USE_DDTW,
+        adapt_thresholds = STAG_ADAPT,
+        p_low            = STAG_P_LOW,
+        p_high           = STAG_P_HIGH,
     )
 
     # Crear carpeta principal de esta sesión batch

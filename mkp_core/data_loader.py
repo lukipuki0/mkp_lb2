@@ -15,6 +15,7 @@ Formato esperado:
 
 from __future__ import annotations
 
+import os
 import numpy as np
 import requests
 
@@ -104,11 +105,20 @@ def parsear_instancias(cadena: str) -> list[Instance]:
 
 # ── API pública ───────────────────────────────────────────────────────────────
 
-def cargar_instancias(url: str) -> list[Instance]:
-    """Descarga y parsea todas las instancias desde *url*."""
-    texto = descargar_texto(url)
+def cargar_instancias(path_or_url: str) -> list[Instance]:
+    """Descarga o lee localmente y parsea todas las instancias desde *path_or_url*."""
+    es_url = path_or_url.startswith("http://") or path_or_url.startswith("https://")
+    
+    if not es_url or os.path.exists(path_or_url):
+        with open(path_or_url, "r", encoding="utf-8") as f:
+            texto = f.read()
+        fuente = f"archivo local '{path_or_url}'"
+    else:
+        texto = descargar_texto(path_or_url)
+        fuente = f"URL '{path_or_url}'"
+        
     instancias = parsear_instancias(texto)
-    print(f"[data_loader] {len(instancias)} instancias cargadas desde {url}")
+    print(f"[data_loader] {len(instancias)} instancias cargadas desde {fuente}")
     return instancias
 
 

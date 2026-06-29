@@ -31,7 +31,7 @@ from plots import (
 
 # ── Configuracion ──────────────────────────────────────────────────────────────
 
-INSTANCE_URL   = "http://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/mknapcb1.txt"
+INSTANCE_URL   = os.path.join("instancias", "mknapcb1.txt")
 INSTANCE_INDEX = 9
 
 TIEMPO_MAX  = 120    # segundos totales de ejecucion
