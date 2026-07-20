@@ -50,6 +50,8 @@ def grafico_dtw_delta(
     legend_patches = []
     seen = set()
 
+    dibujar_lineas = len(log_switches) < 50
+
     for sw in log_switches:
         n_seg = sw.n_iters
         if n_seg == 0:
@@ -59,7 +61,8 @@ def grafico_dtw_delta(
         col   = colores_mh.get(sw.mh_nombre, "gray")
 
         ax.plot(xs_d, seg_d, color=col, linewidth=2.5, alpha=0.85)
-        ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
+        if dibujar_lineas:
+            ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         offset += n_seg
 
         if sw.mh_nombre not in seen:
