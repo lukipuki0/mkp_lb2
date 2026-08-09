@@ -45,6 +45,8 @@ def grafico_instantaneo(
     legend_patches = []
     seen = set()
 
+    dibujar_lineas = len(log_switches) < 50
+
     for sw in log_switches:
         n_seg = sw.n_iters
         if n_seg == 0:
@@ -62,7 +64,8 @@ def grafico_instantaneo(
         ax.plot(xs, seg_hist, color=col, linewidth=3.0, alpha=0.95)
         
         # Separador vertical
-        ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
+        if dibujar_lineas:
+            ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         
         offset += n_seg
 
