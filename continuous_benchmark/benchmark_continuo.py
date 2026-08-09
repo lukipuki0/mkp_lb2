@@ -37,7 +37,7 @@ from plots import (
 
 # ── Configuracion ─────────────────────────────────────────────────────────────
 
-TIEMPO_MAX_POR_FUNCION = 10     # segundos por funcion
+TIEMPO_MAX_POR_FUNCION = 100    # segundos por funcion
 RANDOM_SEED            = 42     # None -> no fijar semilla
 OUTPUT_BASE            = os.path.join("resultados", "benchmark_continuo")
 DIMENSION              = 30     # dimensionalidad de las funciones
