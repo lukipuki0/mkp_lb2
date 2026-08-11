@@ -26,15 +26,19 @@ from continuous_benchmark.mh.pso import PSOParams, ejecutar_epoch as _pso_epoch
 from continuous_benchmark.mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
 from continuous_benchmark.mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from continuous_benchmark.mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
+from continuous_benchmark.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
+from continuous_benchmark.mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
 
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
 
 COLORES_MH = {
     "GA" : "#4CAF50",
     "PSO": "#2196F3",
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
+    "ACO": "#8D6E63",
+    "ABC": "#FFC107",
     "WOA": "#E040FB",
 }
 
@@ -225,6 +229,24 @@ def _ejecutar_mh(
             use_stagnation=True, stag_cfg=stag_cfg,
         )
         return _eho_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "ACO":
+        params = ACOParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _aco_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "ABC":
+        params = ABCParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
     else:

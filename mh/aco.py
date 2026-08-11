@@ -1,7 +1,7 @@
 """
-mh/woa.py
+mh/aco.py
 ---------
-Whale Optimization Algorithm (WOA) para el MKP con binarización LB2.
+Ant Colony Optimization (ACO / Max-Min Ant System) para el MKP.
 
 Versión limpia para el pipeline híbrido: solo usa estrategia "abort"
 cuando el monitor DTW detecta estancamiento.
@@ -9,7 +9,6 @@ cuando el monitor DTW detecta estancamiento.
 
 from __future__ import annotations
 
-import math
 import random
 from dataclasses import dataclass, field
 
@@ -18,47 +17,45 @@ import numpy as np
 from mkp_core.problem   import MKPInstance
 from mkp_core.repair    import reparar_solucion
 from dtw_stagnation     import StagnationConfig, StagnationMonitor
-from lb2 import binarizar_posicion, interpolar_G
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
 @dataclass
-class WOAParams:
-    """Hiperparámetros del WOA."""
-    pop_size       : int   = 30
+class ACOParams:
+    """Hiperparámetros del Ant Colony Optimization (ACO)."""
+    pop_size       : int   = 30     # Número de hormigas por iteración
     iterations     : int   = 300
     epochs         : int   = 10
-    v_max          : float = 6.0
-    b              : float = 1.0   # Constante de espiral logarítmica
-    # LB2 params
-    G1_i : float = 0.5;  G1_f : float = 1.0
-    G2_i : float = 0.5;  G2_f : float = 7.2
-    G3_i : float = 0.5;  G3_f : float = 0.0
+    alpha          : float = 1.0    # Importancia del rastro de feromonas
+    beta           : float = 2.0    # Importancia de la información heurística (pseudo-utilidad)
+    rho            : float = 0.1    # Tasa de evaporación de feromonas (0 < rho < 1)
+    tau_min        : float = 0.1    # Límite inferior de feromona (MMAS)
+    tau_max        : float = 5.0    # Límite superior de feromona (MMAS)
     # Inyección de solución (pipeline híbrido)
-    injection_mode : str  = "random"    # "random" | "mutated" | "mixed"
+    injection_mode : str  = "mixed" # "random" | "mutated" | "mixed"
     # Stagnation
     use_stagnation : bool = True
     stag_cfg       : StagnationConfig | None = None
 
 
 @dataclass
-class WOAEpochResult:
-    """Resultado de un epoch del WOA."""
+class ACOEpochResult:
+    """Resultado de un epoch del ACO."""
     epoch_idx        : int
     mejor_valor      : float
     iteraciones      : int
     stagnation_fires : int
     historial        : list[float] = field(default_factory=list)
-    historial_inst   : list[float] = field(default_factory=list)  # fitness del líder (mejor ballena de la iteración)
-    mejor_solucion   : list[int]  = field(default_factory=list)
+    historial_inst   : list[float] = field(default_factory=list)  # mejor fitness de la iteración
+    mejor_solucion   : list[int]   = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
 
 
 @dataclass
-class WOAResult:
-    """Resultado completo del WOA (todos los epochs)."""
-    epochs             : list[WOAEpochResult]
+class ACOResult:
+    """Resultado completo del ACO (todos los epochs)."""
+    epochs             : list[ACOEpochResult]
     mejor_valor_global : float
     mejor_sol_global   : list[int]
     valor_optimo       : float
@@ -76,24 +73,24 @@ class WOAResult:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _inicializar_ballenas(
-    inst: MKPInstance,
-    pop_size: int,
-    v_max: float,
-) -> tuple[np.ndarray, list[list[int]], list[float]]:
-    """Genera la población inicial: posiciones continuas + soluciones binarias factibles."""
+def _calcular_heuristica(inst: MKPInstance) -> np.ndarray:
+    """Calcula la pseudo-utilidad multiconstricción (eta_j) para cada ítem."""
     n = inst.n
-    posiciones = np.random.uniform(-v_max, v_max, size=(pop_size, n))
-    poblacion_bin = []
-    fitnesses     = []
+    m = inst.m
+    beneficios = np.array(inst.p, dtype=float)
+    pesos = np.array(inst.r, dtype=float)       # shape (m, n)
+    capacidades = np.array(inst.b, dtype=float) # shape (m,)
 
-    for i in range(pop_size):
-        sol = [random.randint(0, 1) for _ in range(n)]
-        sol, val = reparar_solucion(sol, inst)
-        poblacion_bin.append(sol)
-        fitnesses.append(val)
+    # Relación de peso relativo consumido por cada dimensión
+    # sum_i (A_{i,j} / b_i)
+    peso_relativo = np.sum(pesos / capacidades[:, np.newaxis], axis=0)
+    peso_relativo = np.maximum(peso_relativo, 1e-9)
 
-    return posiciones, poblacion_bin, fitnesses
+    eta = beneficios / peso_relativo
+    eta_max = np.max(eta)
+    if eta_max > 0:
+        eta = eta / eta_max
+    return eta
 
 
 def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tuple[list[int], float]:
@@ -109,26 +106,84 @@ def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tupl
     return copia, val
 
 
+def _construir_solucion_hormiga(
+    inst: MKPInstance,
+    tau: np.ndarray,
+    eta: np.ndarray,
+    alpha: float,
+    beta: float,
+) -> tuple[list[int], float]:
+    """Construye una solución probabilística para una hormiga basada en feromonas y heurística."""
+    n = inst.n
+    m = inst.m
+    sol = [0] * n
+    consumo = np.zeros(m, dtype=float)
+    capacidades = np.array(inst.b, dtype=float)
+    pesos = np.array(inst.r, dtype=float)
+
+    candidatos = list(range(n))
+
+    while candidatos:
+        # Filtrar candidatos que quepan físicamente
+        validos = []
+        pesos_seleccion = []
+
+        for j in candidatos:
+            if np.all(consumo + pesos[:, j] <= capacidades):
+                validos.append(j)
+                w = (tau[j] ** alpha) * (eta[j] ** beta)
+                pesos_seleccion.append(w)
+
+        if not validos:
+            break
+
+        # Selección probabilística por ruleta
+        sum_w = sum(pesos_seleccion)
+        if sum_w <= 0 or np.isnan(sum_w):
+            elegido = random.choice(validos)
+        else:
+            probs = [w / sum_w for w in pesos_seleccion]
+            elegido = random.choices(validos, weights=probs, k=1)[0]
+
+        sol[elegido] = 1
+        consumo += pesos[:, elegido]
+        candidatos.remove(elegido)
+
+    # Reparar y garantizar maximalidad/factibilidad
+    sol_rep, val_rep = reparar_solucion(sol, inst)
+    return sol_rep, val_rep
+
+
 # ── Epoch individual ─────────────────────────────────────────────────────────
 
 def ejecutar_epoch(
-    inst      : MKPInstance,
-    params    : WOAParams,
-    epoch_idx : int = 0,
-    verbose   : bool = True,
-    sol_inyectada: list[int] | None = None,
-) -> WOAEpochResult:
-    """Ejecuta un epoch completo de WOA con detección de estancamiento (abort)."""
+    inst          : MKPInstance,
+    params        : ACOParams,
+    epoch_idx     : int = 0,
+    verbose       : bool = True,
+    sol_inyectada : list[int] | None = None,
+) -> ACOEpochResult:
+    """Ejecuta un epoch completo de ACO con detección de estancamiento (abort)."""
 
-    pop_size = params.pop_size
     n = inst.n
+    pop_size = params.pop_size
 
-    # Inicializar población de ballenas
-    posiciones, poblacion_bin, fitnesses = _inicializar_ballenas(
-        inst, pop_size, params.v_max,
-    )
+    # Información heurística constante por instancia
+    eta = _calcular_heuristica(inst)
 
-    # Inyectar solución del orquestador según el modo de inyección
+    # Matriz de feromonas inicializada a tau_max (MMAS)
+    tau = np.full(n, params.tau_max, dtype=float)
+
+    poblacion_bin: list[list[int]] = []
+    fitnesses: list[float] = []
+
+    # Construcción inicial de la colonia
+    for _ in range(pop_size):
+        sol, val = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
+        poblacion_bin.append(sol)
+        fitnesses.append(val)
+
+    # Inyección de solución del orquestador si aplica
     if sol_inyectada is not None:
         sol_rep = list(sol_inyectada)
         sol_rep, val_rep = reparar_solucion(sol_rep, inst)
@@ -156,6 +211,11 @@ def ejecutar_epoch(
                 poblacion_bin[i] = msol
                 fitnesses[i] = mval
 
+        # Reforzar feromona inicial en los ítems de la solución inyectada
+        for j in range(n):
+            if sol_rep[j] == 1:
+                tau[j] = min(params.tau_max, tau[j] * 1.5)
+
     best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
     mejor_val = fitnesses[best_idx]
     mejor_sol = poblacion_bin[best_idx].copy()
@@ -165,81 +225,46 @@ def ejecutar_epoch(
     dtw_deltas     = []
     stag_fires     = 0
 
-    # Estado dinámico de los parámetros G
-    G1 = params.G1_i
-    G2 = params.G2_i
-    G3 = params.G3_i
-
-    # Inicializar monitor
+    # Monitor de estancamiento
     monitor: StagnationMonitor | None = None
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
     for it in range(params.iterations):
-        # Parámetro 'a' disminuye linealmente de 2 a 0
-        a = 2.0 - it * (2.0 / params.iterations)
+        # 1. Construir nuevas soluciones para cada hormiga
+        nuevas_sols = []
+        nuevos_vals = []
 
-        X_best = posiciones[best_idx].copy()
+        for k in range(pop_size):
+            sol_k, val_k = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
+            nuevas_sols.append(sol_k)
+            nuevos_vals.append(val_k)
 
-        # Actualizar cada ballena
-        for i in range(pop_size):
-            if i == best_idx:
-                continue
+        poblacion_bin = nuevas_sols
+        fitnesses = nuevos_vals
 
-            X_i = posiciones[i]
+        # Actualizar mejor de la iteración y mejor global
+        iter_best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
+        fit_iter_best = fitnesses[iter_best_idx]
 
-            p = random.random()
-            r = np.random.random(n)
-            A = 2.0 * a * r - a
-            C = 2.0 * np.random.random(n)
+        if fit_iter_best > mejor_val:
+            mejor_val = fit_iter_best
+            mejor_sol = poblacion_bin[iter_best_idx].copy()
 
-            if p < 0.5:
-                # Escalar para determinar explorar o explotar
-                A_scalar = 2.0 * a * random.random() - a
-                if abs(A_scalar) < 1.0:
-                    # Encircling prey (explotación)
-                    D = np.abs(C * X_best - X_i)
-                    X_new = X_best - A * D
-                else:
-                    # Search for prey (exploración - usando una ballena aleatoria)
-                    rand_idx = random.choice([idx for idx in range(pop_size) if idx != i])
-                    X_rand = posiciones[rand_idx]
-                    D = np.abs(C * X_rand - X_i)
-                    X_new = X_rand - A * D
-            else:
-                # Spiral bubble-net attack (explotación en espiral)
-                D_prime = np.abs(X_best - X_i)
-                l = random.uniform(-1.0, 1.0)
-                X_new = D_prime * np.exp(params.b * l) * np.cos(2.0 * np.pi * l) + X_best
+        # 2. Actualizar feromonas (Evaporación + Depósito MMAS)
+        tau = (1.0 - params.rho) * tau
 
-            # Limitar posiciones al espacio continuo permitido
-            X_new = np.clip(X_new, -params.v_max, params.v_max)
-            posiciones[i] = X_new
+        # Depósito proporcional a la calidad del mejor global del epoch (o de la iteración)
+        deposito = params.rho * (mejor_val / max(1.0, inst.valor_optimo if inst.valor_optimo > 0 else mejor_val))
+        for j in range(n):
+            if mejor_sol[j] == 1:
+                tau[j] += deposito
 
-            # Binarizar posición usando LB2
-            nueva_sol, nueva_val = binarizar_posicion(
-                X_new, poblacion_bin[i], inst,
-                G1, G2, G3, params.v_max,
-            )
-
-            # Selección Greedy
-            if nueva_val >= fitnesses[i]:
-                poblacion_bin[i] = nueva_sol
-                fitnesses[i]     = nueva_val
-
-        # Recalcular mejor ballena
-        best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
-        fit_best_actual = fitnesses[best_idx]
-
-        if fit_best_actual > mejor_val:
-            mejor_val = fit_best_actual
-            mejor_sol = poblacion_bin[best_idx].copy()
+        # Acotar feromonas según Max-Min Ant System (MMAS)
+        tau = np.clip(tau, params.tau_min, params.tau_max)
 
         historial.append(mejor_val)
-        historial_inst.append(fit_best_actual)
-
-        if verbose:
-            print(f"  [WOA MKP] Iter {it+1:3d}/{params.iterations} | Mejor: {mejor_val:10.1f} | IterBest: {fit_best_actual:10.1f}")
+        historial_inst.append(fit_iter_best)
 
         # ── Stagnation check ──────────────────────────────────────────────
         if monitor is not None:
@@ -254,22 +279,18 @@ def ejecutar_epoch(
                 elif 0 <= dlt <= td: estado = "Explorar poco"
                 elif -td <= dlt < 0: estado = "Explotar poco"
                 else: estado = "Explotar mucho"
-                print(f"i={it:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | d1={status.get('D1_vs_ramp', 0.0):.3f} | d2={status.get('D2_vs_const', 0.0):.3f} | best={mejor_val:.1f}")
+                print(f"i={it:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | best={mejor_val:.1f}")
 
             if status.get("fire"):
                 stag_fires += 1
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
-        else:
-            G1 = interpolar_G(it, params.iterations, params.G1_i, params.G1_f)
-            G2 = interpolar_G(it, params.iterations, params.G2_i, params.G2_f)
-            G3 = interpolar_G(it, params.iterations, params.G3_i, params.G3_f)
 
-    return WOAEpochResult(
+    return ACOEpochResult(
         epoch_idx        = epoch_idx,
         mejor_valor      = mejor_val,
-        iteraciones      = it + 1,
+        iteraciones      = len(historial),
         stagnation_fires = stag_fires,
         historial        = historial,
         historial_inst   = historial_inst,
@@ -280,12 +301,12 @@ def ejecutar_epoch(
 
 # ── Ejecución multi-epoch ────────────────────────────────────────────────────
 
-def ejecutar_woa(
+def ejecutar_aco(
     inst: MKPInstance,
-    params: WOAParams,
+    params: ACOParams,
     verbose: bool = True,
-) -> WOAResult:
-    """Ejecuta el WOA completo (todos los epochs) y retorna el WOAResult."""
+) -> ACOResult:
+    """Ejecuta el ACO completo (todos los epochs) y retorna el ACOResult."""
     epochs_result    = []
     mejor_val_global = -float("inf")
     mejor_sol_global: list[int] = []
@@ -298,7 +319,7 @@ def ejecutar_woa(
             mejor_val_global = epoch_res.mejor_valor
             mejor_sol_global = epoch_res.mejor_solucion.copy()
 
-    return WOAResult(
+    return ACOResult(
         epochs             = epochs_result,
         mejor_valor_global = mejor_val_global,
         mejor_sol_global   = mejor_sol_global,

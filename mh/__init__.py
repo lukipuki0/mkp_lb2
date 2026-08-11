@@ -24,5 +24,7 @@ from mh.eho import EHOParams, EHOEpochResult, EHOResult, ejecutar_epoch as eho_e
 from mh.ils import ILSParams, ILSEpochResult, ILSResult, ejecutar_epoch as ils_epoch  # noqa: F401
 from mh.woa import WOAParams, WOAEpochResult, WOAResult, ejecutar_epoch as woa_epoch  # noqa: F401
 from mh.vns import VNSParams, VNSEpochResult, VNSResult, ejecutar_epoch as vns_epoch  # noqa: F401
+from mh.aco import ACOParams, ACOEpochResult, ACOResult, ejecutar_epoch as aco_epoch  # noqa: F401
+from mh.abc import ABCParams, ABCEpochResult, ABCResult, ejecutar_epoch as abc_epoch  # noqa: F401
 
 

@@ -33,11 +33,13 @@ from mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 from mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
 from mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from mh.vns import VNSParams, ejecutar_epoch as _vns_epoch
+from mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
+from mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
 POOL_TRAYECTORIA = ["SA", "TS", "ILS", "VNS"]
 
 COLORES_MH = {
@@ -45,6 +47,8 @@ COLORES_MH = {
     "PSO": "#2196F3",
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
+    "ACO": "#8D6E63",
+    "ABC": "#FFC107",
     "SA" : "#FF5722",
     "TS" : "#FF9800",
     "ILS": "#E91E63",
@@ -279,6 +283,24 @@ def _ejecutar_mh(
             use_stagnation=True, stag_cfg=stag_cfg,
         )
         return _woa_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "ACO":
+        params = ACOParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _aco_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "ABC":
+        params = ABCParams(
+            pop_size=30, iterations=300, epochs=1,
+            injection_mode=pop_injection_mode,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _abc_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
     elif mh_nombre == "SA":
