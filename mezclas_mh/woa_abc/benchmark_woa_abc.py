@@ -44,6 +44,7 @@ from mezclas_mh.woa_abc import (
     VariantBParams, variant_b_epoch, variant_b_epoch_continuo,
     VariantCParams, variant_c_epoch, variant_c_epoch_continuo,
     MDGWABCParams, mdg_wabc_epoch, mdg_wabc_epoch_continuo,
+    DTWWOAABCParams, variant_d_epoch, variant_d_epoch_continuo,
 )
 
 
@@ -62,6 +63,7 @@ COLORES_ALGO = {
     "Variante B": "#FF5722",             # Naranja
     "Variante C": "#00BCD4",             # Cian
     "MDG-WABC (B+C)": "#4CAF50",         # Verde
+    "Variante D (DTW)": "#E91E63",       # Rosado/Fucsia
 }
 
 
@@ -84,6 +86,7 @@ def procesar_instancia_mkp(
     p_b = VariantBParams(pop_size=POP_SIZE, iterations=iterations)
     p_c = VariantCParams(pop_size=POP_SIZE, iterations=iterations)
     p_mdg = MDGWABCParams(pop_size=POP_SIZE, iterations=iterations)
+    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations)
 
     dict_res = {}
     algos = [
@@ -93,6 +96,7 @@ def procesar_instancia_mkp(
         ("Variante B", variant_b_epoch, p_b),
         ("Variante C", variant_c_epoch, p_c),
         ("MDG-WABC (B+C)", mdg_wabc_epoch, p_mdg),
+        ("Variante D (DTW)", variant_d_epoch, p_d),
     ]
 
     for name, fn_epoch, params in algos:
@@ -186,6 +190,7 @@ def procesar_funcion_continua(
     p_b = VariantBParams(pop_size=POP_SIZE, iterations=iterations)
     p_c = VariantCParams(pop_size=POP_SIZE, iterations=iterations)
     p_mdg = MDGWABCParams(pop_size=POP_SIZE, iterations=iterations)
+    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations)
 
     dict_res = {}
     algos = [
@@ -195,6 +200,7 @@ def procesar_funcion_continua(
         ("Variante B", variant_b_epoch_continuo, p_b),
         ("Variante C", variant_c_epoch_continuo, p_c),
         ("MDG-WABC (B+C)", mdg_wabc_epoch_continuo, p_mdg),
+        ("Variante D (DTW)", variant_d_epoch_continuo, p_d),
     ]
 
     for name, fn_epoch, params in algos:
@@ -322,37 +328,37 @@ def ejecutar_benchmark_completo():
     txt_mkp = os.path.join(mkp_root_dir, "resumen_mkp.txt")
     with open(txt_mkp, "w", encoding="utf-8") as f:
         f.write("RESUMEN GLOBAL MKP - WOA-ABC\n")
-        f.write(f"{'Instancia':<25} {'WOA':>10} {'ABC':>10} {'Var A':>10} {'Var B':>10} {'Var C':>10} {'MDG-WABC':>10} {'Ganador':>15}\n")
-        f.write("-" * 105 + "\n")
+        f.write(f"{'Instancia':<25} {'WOA':>10} {'ABC':>10} {'Var A':>10} {'Var B':>10} {'Var C':>10} {'MDG-WABC':>10} {'Var D':>10} {'Ganador':>15}\n")
+        f.write("-" * 118 + "\n")
         for r in resumen_mkp:
             d = r["detalles"]
             f.write(f"{r['nombre']:<25} {d['WOA Puro']:>10.1f} {d['ABC Puro']:>10.1f} {d['Variante A']:>10.1f} "
-                    f"{d['Variante B']:>10.1f} {d['Variante C']:>10.1f} {d['MDG-WABC (B+C)']:>10.1f} {r['ganador']:>15}\n")
+                    f"{d['Variante B']:>10.1f} {d['Variante C']:>10.1f} {d['MDG-WABC (B+C)']:>10.1f} {d['Variante D (DTW)']:>10.1f} {r['ganador']:>15}\n")
 
     # 2. CSV MKP
     csv_mkp = os.path.join(mkp_root_dir, "resumen_mkp.csv")
     with open(csv_mkp, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["instancia", "n", "m", "WOA_Puro", "ABC_Puro", "Variante_A", "Variante_B", "Variante_C", "MDG_WABC", "Ganador"])
+        writer.writerow(["instancia", "n", "m", "WOA_Puro", "ABC_Puro", "Variante_A", "Variante_B", "Variante_C", "MDG_WABC", "Variante_D_DTW", "Ganador"])
         for r in resumen_mkp:
             d = r["detalles"]
             writer.writerow([
                 r["nombre"], r["n"], r["m"],
                 d["WOA Puro"], d["ABC Puro"], d["Variante A"],
                 d["Variante B"], d["Variante C"], d["MDG-WABC (B+C)"],
-                r["ganador"]
+                d["Variante D (DTW)"], r["ganador"]
             ])
 
     # 3. MD MKP
     md_mkp = os.path.join(mkp_root_dir, "resumen_mkp.md")
     with open(md_mkp, "w", encoding="utf-8") as f:
         f.write(f"# Resumen MKP - Benchmark WOA-ABC ({timestamp})\n\n")
-        f.write("| Instancia | WOA Puro | ABC Puro | Var A | Var B | Var C | MDG-WABC | Ganador |\n")
-        f.write("|-----------|----------|----------|-------|-------|-------|----------|---------|\n")
+        f.write("| Instancia | WOA Puro | ABC Puro | Var A | Var B | Var C | MDG-WABC | Var D (DTW) | Ganador |\n")
+        f.write("|-----------|----------|----------|-------|-------|-------|----------|-------------|---------|\n")
         for r in resumen_mkp:
             d = r["detalles"]
             f.write(f"| `{r['nombre']}` | {d['WOA Puro']:.1f} | {d['ABC Puro']:.1f} | {d['Variante A']:.1f} | "
-                    f"{d['Variante B']:.1f} | {d['Variante C']:.1f} | **{d['MDG-WABC (B+C)']:.1f}** | `{r['ganador']}` |\n")
+                    f"{d['Variante B']:.1f} | {d['Variante C']:.1f} | {d['MDG-WABC (B+C)']:.1f} | **{d['Variante D (DTW)']:.1f}** | `{r['ganador']}` |\n")
 
     print(f"  [mkp] Carpetas e informes creados en '{mkp_root_dir}'")
 
@@ -375,38 +381,38 @@ def ejecutar_benchmark_completo():
     txt_cec = os.path.join(cec_root_dir, "resumen_global.txt")
     with open(txt_cec, "w", encoding="utf-8") as f:
         f.write("RESUMEN GLOBAL CEC2022 - WOA-ABC\n")
-        f.write(f"{'Función':<30} {'Óptimo':>10} {'WOA':>10} {'ABC':>10} {'Var A':>10} {'Var B':>10} {'Var C':>10} {'MDG-WABC':>10} {'Ganador':>15}\n")
-        f.write("-" * 115 + "\n")
+        f.write(f"{'Función':<30} {'Óptimo':>10} {'WOA':>10} {'ABC':>10} {'Var A':>10} {'Var B':>10} {'Var C':>10} {'MDG-WABC':>10} {'Var D':>10} {'Ganador':>15}\n")
+        f.write("-" * 128 + "\n")
         for r in resumen_cec:
             d = r["detalles"]
             f.write(f"{r['nombre']:<30} {r['optimo']:>10.1f} "
                     f"{d['WOA Puro']:>10.2f} {d['ABC Puro']:>10.2f} {d['Variante A']:>10.2f} "
-                    f"{d['Variante B']:>10.2f} {d['Variante C']:>10.2f} {d['MDG-WABC (B+C)']:>10.2f} {r['ganador']:>15}\n")
+                    f"{d['Variante B']:>10.2f} {d['Variante C']:>10.2f} {d['MDG-WABC (B+C)']:>10.2f} {d['Variante D (DTW)']:>10.2f} {r['ganador']:>15}\n")
 
     # 2. CSV CEC
     csv_cec = os.path.join(cec_root_dir, "resumen_global.csv")
     with open(csv_cec, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["funcion", "dim", "optimo", "WOA_Puro", "ABC_Puro", "Variante_A", "Variante_B", "Variante_C", "MDG_WABC", "Ganador"])
+        writer.writerow(["funcion", "dim", "optimo", "WOA_Puro", "ABC_Puro", "Variante_A", "Variante_B", "Variante_C", "MDG_WABC", "Variante_D_DTW", "Ganador"])
         for r in resumen_cec:
             d = r["detalles"]
             writer.writerow([
                 r["nombre"], r["n_dim"], r["optimo"],
                 d["WOA Puro"], d["ABC Puro"], d["Variante A"],
                 d["Variante B"], d["Variante C"], d["MDG-WABC (B+C)"],
-                r["ganador"]
+                d["Variante D (DTW)"], r["ganador"]
             ])
 
     # 3. MD CEC
     md_cec = os.path.join(cec_root_dir, "resumen_global.md")
     with open(md_cec, "w", encoding="utf-8") as f:
         f.write(f"# Resumen CEC2022 - Benchmark WOA-ABC ({timestamp})\n\n")
-        f.write("| # | Función | Óptimo | WOA Puro | ABC Puro | Var A | Var B | Var C | MDG-WABC | Ganador |\n")
-        f.write("|---|---------|--------|----------|----------|-------|-------|-------|----------|---------|\n")
+        f.write("| # | Función | Óptimo | WOA Puro | ABC Puro | Var A | Var B | Var C | MDG-WABC | Var D (DTW) | Ganador |\n")
+        f.write("|---|---------|--------|----------|----------|-------|-------|-------|----------|-------------|---------|\n")
         for i, r in enumerate(resumen_cec, 1):
             d = r["detalles"]
             f.write(f"| {i} | `{r['nombre']}` | {r['optimo']:.1f} | {d['WOA Puro']:.2f} | {d['ABC Puro']:.2f} | "
-                    f"{d['Variante A']:.2f} | {d['Variante B']:.2f} | {d['Variante C']:.2f} | {d['MDG-WABC (B+C)']:.2f} | `{r['ganador']}` |\n")
+                    f"{d['Variante A']:.2f} | {d['Variante B']:.2f} | {d['Variante C']:.2f} | {d['MDG-WABC (B+C)']:.2f} | {d['Variante D (DTW)']:.2f} | `{r['ganador']}` |\n")
 
     print(f"  [cec2022] Carpetas e informes creados en '{cec_root_dir}'")
 

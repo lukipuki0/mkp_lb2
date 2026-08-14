@@ -38,7 +38,7 @@ from plots import (
 
 INSTANCE_FILE  = os.path.join("instancias", "mknapcb1.txt")   # <-- cambia el TXT aqui
 
-TIEMPO_MAX  = 120    # segundos totales de ejecucion por instancia
+MAX_ITERS   = 1000   # iteraciones totales por instancia
 RANDOM_SEED = None   # None -> no fijar semilla; int -> reproducible
 OUTPUT_DIR  = os.path.join("resultados", "pipeline_hibrido")
 
@@ -59,7 +59,7 @@ STAG_P_HIGH      = 70.0     # Percentil alto para umbral de rampa/delta (que tan
 def procesar_instancia(
     inst: MKPInstance,
     nombre: str,
-    tiempo_max: float,
+    max_iters: int,
     stag_cfg: StagnationConfig,
     output_dir: str,
     verbose: bool = True,
@@ -75,7 +75,7 @@ def procesar_instancia(
     # ── Ejecutar pipeline ─────────────────────────────────────────────────
     resultado = ejecutar_pipeline(
         inst       = inst,
-        tiempo_max = tiempo_max,
+        max_iters  = max_iters,
         stag_cfg   = stag_cfg,
         verbose    = verbose,
     )
@@ -210,7 +210,7 @@ def main() -> None:
     print(banner)
     print(f"  Archivo TXT           : {INSTANCE_FILE}")
     print(f"  Instancias a procesar : {n_total}")
-    print(f"  Tiempo max / instancia: {TIEMPO_MAX}s")
+    print(f"  Max iters / instancia : {MAX_ITERS}")
     print(f"  Carpeta de salida     : {run_dir}")
     print(banner)
 
@@ -231,7 +231,7 @@ def main() -> None:
         resumen = procesar_instancia(
             inst       = inst,
             nombre     = nombre,
-            tiempo_max = TIEMPO_MAX,
+            max_iters  = MAX_ITERS,
             stag_cfg   = stag_cfg,
             output_dir = inst_dir,
             verbose    = True,
@@ -257,7 +257,7 @@ def main() -> None:
         f.write(f"Fecha       : {timestamp}\n")
         f.write(f"Archivo     : {INSTANCE_FILE}\n")
         f.write(f"Instancias  : {n_total}\n")
-        f.write(f"Tiempo/inst : {TIEMPO_MAX}s\n\n")
+        f.write(f"Iters/inst  : {MAX_ITERS}\n\n")
         f.write(f"{'#':<3} {'Instancia':<22} {'N':>5} {'M':>3} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}\n")
         f.write("-" * 76 + "\n")
         for i, r in enumerate(resumen_global, 1):
@@ -286,7 +286,7 @@ def main() -> None:
         f.write(f"# Resumen Global - {txt_nombre} ({timestamp})\n\n")
         f.write(f"- **Archivo:** `{INSTANCE_FILE}`\n")
         f.write(f"- **Total instancias:** {n_total}\n")
-        f.write(f"- **Tiempo maximo por instancia:** {TIEMPO_MAX} s\n\n")
+        f.write(f"- **Max iteraciones por instancia:** {MAX_ITERS}\n\n")
         f.write("| # | Instancia | N | M | Mejor Valor | Optimo | Gap % | Switches |\n")
         f.write("|---|-----------|---|---|-------------|--------|-------|----------|\n")
         for i, r in enumerate(resumen_global, 1):

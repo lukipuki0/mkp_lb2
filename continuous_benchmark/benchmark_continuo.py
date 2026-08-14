@@ -2,11 +2,15 @@
 continuous_benchmark/benchmark_continuo.py
 ------------------------------------------
 Script principal: ejecuta el Pipeline Hibrido DTW sobre TODAS las funciones
-continuas definidas en test_functions.py en una sola corrida.
+continuas CEC2022 con N_RUNS repeticiones independientes.
 
-Cada funcion genera su propia subcarpeta con graficos, CSV y reporte.
-Al final se genera un resumen global (TXT, CSV, MD) comparando todas
-las funciones en la carpeta raiz del run.
+Por cada funcion se genera:
+  - subcarpeta con artefactos del run 1 (convergencia, DTW, switches)
+  - CSV con los resultados de los N_RUNS runs
+  - Boxplot de los valores finales obtenidos en cada run
+
+Al final se genera un resumen global (TXT, CSV, MD) con estadisticas
+descriptivas (media, std, mediana, min, max) por funcion.
 
 Uso:
     python -m continuous_benchmark.benchmark_continuo
@@ -19,6 +23,9 @@ import datetime
 import sys
 
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Agregar raiz del proyecto al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -37,10 +44,11 @@ from plots import (
 
 # ── Configuracion ─────────────────────────────────────────────────────────────
 
-TIEMPO_MAX_POR_FUNCION = 100    # segundos por funcion
-RANDOM_SEED            = 42     # None -> no fijar semilla
+MAX_ITERS_POR_FUNCION  = 1000    # iteraciones totales por funcion por run
+N_RUNS                 = 31      # repeticiones independientes por funcion
+RANDOM_SEED            = None    # None -> semilla aleatoria en cada run
 OUTPUT_BASE            = os.path.join("resultados", "benchmark_continuo")
-DIMENSION              = 30     # dimensionalidad de las funciones
+DIMENSION              = 10      # dimensionalidad de las funciones
 
 # DTW Stagnation params
 STAG_WINDOW      = 30
@@ -54,113 +62,232 @@ STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
 
 
-# ── Procesar una funcion ──────────────────────────────────────────────────────
+# ── Boxplot por funcion ───────────────────────────────────────────────────────
+
+def grafico_boxplot_runs(
+    func_name  : str,
+    valores    : list[float],
+    valor_opt  : float,
+    output_dir : str,
+) -> None:
+    """Genera un boxplot de los N_RUNS valores finales para una funcion."""
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    bp = ax.boxplot(
+        valores,
+        patch_artist=True,
+        medianprops=dict(color="#FF5722", linewidth=2.5),
+        boxprops=dict(facecolor="#1565C0", alpha=0.7),
+        flierprops=dict(marker="o", color="#FF9800", markersize=5),
+        whiskerprops=dict(color="#90CAF9", linewidth=1.5),
+        capprops=dict(color="#90CAF9", linewidth=2),
+    )
+
+    ax.axhline(valor_opt, color="#4CAF50", linestyle="--", linewidth=1.5,
+               label=f"Optimo conocido = {valor_opt:.4f}")
+
+    mu  = np.mean(valores)
+    med = np.median(valores)
+    ax.scatter([1], [mu],  color="#FFEB3B", zorder=5, s=60, label=f"Media = {mu:.4f}")
+
+    ax.set_title(f"Distribucion de {N_RUNS} Runs\n{func_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Pipeline Hibrido DTW", fontsize=10)
+    ax.set_ylabel("Mejor valor final (minimizacion)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+    ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    out_path = os.path.join(output_dir, "boxplot_runs.png")
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  [png] Boxplot guardado en '{out_path}'")
+
+
+# ── Procesar una funcion (N_RUNS veces) ───────────────────────────────────────
 
 def procesar_funcion(
     func       : ContinuousFunction,
-    tiempo_max : float,
+    max_iters  : int,
+    n_runs     : int,
     stag_cfg   : StagnationConfig,
     output_dir : str,
 ) -> dict:
-    """Ejecuta el pipeline sobre una funcion continua y guarda todos los artefactos."""
+    """Ejecuta el pipeline n_runs veces para una funcion CEC y guarda artefactos."""
     os.makedirs(output_dir, exist_ok=True)
 
-    resultado = ejecutar_pipeline(
-        func       = func,
-        tiempo_max = tiempo_max,
-        stag_cfg   = stag_cfg,
-        verbose    = True,
-    )
+    valores_finales   : list[float] = []
+    n_switches_runs   : list[int]   = []
+    resultado_run1    = None
 
-    # ── Reporte consola ───────────────────────────────────────────────────
+    for run_idx in range(1, n_runs + 1):
+        print(f"\n  --- Run {run_idx:2d}/{n_runs} | {func.name} ---", flush=True)
+
+        resultado = ejecutar_pipeline(
+            func      = func,
+            max_iters = max_iters,
+            stag_cfg  = stag_cfg,
+            verbose   = True,
+        )
+        valores_finales.append(resultado.mejor_valor_global)
+        n_switches_runs.append(resultado.n_switches)
+
+        # Guardar artefactos solo del primer run
+        if run_idx == 1:
+            resultado_run1 = resultado
+
+    # ── Estadisticas descriptivas ─────────────────────────────────────────
+    vals = np.array(valores_finales)
+    media   = float(np.mean(vals))
+    std     = float(np.std(vals))
+    mediana = float(np.median(vals))
+    mejor   = float(np.min(vals))
+    peor    = float(np.max(vals))
+
     sep = "=" * 62
     print(f"\n{sep}")
-    print(f"  RESUMEN - {func.name}")
+    print(f"  RESUMEN {n_runs} RUNS - {func.name}")
     print(sep)
-    print(f"  Mejor valor global : {resultado.mejor_valor_global:.6f}")
-    print(f"  Optimo conocido    : {resultado.valor_optimo:.6f}")
-    print(f"  Gap relativo       : {resultado.gap_pct:.2f}%")
-    print(f"  Total de switches  : {resultado.n_switches}")
+    print(f"  Media   : {media:.6f}")
+    print(f"  Std     : {std:.6f}")
+    print(f"  Mediana : {mediana:.6f}")
+    print(f"  Mejor   : {mejor:.6f}")
+    print(f"  Peor    : {peor:.6f}")
+    print(f"  Optimo  : {func.optimum:.6f}")
     print()
-    print(f"  {'#':<3} {'MH':<5} {'Mejor':>12}  {'Inicio':>7}  {'Fin':>7}  {'Iters':>6}")
-    print("  " + "-" * 54)
-    for i, sw in enumerate(resultado.log_switches, 1):
-        print(f"  {i:<3} {sw.mh_nombre:<5} {sw.mejor_valor:>12.4f}"
-              f"  {sw.t_inicio:>6.1f}s  {sw.t_fin:>6.1f}s  {sw.n_iters:>6}")
 
-    # ── Guardar reporte TXT ───────────────────────────────────────────────
+    # ── Boxplot ───────────────────────────────────────────────────────────
+    grafico_boxplot_runs(
+        func_name  = func.name,
+        valores    = valores_finales,
+        valor_opt  = func.optimum,
+        output_dir = output_dir,
+    )
+
+    # ── CSV con todos los runs ────────────────────────────────────────────
+    csv_runs_path = os.path.join(output_dir, "runs_resultados.csv")
+    with open(csv_runs_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["run", "mejor_valor", "n_switches"])
+        for i, (v, ns) in enumerate(zip(valores_finales, n_switches_runs), 1):
+            writer.writerow([i, v, ns])
+    print(f"  [csv] Resultados de runs en '{csv_runs_path}'")
+
+    # ── Reporte TXT del run 1 + estadisticas ─────────────────────────────
     report_path = os.path.join(output_dir, "resumen_pipeline.txt")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(f"Funcion            : {func.name}\n")
         f.write(f"Dimension          : {func.n_dim}\n")
         f.write(f"Limites            : [{func.lb}, {func.ub}]\n")
-        f.write(f"Mejor valor global : {resultado.mejor_valor_global:.6f}\n")
-        f.write(f"Optimo conocido    : {resultado.valor_optimo:.6f}\n")
-        f.write(f"Gap relativo       : {resultado.gap_pct:.2f}%\n")
-        f.write(f"Total switches     : {resultado.n_switches}\n\n")
-        for i, sw in enumerate(resultado.log_switches, 1):
-            f.write(f"{i}. {sw.mh_nombre} | mejor={sw.mejor_valor:.6f}"
-                    f" | {sw.t_inicio:.1f}s-{sw.t_fin:.1f}s | iters={sw.n_iters}\n")
-    print(f"\n  [txt] {report_path}")
+        f.write(f"N_Runs             : {n_runs}\n")
+        f.write(f"Max Iters / Run    : {max_iters}\n\n")
+        f.write(f"Optimo conocido    : {func.optimum:.6f}\n\n")
+        f.write(f"--- Estadisticas descriptivas ({n_runs} runs) ---\n")
+        f.write(f"  Media   : {media:.6f}\n")
+        f.write(f"  Std     : {std:.6f}\n")
+        f.write(f"  Mediana : {mediana:.6f}\n")
+        f.write(f"  Mejor   : {mejor:.6f}\n")
+        f.write(f"  Peor    : {peor:.6f}\n\n")
+        f.write("--- Valores por run ---\n")
+        for i, v in enumerate(valores_finales, 1):
+            f.write(f"  Run {i:2d}: {v:.6f}\n")
+    print(f"  [txt] {report_path}")
 
-    # ── Exportar CSV ──────────────────────────────────────────────────────
-    csv_path  = os.path.join(output_dir, "historial_dtw.csv")
-    deltas    = resultado.dtw_deltas_global
-    inst_hist = resultado.historial_inst_global
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["iteracion", "fitness", "dtw_delta", "fitness_instantaneo"])
-        for i, fit in enumerate(resultado.historial_global):
-            d = deltas[i] if i < len(deltas) else ""
-            d_str = "" if (isinstance(d, float) and np.isnan(d)) else d
-            fi = inst_hist[i] if i < len(inst_hist) else ""
-            writer.writerow([i, fit, d_str, fi])
-    print(f"  [csv] {csv_path}")
-
-    # ── Generar graficos ──────────────────────────────────────────────────
-    print("\n  Generando graficos...")
-    grafico_convergencia(
-        historial_global = resultado.historial_global,
-        log_switches     = resultado.log_switches,
-        colores_mh       = COLORES_MH,
-        valor_optimo     = resultado.valor_optimo,
-        output_dir       = output_dir,
-    )
-    grafico_instantaneo(
-        historial_global      = resultado.historial_global,
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = resultado.valor_optimo,
-        output_dir            = output_dir,
-    )
-    grafico_solo_instantaneo(
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = resultado.valor_optimo,
-        output_dir            = output_dir,
-    )
-    grafico_dtw_delta(
-        dtw_deltas_global = resultado.dtw_deltas_global,
-        log_switches      = resultado.log_switches,
-        colores_mh        = COLORES_MH,
-        output_dir        = output_dir,
-    )
-    grafico_switches(
-        log_switches = resultado.log_switches,
-        colores_mh   = COLORES_MH,
-        output_dir   = output_dir,
-    )
+    # ── Graficos del Run 1 ────────────────────────────────────────────────
+    if resultado_run1 is not None:
+        run1_dir = os.path.join(output_dir, "run_01_graficos")
+        os.makedirs(run1_dir, exist_ok=True)
+        print("\n  Generando graficos del Run 1...")
+        grafico_convergencia(
+            historial_global = resultado_run1.historial_global,
+            log_switches     = resultado_run1.log_switches,
+            colores_mh       = COLORES_MH,
+            valor_optimo     = resultado_run1.valor_optimo,
+            output_dir       = run1_dir,
+        )
+        grafico_instantaneo(
+            historial_global      = resultado_run1.historial_global,
+            historial_inst_global = resultado_run1.historial_inst_global,
+            log_switches          = resultado_run1.log_switches,
+            colores_mh            = COLORES_MH,
+            valor_optimo          = resultado_run1.valor_optimo,
+            output_dir            = run1_dir,
+        )
+        grafico_solo_instantaneo(
+            historial_inst_global = resultado_run1.historial_inst_global,
+            log_switches          = resultado_run1.log_switches,
+            colores_mh            = COLORES_MH,
+            valor_optimo          = resultado_run1.valor_optimo,
+            output_dir            = run1_dir,
+        )
+        grafico_dtw_delta(
+            dtw_deltas_global = resultado_run1.dtw_deltas_global,
+            log_switches      = resultado_run1.log_switches,
+            colores_mh        = COLORES_MH,
+            output_dir        = run1_dir,
+        )
+        grafico_switches(
+            log_switches = resultado_run1.log_switches,
+            colores_mh   = COLORES_MH,
+            output_dir   = run1_dir,
+        )
 
     return {
         "nombre":       func.name,
         "n_dim":        func.n_dim,
-        "mejor_valor":  resultado.mejor_valor_global,
-        "valor_optimo": resultado.valor_optimo,
-        "gap_pct":      resultado.gap_pct,
-        "n_switches":   resultado.n_switches,
+        "valor_optimo": func.optimum,
+        "media":        media,
+        "std":          std,
+        "mediana":      mediana,
+        "mejor":        mejor,
+        "peor":         peor,
+        "n_runs":       n_runs,
+        "valores_runs": valores_finales,
     }
+
+
+# ── Boxplot comparativo global (todas las funciones) ─────────────────────────
+
+def grafico_boxplot_global(
+    resumen_global : list[dict],
+    output_dir     : str,
+) -> None:
+    """Genera un boxplot multi-funcion comparando los N_RUNS runs de cada una."""
+    nombres   = [r["nombre"].replace("F1_", "").replace("F2_", "").replace("F3_", "")
+                 .replace("F4_", "").replace("F5_", "").replace("F6_", "")
+                 .replace("F7_", "").replace("F8_", "").replace("F9_", "")
+                 .replace("F10_", "").replace("F11_", "").replace("F12_", "")
+                 .split("_")[0][:12]
+                 for r in resumen_global]
+    datos = [r["valores_runs"] for r in resumen_global]
+    n = len(datos)
+
+    fig, ax = plt.subplots(figsize=(max(10, n * 1.5), 6))
+    colores = plt.cm.tab20.colors
+
+    bp = ax.boxplot(
+        datos,
+        patch_artist=True,
+        medianprops=dict(color="#FF5722", linewidth=2),
+        whiskerprops=dict(linewidth=1.2),
+        capprops=dict(linewidth=2),
+        flierprops=dict(marker="o", markersize=4, alpha=0.6),
+    )
+    for patch, color in zip(bp["boxes"], colores[:n]):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    ax.set_xticks(range(1, n + 1))
+    ax.set_xticklabels(nombres, rotation=40, ha="right", fontsize=8)
+    ax.set_title(f"Boxplot Global — {resumen_global[0]['n_runs']} Runs por Funcion CEC2022",
+                 fontsize=12, fontweight="bold")
+    ax.set_ylabel("Mejor valor final (minimizacion)", fontsize=10)
+    ax.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+
+    out_path = os.path.join(output_dir, "boxplot_global.png")
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"\n  [png] Boxplot global guardado en '{out_path}'")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -190,86 +317,105 @@ def main() -> None:
 
     banner = "=" * 62
     print(f"\n{banner}")
-    print("  CONTINUOUS BENCHMARK - Pipeline Hibrido DTW")
+    print("  CONTINUOUS BENCHMARK - Pipeline Hibrido DTW (Multi-Run)")
     print(banner)
     print(f"  Funciones a procesar  : {len(funciones)}")
     for fn in funciones:
         print(f"    - {fn.name} (Dim={fn.n_dim}, [{fn.lb}, {fn.ub}])")
-    print(f"  Tiempo max / funcion  : {TIEMPO_MAX_POR_FUNCION}s")
+    print(f"  Runs por funcion      : {N_RUNS}")
+    print(f"  Max iters / run       : {MAX_ITERS_POR_FUNCION}")
     print(f"  Carpeta de salida     : {batch_dir}")
     print(banner)
 
     resumen_global: list[dict] = []
 
     for idx, func in enumerate(funciones, 1):
-        print(f"\n{'-' * 62}")
-        print(f"  [{idx}/{len(funciones)}] Optimizando {func.name} (Dim={func.n_dim})")
-        print(f"{'-' * 62}")
+        print(f"\n{'=' * 62}")
+        print(f"  [{idx}/{len(funciones)}] {func.name} (Dim={func.n_dim})")
+        print(f"{'=' * 62}")
 
         func_dir = os.path.join(batch_dir, func.name)
 
         resumen = procesar_funcion(
-            func       = func,
-            tiempo_max = TIEMPO_MAX_POR_FUNCION,
-            stag_cfg   = stag_cfg,
+            func      = func,
+            max_iters = MAX_ITERS_POR_FUNCION,
+            n_runs    = N_RUNS,
+            stag_cfg  = stag_cfg,
             output_dir = func_dir,
         )
         resumen_global.append(resumen)
 
-    # ── Resumen global ────────────────────────────────────────────────────
+    # ── Boxplot comparativo global ────────────────────────────────────────
+    grafico_boxplot_global(resumen_global, batch_dir)
+
+    # ── Resumen global en consola ─────────────────────────────────────────
     print(f"\n\n{banner}")
     print("  RESUMEN GLOBAL DEL BATCH CONTINUO")
     print(banner)
-    print(f"  {'#':<3} {'Funcion':<15} {'Dim':>5} {'Mejor':>14} {'Optimo':>10} {'Gap%':>10} {'Switches':>9}")
-    print("  " + "-" * 70)
+    header = f"  {'#':<3} {'Funcion':<22} {'Dim':>4} {'Media':>14} {'Std':>12} {'Mediana':>12} {'Mejor':>12} {'Optimo':>10}"
+    print(header)
+    print("  " + "-" * 95)
     for i, r in enumerate(resumen_global, 1):
-        gap_str = f"{r['gap_pct']:.4f}"
-        print(f"  {i:<3} {r['nombre']:<15} {r['n_dim']:>5} {r['mejor_valor']:>14.6f}"
-              f" {r['valor_optimo']:>10.4f} {gap_str:>10} {r['n_switches']:>9}")
+        print(f"  {i:<3} {r['nombre']:<22} {r['n_dim']:>4}"
+              f" {r['media']:>14.4f} {r['std']:>12.4f} {r['mediana']:>12.4f}"
+              f" {r['mejor']:>12.4f} {r['valor_optimo']:>10.4f}")
     print(banner)
 
-    # TXT
+    # ── TXT ───────────────────────────────────────────────────────────────
     resumen_txt = os.path.join(batch_dir, "resumen_global.txt")
     with open(resumen_txt, "w", encoding="utf-8") as f:
-        f.write("RESUMEN GLOBAL DEL BATCH CONTINUO\n")
+        f.write("RESUMEN GLOBAL DEL BENCHMARK CONTINUO\n")
         f.write(f"Fecha       : {timestamp}\n")
         f.write(f"Funciones   : {len(funciones)}\n")
-        f.write(f"Tiempo/func : {TIEMPO_MAX_POR_FUNCION}s\n\n")
-        f.write(f"{'#':<3} {'Funcion':<15} {'Dim':>5} {'Mejor':>14} {'Optimo':>10} {'Gap%':>10} {'Switches':>9}\n")
-        f.write("-" * 72 + "\n")
+        f.write(f"Runs/func   : {N_RUNS}\n")
+        f.write(f"Iters/run   : {MAX_ITERS_POR_FUNCION}\n\n")
+        f.write(f"{'#':<3} {'Funcion':<22} {'Dim':>4} {'Media':>14} {'Std':>12} {'Mediana':>12} {'Mejor':>12} {'Optimo':>10}\n")
+        f.write("-" * 97 + "\n")
         for i, r in enumerate(resumen_global, 1):
-            gap_str = f"{r['gap_pct']:.4f}"
-            f.write(f"{i:<3} {r['nombre']:<15} {r['n_dim']:>5} {r['mejor_valor']:>14.6f}"
-                    f" {r['valor_optimo']:>10.4f} {gap_str:>10} {r['n_switches']:>9}\n")
+            f.write(f"{i:<3} {r['nombre']:<22} {r['n_dim']:>4}"
+                    f" {r['media']:>14.4f} {r['std']:>12.4f} {r['mediana']:>12.4f}"
+                    f" {r['mejor']:>12.4f} {r['valor_optimo']:>10.4f}\n")
     print(f"\n  [txt] Resumen global guardado en '{resumen_txt}'")
 
-    # CSV
+    # ── CSV ───────────────────────────────────────────────────────────────
     resumen_csv = os.path.join(batch_dir, "resumen_global.csv")
     with open(resumen_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["funcion", "n_dim", "mejor_valor", "valor_optimo", "gap_pct", "n_switches"])
+        writer.writerow(["funcion", "n_dim", "n_runs", "media", "std", "mediana", "mejor", "peor", "valor_optimo"])
         for r in resumen_global:
             writer.writerow([
-                r["nombre"], r["n_dim"], r["mejor_valor"],
-                r["valor_optimo"], r["gap_pct"], r["n_switches"],
+                r["nombre"], r["n_dim"], r["n_runs"],
+                r["media"], r["std"], r["mediana"],
+                r["mejor"], r["peor"], r["valor_optimo"],
             ])
     print(f"  [csv] Resumen global guardado en '{resumen_csv}'")
 
-    # Markdown
+    # ── CSV de todos los runs individuales ────────────────────────────────
+    runs_csv = os.path.join(batch_dir, "todos_los_runs.csv")
+    with open(runs_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["funcion", "run", "mejor_valor", "valor_optimo"])
+        for r in resumen_global:
+            for run_i, v in enumerate(r["valores_runs"], 1):
+                writer.writerow([r["nombre"], run_i, v, r["valor_optimo"]])
+    print(f"  [csv] Todos los runs guardados en '{runs_csv}'")
+
+    # ── Markdown ──────────────────────────────────────────────────────────
     resumen_md = os.path.join(batch_dir, "resumen_global.md")
     with open(resumen_md, "w", encoding="utf-8") as f:
-        f.write(f"# Resumen Global - Benchmark Continuo ({timestamp})\n\n")
+        f.write(f"# Resumen Global — Benchmark Continuo CEC2022 ({timestamp})\n\n")
         f.write(f"- **Total funciones:** {len(funciones)}\n")
-        f.write(f"- **Tiempo maximo por funcion:** {TIEMPO_MAX_POR_FUNCION} s\n\n")
-        f.write("| # | Funcion | Dim | Mejor Valor | Optimo | Gap % | Switches |\n")
-        f.write("|---|---------|-----|-------------|--------|-------|----------|\n")
+        f.write(f"- **Runs por funcion:** {N_RUNS}\n")
+        f.write(f"- **Max iteraciones por run:** {MAX_ITERS_POR_FUNCION}\n\n")
+        f.write("| # | Funcion | Dim | Media | Std | Mediana | Mejor | Optimo |\n")
+        f.write("|---|---------|-----|-------|-----|---------|-------|--------|\n")
         for i, r in enumerate(resumen_global, 1):
-            gap_str = f"{r['gap_pct']:.4f}%"
-            f.write(f"| {i} | `{r['nombre']}` | {r['n_dim']} | {r['mejor_valor']:.6f}"
-                    f" | {r['valor_optimo']:.4f} | {gap_str} | {r['n_switches']} |\n")
+            f.write(f"| {i} | `{r['nombre']}` | {r['n_dim']}"
+                    f" | {r['media']:.4f} | {r['std']:.4f} | {r['mediana']:.4f}"
+                    f" | {r['mejor']:.4f} | {r['valor_optimo']:.4f} |\n")
     print(f"  [md]  Resumen global guardado en '{resumen_md}'")
 
-    print(f"\n  BENCHMARK CONTINUO COMPLETADO. ({len(funciones)} funciones procesadas)\n")
+    print(f"\n  BENCHMARK CONTINUO COMPLETADO. ({len(funciones)} funciones x {N_RUNS} runs)\n")
 
 
 if __name__ == "__main__":

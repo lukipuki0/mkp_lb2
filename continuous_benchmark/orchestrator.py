@@ -79,11 +79,15 @@ class PipelineResult:
 
 def ejecutar_pipeline(
     func               ,  # ContinuousFunction
-    tiempo_max         : float = 120.0,
+    max_iters          : int | None = 1000,
+    tiempo_max         : float | None = None,
     stag_cfg           : StagnationConfig | None = None,
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
 ) -> PipelineResult:
+
+    if max_iters is None and tiempo_max is None:
+        max_iters = 1000
 
     if stag_cfg is None:
         stag_cfg = StagnationConfig()
@@ -102,11 +106,17 @@ def ejecutar_pipeline(
         print("\n" + "=" * 62)
         print("  CONTINUOUS PIPELINE HIBRIDO DTW -- INICIO")
         print(f"  Funcion    : {func.name} (Dim={func.n_dim}, [{func.lb}, {func.ub}])")
-        print(f"  Tiempo max : {tiempo_max}s")
+        lim_str = f"Max Iters: {max_iters}" if max_iters is not None else f"Tiempo max: {tiempo_max}s"
+        print(f"  Condicion  : {lim_str}")
         print(f"  Pool       : {POOL_POBLACIONAL}")
         print("=" * 62)
 
-    while (time.time() - t_inicio) < tiempo_max:
+    while True:
+        if max_iters is not None and len(historial_global) >= max_iters:
+            break
+        if tiempo_max is not None and (time.time() - t_inicio) >= tiempo_max:
+            break
+
         t_mh_inicio = time.time() - t_inicio
 
         mh = random.choice(POOL_POBLACIONAL)

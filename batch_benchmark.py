@@ -48,9 +48,9 @@ from plots import (
 MKNAPCB_NUM = 1
 
 # Parámetros de ejecución
-TIEMPO_MAX_POR_INSTANCIA = 120
+MAX_ITERS_POR_INSTANCIA = 1000
 RANDOM_SEED = None
-OUTPUT_BASE = os.path.join("resultados", "batch_runs")
+OUTPUT_BASE = os.path.join("resultados", "mkp_experiment")
 
 # Parámetros de Stagnation (DTW)
 STAG_WINDOW      = 30
@@ -67,7 +67,7 @@ STAG_P_HIGH      = 70.0
 def procesar_instancia(
     inst: MKPInstance,
     nombre: str,
-    tiempo_max: float,
+    max_iters: int,
     stag_cfg: StagnationConfig,
     output_dir: str,
     verbose: bool = True,
@@ -83,7 +83,7 @@ def procesar_instancia(
     # ── Ejecutar pipeline ─────────────────────────────────────────────────
     resultado = ejecutar_pipeline(
         inst       = inst,
-        tiempo_max = tiempo_max,
+        max_iters  = max_iters,
         stag_cfg   = stag_cfg,
         verbose    = verbose,
     )
@@ -186,7 +186,7 @@ def procesar_instancia(
 def main() -> None:
     # Usar el número de instancia configurado arriba
     mknapcb_num = MKNAPCB_NUM
-    tiempo_max = TIEMPO_MAX_POR_INSTANCIA
+    max_iters = MAX_ITERS_POR_INSTANCIA
 
     # Validar que esté en el rango de 1 a 9
     if mknapcb_num < 1 or mknapcb_num > 9:
@@ -230,7 +230,7 @@ def main() -> None:
     print("  BATCH BENCHMARK - Pipeline Hibrido DTW")
     print(banner)
     print(f"  Instancias a procesar : {len(instancias)}")
-    print(f"  Tiempo max / instancia: {tiempo_max}s")
+    print(f"  Max iters / instancia : {max_iters}")
     print(f"  Carpeta de salida     : {batch_dir}")
     print(banner)
 
@@ -262,7 +262,7 @@ def main() -> None:
         resumen = procesar_instancia(
             inst       = inst,
             nombre     = nombre,
-            tiempo_max = tiempo_max,
+            max_iters  = max_iters,
             stag_cfg   = stag_cfg,
             output_dir = inst_dir,
             verbose    = True,
@@ -287,7 +287,7 @@ def main() -> None:
         f.write("RESUMEN GLOBAL DEL BATCH\n")
         f.write(f"Fecha       : {timestamp}\n")
         f.write(f"Instancias  : {len(instancias)}\n")
-        f.write(f"Tiempo/inst : {tiempo_max}s\n\n")
+        f.write(f"Iters/inst  : {max_iters}\n\n")
         f.write(f"{'#':<3} {'Instancia':<22} {'N':>5} {'M':>3} {'Mejor':>10} {'Optimo':>10} {'Gap%':>8} {'Switches':>9}\n")
         f.write("-" * 76 + "\n")
         for i, r in enumerate(resumen_global, 1):

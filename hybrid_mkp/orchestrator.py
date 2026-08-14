@@ -95,28 +95,30 @@ class PipelineResult:
 
 def ejecutar_pipeline(
     inst               : MKPInstance,
-    tiempo_max         : float = 120.0,
+    max_iters          : int | None = 1000,
+    tiempo_max         : float | None = None,
     stag_cfg           : StagnationConfig | None = None,
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
 ) -> PipelineResult:
-    """Ejecuta el pipeline híbrido rotando MH hasta agotar tiempo_max.
+    """Ejecuta el pipeline híbrido rotando MH hasta alcanzar max_iters o agotar tiempo_max.
 
     Parameters
     ----------
     inst               : Instancia del MKP.
-    tiempo_max         : Tiempo máximo en segundos.
+    max_iters          : Máximo de iteraciones totales acumuladas.
+    tiempo_max         : Tiempo máximo en segundos (opcional).
     stag_cfg           : Configuración del monitor DTW. Si None usa valores por defecto.
     pop_injection_mode : Estrategia de inyección para MH poblacionales.
-                         "random"  → 1 inyectada + resto aleatorio.
-                         "mutated" → toda la población mutada de la inyectada.
-                         "mixed"   → 50% mutaciones + 50% aleatorios.
     verbose            : Imprime log de cada switch en consola.
 
     Returns
     -------
     PipelineResult con la mejor solución global y el log de switches.
     """
+    if max_iters is None and tiempo_max is None:
+        max_iters = 1000
+
     if stag_cfg is None:
         stag_cfg = StagnationConfig()
 
@@ -135,13 +137,19 @@ def ejecutar_pipeline(
     if verbose:
         print("\n" + "=" * 62)
         print("  PIPELINE HIBRIDO DTW -- INICIO")
-        print(f"  Tiempo max : {tiempo_max}s")
+        lim_str = f"Max Iters: {max_iters}" if max_iters is not None else f"Tiempo max: {tiempo_max}s"
+        print(f"  Condicion  : {lim_str}")
         print(f"  Inyeccion  : {pop_injection_mode}")
         print(f"  Poblacional: {POOL_POBLACIONAL}")
         print(f"  Trayectoria: {POOL_TRAYECTORIA}")
         print("=" * 62)
 
-    while (time.time() - t_inicio) < tiempo_max:
+    while True:
+        if max_iters is not None and len(historial_global) >= max_iters:
+            break
+        if tiempo_max is not None and (time.time() - t_inicio) >= tiempo_max:
+            break
+
         t_mh_inicio = time.time() - t_inicio
 
         # Elegir MH del pool correspondiente
