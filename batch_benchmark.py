@@ -47,10 +47,10 @@ from plots import (
 MKNAPCB_NUM = 1
 
 # Parámetros de ejecución
-N_RUNS                   = 31     # Repeticiones independientes por instancia
-TIEMPO_MAX_POR_INSTANCIA = 120
-RANDOM_SEED              = None
-OUTPUT_BASE              = os.path.join("resultados", "batch_runs")
+N_RUNS       = 31     # Repeticiones independientes por instancia
+MAX_ITERS    = 1000   # Condición de parada por iteraciones
+RANDOM_SEED  = None
+OUTPUT_BASE  = os.path.join("resultados", "batch_mkp")
 
 # Parámetros de Stagnation (DTW)
 STAG_WINDOW      = 30
@@ -108,7 +108,7 @@ def grafico_boxplot_runs(
 def procesar_instancia(
     inst: MKPInstance,
     nombre: str,
-    tiempo_max: float,
+    max_iters: int,
     n_runs: int,
     stag_cfg: StagnationConfig,
     output_dir: str,
@@ -131,10 +131,10 @@ def procesar_instancia(
             print(f"\n  --- Run {run_idx:2d}/{n_runs} | {nombre} ---", flush=True)
 
         resultado = ejecutar_pipeline(
-            inst       = inst,
-            tiempo_max = tiempo_max,
-            stag_cfg   = stag_cfg,
-            verbose    = verbose,
+            inst      = inst,
+            max_iters = max_iters,
+            stag_cfg  = stag_cfg,
+            verbose   = verbose,
         )
         valores_finales.append(resultado.mejor_valor_global)
         n_switches_runs.append(resultado.n_switches)
@@ -287,7 +287,7 @@ def procesar_instancia(
 
 def main() -> None:
     mknapcb_num = MKNAPCB_NUM
-    tiempo_max = TIEMPO_MAX_POR_INSTANCIA
+    max_iters   = MAX_ITERS
 
     if mknapcb_num < 1 or mknapcb_num > 9:
         print(f"\n[!] Número de mknapcb inválido ({mknapcb_num}). Debe ser de 1 a 9. Usando 1.")
@@ -328,7 +328,7 @@ def main() -> None:
     print(banner)
     print(f"  Instancias a procesar : {len(instancias)}")
     print(f"  Runs por instancia    : {N_RUNS}")
-    print(f"  Tiempo max / run      : {tiempo_max}s")
+    print(f"  Max iters / run       : {max_iters}")
     print(f"  Carpeta de salida     : {batch_dir}")
     print(banner)
 
@@ -357,7 +357,7 @@ def main() -> None:
         resumen = procesar_instancia(
             inst       = inst,
             nombre     = nombre,
-            tiempo_max = tiempo_max,
+            max_iters  = max_iters,
             n_runs     = N_RUNS,
             stag_cfg   = stag_cfg,
             output_dir = inst_dir,
@@ -387,7 +387,7 @@ def main() -> None:
         f.write(f"Fecha       : {timestamp}\n")
         f.write(f"Instancias  : {len(instancias)}\n")
         f.write(f"Runs/inst   : {N_RUNS}\n")
-        f.write(f"Tiempo/run  : {tiempo_max}s\n\n")
+        f.write(f"Iters/run   : {max_iters}\n\n")
         f.write(f"{'#':<3} {'Instancia':<18} {'N':>5} {'M':>3} {'Media':>8} {'Std':>6} {'Mejor':>8} {'Optimo':>8} {'GapMed%':>8} {'GapMej%':>8} {'Sw(med)':>7}\n")
         f.write("-" * 90 + "\n")
         for i, r in enumerate(resumen_global, 1):
@@ -426,7 +426,7 @@ def main() -> None:
         f.write(f"# Resumen de Ejecución por Lotes - {timestamp}\n\n")
         f.write(f"- **Total de Instancias:** {len(instancias)}\n")
         f.write(f"- **Runs por Instancia:** {N_RUNS}\n")
-        f.write(f"- **Tiempo Máximo por Run:** {tiempo_max} segundos\n\n")
+        f.write(f"- **Max Iteraciones por Run:** {max_iters}\n\n")
         f.write("## Características de las Instancias y Resultados\n\n")
         f.write("| # | Instancia | N | M | Media | Std | Mejor | Peor | Óptimo | Gap Medio % | Gap Mejor % | Switches (med) |\n")
         f.write("|---|-----------|---|---|-------|-----|-------|------|--------|-------------|-------------|----------------|\n")

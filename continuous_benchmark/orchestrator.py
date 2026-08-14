@@ -114,7 +114,7 @@ def ejecutar_pipeline(
     while True:
         if max_iters is not None and len(historial_global) >= max_iters:
             break
-        if tiempo_max is not None and (time.time() - t_inicio) >= tiempo_max:
+        if max_iters is None and tiempo_max is not None and (time.time() - t_inicio) >= tiempo_max:
             break
 
         t_mh_inicio = time.time() - t_inicio
@@ -171,7 +171,7 @@ def ejecutar_pipeline(
 
     elapsed_total = time.time() - t_inicio
     if verbose:
-        print(f"\n  [{elapsed_total:.1f}s] TIEMPO AGOTADO")
+        print(f"\n  [{elapsed_total:.1f}s] EJECUCIÓN FINALIZADA")
         print(f"  Mejor global  : {valor_global:.6f}")
         print(f"  Total switches: {len(log_switches)}")
         print("=" * 62)
