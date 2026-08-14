@@ -28,18 +28,22 @@ from continuous_benchmark.mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from continuous_benchmark.mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 from continuous_benchmark.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
 from continuous_benchmark.mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
+from continuous_benchmark.mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
+from continuous_benchmark.mh.sa  import SAParams,  ejecutar_epoch as _sa_epoch
 
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
+POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
+POOL_TRAYECTORIA = ["ILS", "SA"]
 
 COLORES_MH = {
-    "GA" : "#4CAF50",
     "PSO": "#2196F3",
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
     "ABC": "#FFC107",
     "WOA": "#E040FB",
+    "ILS": "#E91E63",
+    "SA" : "#FF5722",
 }
 
 
@@ -99,8 +103,9 @@ def ejecutar_pipeline(
     dtw_deltas_global : list[float] = []
     log_switches      : list[SwitchLog] = []
 
-    epoch_ctr = 0
-    t_inicio  = time.time()
+    epoch_ctr   = 0
+    fase_actual = "poblacional"
+    t_inicio    = time.time()
 
     if verbose:
         print("\n" + "=" * 62)
@@ -108,7 +113,8 @@ def ejecutar_pipeline(
         print(f"  Funcion    : {func.name} (Dim={func.n_dim}, [{func.lb}, {func.ub}])")
         lim_str = f"Max Iters: {max_iters}" if max_iters is not None else f"Tiempo max: {tiempo_max}s"
         print(f"  Condicion  : {lim_str}")
-        print(f"  Pool       : {POOL_POBLACIONAL}")
+        print(f"  Pool Poblacional : {POOL_POBLACIONAL}")
+        print(f"  Pool Trayectoria : {POOL_TRAYECTORIA}")
         print("=" * 62)
 
     while True:
@@ -119,8 +125,15 @@ def ejecutar_pipeline(
 
         t_mh_inicio = time.time() - t_inicio
 
-        mh = random.choice(POOL_POBLACIONAL)
-        tipo = "poblacional"
+        if fase_actual == "poblacional":
+            mh = random.choice(POOL_POBLACIONAL)
+            tipo = "poblacional"
+            fase_actual = "trayectoria"
+        else:
+            mh = random.choice(POOL_TRAYECTORIA)
+            tipo = "trayectoria"
+            fase_actual = "poblacional"
+
 
         if verbose:
             elapsed = time.time() - t_inicio
@@ -259,5 +272,53 @@ def _ejecutar_mh(
         return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
+    elif mh_nombre == "ILS":
+        params = ILSParams(
+            iterations=300, epochs=1,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _ils_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
+                          sol_inyectada=solucion_global)
+
+    elif mh_nombre == "SA":
+        params = SAParams(
+            iterations=300, epochs=1,
+            use_stagnation=True, stag_cfg=stag_cfg,
+        )
+        return _sa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
+                         sol_inyectada=solucion_global)
+
     else:
         raise ValueError(f"MH desconocida: '{mh_nombre}'")
+
+
+def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
+    """Ejecuta una única metaheurística de forma standalone durante max_iters iteraciones."""
+    if mh_nombre == "PSO":
+        params = PSOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _pso_epoch(func, params, verbose=False)
+    elif mh_nombre == "GWO":
+        params = GWOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _gwo_epoch(func, params, verbose=False)
+    elif mh_nombre == "WOA":
+        params = WOAParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _woa_epoch(func, params, verbose=False)
+    elif mh_nombre == "EHO":
+        params = EHOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _eho_epoch(func, params, verbose=False)
+    elif mh_nombre == "ACO":
+        params = ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _aco_epoch(func, params, verbose=False)
+    elif mh_nombre == "ABC":
+        params = ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _abc_epoch(func, params, verbose=False)
+    elif mh_nombre == "ILS":
+        params = ILSParams(iterations=max_iters, use_stagnation=False)
+        return _ils_epoch(func, params, verbose=False)
+    elif mh_nombre == "SA":
+        params = SAParams(iterations=max_iters, use_stagnation=False)
+        return _sa_epoch(func, params, verbose=False)
+    else:
+        raise ValueError(f"Metaheurística standalone no soportada: '{mh_nombre}'")
+
+
