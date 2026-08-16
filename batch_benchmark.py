@@ -35,11 +35,10 @@ from hybrid_mkp.orchestrator import ejecutar_pipeline, COLORES_MH
 from analisis_estadistico import realizar_analisis_estadistico
 from plots import (
     grafico_convergencia,
-    grafico_instantaneo,
-    grafico_solo_instantaneo,
     grafico_dtw_delta,
     grafico_switches,
 )
+
 
 
 # ── Configuración y defaults ──────────────────────────────────────────────────
@@ -179,22 +178,8 @@ def procesar_instancia(
                 valor_optimo     = resultado.valor_optimo,
                 output_dir       = output_dir,
             )
-            grafico_instantaneo(
-                historial_global      = resultado.historial_global,
-                historial_inst_global = resultado.historial_inst_global,
-                log_switches          = resultado.log_switches,
-                colores_mh            = COLORES_MH,
-                valor_optimo          = resultado.valor_optimo,
-                output_dir            = output_dir,
-            )
-            grafico_solo_instantaneo(
-                historial_inst_global = resultado.historial_inst_global,
-                log_switches          = resultado.log_switches,
-                colores_mh            = COLORES_MH,
-                valor_optimo          = resultado.valor_optimo,
-                output_dir            = output_dir,
-            )
             grafico_dtw_delta(
+
                 dtw_deltas_global = resultado.dtw_deltas_global,
                 log_switches      = resultado.log_switches,
                 colores_mh        = COLORES_MH,

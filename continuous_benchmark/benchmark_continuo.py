@@ -34,13 +34,13 @@ from dtw_stagnation import StagnationConfig
 from continuous_benchmark.funciones_cec2022 import get_test_functions, ContinuousFunction
 from continuous_benchmark.orchestrator import ejecutar_pipeline, COLORES_MH
 from analisis_estadistico import realizar_analisis_estadistico
-from plots import (
+from continuous_benchmark.plots import (
     grafico_convergencia,
-    grafico_instantaneo,
-    grafico_solo_instantaneo,
     grafico_dtw_delta,
     grafico_switches,
 )
+
+
 
 
 # ── Configuracion ─────────────────────────────────────────────────────────────
@@ -205,22 +205,8 @@ def procesar_funcion(
             valor_optimo     = resultado_run1.valor_optimo,
             output_dir       = run1_dir,
         )
-        grafico_instantaneo(
-            historial_global      = resultado_run1.historial_global,
-            historial_inst_global = resultado_run1.historial_inst_global,
-            log_switches          = resultado_run1.log_switches,
-            colores_mh            = COLORES_MH,
-            valor_optimo          = resultado_run1.valor_optimo,
-            output_dir            = run1_dir,
-        )
-        grafico_solo_instantaneo(
-            historial_inst_global = resultado_run1.historial_inst_global,
-            log_switches          = resultado_run1.log_switches,
-            colores_mh            = COLORES_MH,
-            valor_optimo          = resultado_run1.valor_optimo,
-            output_dir            = run1_dir,
-        )
         grafico_dtw_delta(
+
             dtw_deltas_global = resultado_run1.dtw_deltas_global,
             log_switches      = resultado_run1.log_switches,
             colores_mh        = COLORES_MH,

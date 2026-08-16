@@ -28,11 +28,10 @@ from dtw_stagnation       import StagnationConfig
 from hybrid_mkp.orchestrator import ejecutar_pipeline, COLORES_MH
 from plots import (
     grafico_convergencia,
-    grafico_instantaneo,
-    grafico_solo_instantaneo,
     grafico_dtw_delta,
     grafico_switches,
 )
+
 
 # ── Configuracion ──────────────────────────────────────────────────────────────
 
@@ -127,7 +126,6 @@ def procesar_instancia(
     print(f"  [csv] Guardado en '{csv_path}'")
 
     # ── Generar graficos separados ─────────────────────────────────────────
-    print("\n  Generando graficos...")
     grafico_convergencia(
         historial_global = resultado.historial_global,
         log_switches     = resultado.log_switches,
@@ -135,27 +133,13 @@ def procesar_instancia(
         valor_optimo     = resultado.valor_optimo,
         output_dir       = output_dir,
     )
-    grafico_instantaneo(
-        historial_global      = resultado.historial_global,
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = resultado.valor_optimo,
-        output_dir            = output_dir,
-    )
-    grafico_solo_instantaneo(
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = resultado.valor_optimo,
-        output_dir            = output_dir,
-    )
     grafico_dtw_delta(
         dtw_deltas_global = resultado.dtw_deltas_global,
         log_switches      = resultado.log_switches,
         colores_mh        = COLORES_MH,
         output_dir        = output_dir,
     )
+
     grafico_switches(
         log_switches = resultado.log_switches,
         colores_mh   = COLORES_MH,

@@ -18,8 +18,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Añadir raíz del proyecto al path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Añadir primero la carpeta propia de HRES2-H2 (para cargar su módulo plots local)
+sys.path.insert(0, os.path.dirname(__file__))
+# Luego la raíz del proyecto
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
 from dtw_stagnation import StagnationConfig
 import importlib
@@ -32,13 +34,28 @@ import importlib
 analisis_mod = importlib.import_module("HRES2-H2.analisis_estadistico_hres2")
 realizar_analisis_estadistico_completo = analisis_mod.realizar_analisis_estadistico_completo
 
-from plots import (
-    grafico_convergencia,
-    grafico_instantaneo,
-    grafico_solo_instantaneo,
-    grafico_dtw_delta,
-    grafico_switches,
-)
+# ── Importar módulo plots LOCAL de HRES2-H2 (sin conflicto con raíz) ──────────
+import importlib.util as _ilu
+
+def _load_hres2_plot(module_name, filename):
+    _dir = os.path.dirname(__file__)
+    spec = _ilu.spec_from_file_location(
+        module_name, os.path.join(_dir, "plots", filename)
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+_conv_mod  = _load_hres2_plot("hres2_plots_conv",  "convergencia.py")
+_dtw_mod   = _load_hres2_plot("hres2_plots_dtw",   "dtw_delta.py")
+_gantt_mod = _load_hres2_plot("hres2_plots_gantt", "switches_gantt.py")
+
+grafico_convergencia_hres2 = _conv_mod.grafico_convergencia_hres2
+grafico_dtw_delta           = _dtw_mod.grafico_dtw_delta
+grafico_switches            = _gantt_mod.grafico_switches
+
+
+
 
 
 # ── Configuración ─────────────────────────────────────────────────────────────
@@ -215,27 +232,11 @@ def ejecutar_benchmark_hres2(
     best_run_dir = os.path.join(output_dir, f"best_run_{best_run_idx + 1:02d}")
     os.makedirs(best_run_dir, exist_ok=True)
 
-    grafico_convergencia(
+    grafico_convergencia_hres2(
         historial_global = best_res.historial_global,
         log_switches     = best_res.log_switches,
         colores_mh       = COLORES_MH,
-        valor_optimo     = 0.30,
         output_dir       = best_run_dir,
-    )
-    grafico_instantaneo(
-        historial_global      = best_res.historial_global,
-        historial_inst_global = best_res.historial_inst_global,
-        log_switches          = best_res.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = 0.30,
-        output_dir            = best_run_dir,
-    )
-    grafico_solo_instantaneo(
-        historial_inst_global = best_res.historial_inst_global,
-        log_switches          = best_res.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = 0.30,
-        output_dir            = best_run_dir,
     )
     grafico_dtw_delta(
         dtw_deltas_global = best_res.dtw_deltas_global,
@@ -248,6 +249,7 @@ def ejecutar_benchmark_hres2(
         colores_mh   = COLORES_MH,
         output_dir   = best_run_dir,
     )
+
 
     with open(os.path.join(best_run_dir, "detalle_run.txt"), "w", encoding="utf-8") as f_run:
         f_run.write(f"DETALLE MEJOR RUN (Run #{best_run_idx + 1:02d})\n")

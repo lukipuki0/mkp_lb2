@@ -1,7 +1,8 @@
 """
-plots/convergencia.py
----------------------
-Gráfico de convergencia global del pipeline coloreado por metaheurística.
+HRES2-H2/plots/convergencia.py
+-------------------------------
+Gráfico de convergencia LCOE del pipeline HRES2-H2, coloreado por metaheurística.
+NO dibuja línea de óptimo externo (LCOE óptimo es desconocido en HRES2).
 
 Genera: convergencia_fitness.png
 """
@@ -11,23 +12,24 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 
-def grafico_convergencia(
+def grafico_convergencia_hres2(
     historial_global: list,
     log_switches: list,
     colores_mh: dict,
-    valor_optimo: float,
     output_dir: str,
+    ylabel: str = "Best LCOE (CNY/kWh)",
 ) -> str:
     """
-    Genera y guarda el gráfico de convergencia de fitness.
+    Genera y guarda el gráfico de convergencia LCOE del pipeline HRES2-H2.
+    No dibuja ninguna línea de referencia de óptimo conocido.
 
     Parameters
     ----------
-    historial_global : Lista de fitness acumulada iteración a iteración.
+    historial_global : Lista de LCOE acumulado iteración a iteración.
     log_switches     : Lista de SwitchLog del orquestador.
     colores_mh       : Dict {nombre_mh: color_hex}.
-    valor_optimo     : Valor óptimo conocido de la instancia (0 = desconocido).
     output_dir       : Carpeta donde se guarda el PNG.
+    ylabel           : Etiqueta del eje Y.
 
     Returns
     -------
@@ -61,16 +63,10 @@ def grafico_convergencia(
             legend_patches.append(mpatches.Patch(color=col, label=sw.mh_nombre))
             seen.add(sw.mh_nombre)
 
-    if valor_optimo > 0:
-        ax.axhline(y=valor_optimo, color="red", linestyle="--",
-                   linewidth=2.0)
-        legend_patches.append(
-            mpatches.Patch(color="red", label=f"Optimum ({valor_optimo:.0f})")
-        )
-
-    ax.set_title("Hybrid DTW Pipeline - Fitness Convergence", fontsize=20, fontweight="bold")
+    ax.set_title("HRES2-H2 Hybrid DTW Pipeline - LCOE Convergence",
+                 fontsize=20, fontweight="bold")
     ax.set_xlabel("Accumulated Iterations", fontsize=18)
-    ax.set_ylabel("Best Fitness Value", fontsize=18)
+    ax.set_ylabel(ylabel, fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
     ax.legend(handles=legend_patches, loc="upper right", fontsize=15)
     ax.grid(True, alpha=0.3)

@@ -27,7 +27,10 @@ import matplotlib
 matplotlib.use("Agg")
 
 # ── Path ──────────────────────────────────────────────────────────────────────
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Primero la carpeta propia de HRES2-H2 (para cargar su módulo plots local)
+sys.path.insert(0, os.path.dirname(__file__))
+# Luego la raíz del proyecto
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
 from dtw_stagnation import StagnationConfig
 import importlib
@@ -36,13 +39,30 @@ HRES2Function   = wpeb_model.HRES2Function
 decode_solution = wpeb_model.decode_solution
 
 from continuous_benchmark.orchestrator import ejecutar_pipeline, COLORES_MH
-from plots import (
-    grafico_convergencia,
-    grafico_instantaneo,
-    grafico_solo_instantaneo,
-    grafico_dtw_delta,
-    grafico_switches,
-)
+
+# ── Importar módulo plots LOCAL de HRES2-H2 (sin conflicto con raíz) ──────────
+import importlib.util as _ilu
+
+def _load_hres2_plot(module_name, filename):
+    _dir = os.path.dirname(__file__)
+    spec = _ilu.spec_from_file_location(
+        module_name, os.path.join(_dir, "plots", filename)
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+_conv_mod = _load_hres2_plot("hres2_plots_conv",    "convergencia.py")
+_dtw_mod  = _load_hres2_plot("hres2_plots_dtw",     "dtw_delta.py")
+_gantt_mod= _load_hres2_plot("hres2_plots_gantt",   "switches_gantt.py")
+
+grafico_convergencia_hres2 = _conv_mod.grafico_convergencia_hres2
+grafico_dtw_delta           = _dtw_mod.grafico_dtw_delta
+grafico_switches            = _gantt_mod.grafico_switches
+
+
+
+
 
 
 # ── Configuración ─────────────────────────────────────────────────────────────
@@ -202,27 +222,11 @@ def main() -> None:
 
     # ── Gráficos ──────────────────────────────────────────────────────────
     print("\n  Generando gráficos...")
-    grafico_convergencia(
+    grafico_convergencia_hres2(
         historial_global = resultado.historial_global,
         log_switches     = resultado.log_switches,
         colores_mh       = COLORES_MH,
-        valor_optimo     = 0.30,
         output_dir       = output_dir,
-    )
-    grafico_instantaneo(
-        historial_global      = resultado.historial_global,
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = 0.30,
-        output_dir            = output_dir,
-    )
-    grafico_solo_instantaneo(
-        historial_inst_global = resultado.historial_inst_global,
-        log_switches          = resultado.log_switches,
-        colores_mh            = COLORES_MH,
-        valor_optimo          = 0.30,
-        output_dir            = output_dir,
     )
     grafico_dtw_delta(
         dtw_deltas_global = resultado.dtw_deltas_global,
@@ -235,6 +239,7 @@ def main() -> None:
         colores_mh   = COLORES_MH,
         output_dir   = output_dir,
     )
+
 
     print(f"\n  Todos los artefactos guardados en: '{output_dir}'")
     print(f"{sep}\n")
