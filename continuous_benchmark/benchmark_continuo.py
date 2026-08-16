@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from dtw_stagnation import StagnationConfig
 from continuous_benchmark.funciones_cec2022 import get_test_functions, ContinuousFunction
 from continuous_benchmark.orchestrator import ejecutar_pipeline, COLORES_MH
+from analisis_estadistico import realizar_analisis_estadistico
 from plots import (
     grafico_convergencia,
     grafico_instantaneo,
@@ -231,6 +232,19 @@ def procesar_funcion(
             output_dir   = run1_dir,
         )
 
+    # ── Análisis Estadístico de los N_RUNS del Pipeline Híbrido ─────────────
+    realizar_analisis_estadistico(
+        resultados_dict      = {"Hybrid DTW": valores_finales},
+        output_dir           = output_dir,
+        algoritmo_referencia = "Hybrid DTW",
+        metrica_label        = f"Fitness — {func.name} (Minimización)",
+        titulo_benchmark     = f"CEC2022 — {func.name}",
+        minimizacion         = True,
+        boxplot_filename     = "boxplot_estadistico.png",
+        csv_filename         = "analisis_estadistico_pvalues.csv",
+        md_filename          = "analisis_estadistico_pvalues.md",
+    )
+
     return {
         "nombre":       func.name,
         "n_dim":        func.n_dim,
@@ -414,6 +428,22 @@ def main() -> None:
                     f" | {r['media']:.4f} | {r['std']:.4f} | {r['mediana']:.4f}"
                     f" | {r['mejor']:.4f} | {r['valor_optimo']:.4f} |\n")
     print(f"  [md]  Resumen global guardado en '{resumen_md}'")
+
+    # ── Análisis Estadístico Global (comparación entre todas las funciones CEC) ──
+    if len(resumen_global) > 1:
+        resultados_multi = {r["nombre"]: r["valores_runs"] for r in resumen_global}
+        referencia_global = resumen_global[0]["nombre"]
+        realizar_analisis_estadistico(
+            resultados_dict      = resultados_multi,
+            output_dir           = batch_dir,
+            algoritmo_referencia = referencia_global,
+            metrica_label        = "Fitness (Minimización CEC2022)",
+            titulo_benchmark     = f"CEC2022 Global ({len(resumen_global)} funciones)",
+            minimizacion         = True,
+            boxplot_filename     = "boxplot_comparativo_funciones.png",
+            csv_filename         = "analisis_estadistico_global.csv",
+            md_filename          = "analisis_estadistico_global.md",
+        )
 
     print(f"\n  BENCHMARK CONTINUO COMPLETADO. ({len(funciones)} funciones x {N_RUNS} runs)\n")
 

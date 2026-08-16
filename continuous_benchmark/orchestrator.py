@@ -88,6 +88,7 @@ def ejecutar_pipeline(
     stag_cfg           : StagnationConfig | None = None,
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
+    on_epoch_callback  = None,  # callable(epoch, mh, tipo, iters_total, mejor_valor, mejor_solucion)
 ) -> PipelineResult:
 
     if max_iters is None and tiempo_max is None:
@@ -182,6 +183,17 @@ def ejecutar_pipeline(
                   f"| mejor MH: {resultado.mejor_valor:.6f} "
                   f"| global: {valor_global:.6f}")
 
+        # ── Callback opcional por época ───────────────────────────────────
+        if on_epoch_callback is not None:
+            on_epoch_callback(
+                epoch         = epoch_ctr,
+                mh            = mh,
+                tipo          = tipo,
+                iters_total   = len(historial_global),
+                mejor_valor   = valor_global,
+                mejor_solucion= solucion_global,
+            )
+
     elapsed_total = time.time() - t_inicio
     if verbose:
         print(f"\n  [{elapsed_total:.1f}s] EJECUCIÓN FINALIZADA")
@@ -198,6 +210,7 @@ def ejecutar_pipeline(
         log_switches          = log_switches,
         valor_optimo          = func.optimum,
     )
+
 
 
 def _ejecutar_mh(

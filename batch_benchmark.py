@@ -32,6 +32,7 @@ from mkp_core.data_loader import cargar_instancias, seleccionar_instancia
 from mkp_core.problem     import MKPInstance
 from dtw_stagnation       import StagnationConfig
 from hybrid_mkp.orchestrator import ejecutar_pipeline, COLORES_MH
+from analisis_estadistico import realizar_analisis_estadistico
 from plots import (
     grafico_convergencia,
     grafico_instantaneo,
@@ -267,6 +268,19 @@ def procesar_instancia(
             f.write(f"Gap mejor          : {gap_mejor:.2f}%\n")
         f.write(f"Switches medios    : {switches_medio:.1f}\n")
 
+    # ── Análisis Estadístico de los N_RUNS del Pipeline Híbrido ─────────────
+    realizar_analisis_estadistico(
+        resultados_dict      = {"Hybrid DTW": valores_finales},
+        output_dir           = output_dir,
+        algoritmo_referencia = "Hybrid DTW",
+        metrica_label        = "Fitness (Maximización MKP)",
+        titulo_benchmark     = f"Batch MKP — {nombre}",
+        minimizacion         = False,
+        boxplot_filename     = "boxplot_estadistico.png",
+        csv_filename         = "analisis_estadistico_pvalues.csv",
+        md_filename          = "analisis_estadistico_pvalues.md",
+    )
+
     return {
         "nombre":         nombre,
         "n":              inst.n,
@@ -280,6 +294,7 @@ def procesar_instancia(
         "gap_medio":      gap_medio,
         "gap_mejor":      gap_mejor,
         "switches_medio": switches_medio,
+        "valores_runs":   valores_finales,
     }
 
 
@@ -435,6 +450,22 @@ def main() -> None:
             g_mej_str = f"{r['gap_mejor']:.2f}%" if r["gap_mejor"] is not None else "N/A"
             f.write(f"| {i} | `{r['nombre']}` | {r['n']} | {r['m']} | {r['media']:.1f} | {r['std']:.2f} | {r['mejor']:.1f} | {r['peor']:.1f} | {r['valor_optimo']:.1f} | {g_med_str} | {g_mej_str} | {r['switches_medio']:.1f} |\n")
     print(f"  [md] Resumen batch guardado en '{md_path}'")
+
+    # ── Análisis Estadístico Global (todas las instancias, comparación entre sí) ──
+    if len(resumen_global) > 1:
+        resultados_multi = {r["nombre"]: r["valores_runs"] for r in resumen_global}
+        referencia_global = resumen_global[0]["nombre"]
+        realizar_analisis_estadistico(
+            resultados_dict      = resultados_multi,
+            output_dir           = batch_dir,
+            algoritmo_referencia = referencia_global,
+            metrica_label        = "Fitness (Maximización MKP)",
+            titulo_benchmark     = f"Batch MKP Global ({len(resumen_global)} instancias)",
+            minimizacion         = False,
+            boxplot_filename     = "boxplot_comparativo_instancias.png",
+            csv_filename         = "analisis_estadistico_global.csv",
+            md_filename          = "analisis_estadistico_global.md",
+        )
 
     print(f"\n  BATCH COMPLETADO. ({len(instancias)} instancias x {N_RUNS} runs procesados)\n")
 
