@@ -5,9 +5,9 @@ Script de ejecución de una sola corrida del Pipeline Híbrido DTW
 sobre el sistema HRES2-H2 (WPEB Extendido).
 
 Genera en resultados/run_TIMESTAMP/:
-  - convergencia_fitness.png
-  - convergencia_instantanea.png
-  - solo_instantaneo.png
+  - fitness_convergence.png
+  - instantaneous_convergence.png
+  - instantaneous_fitness_only.png
   - dtw_delta.png
   - switches_gantt.png
   - historial_dtw.csv
@@ -68,7 +68,7 @@ grafico_switches            = _gantt_mod.grafico_switches
 # ── Configuración ─────────────────────────────────────────────────────────────
 
 MAX_ITERS   = 1000   # iteraciones totales del pipeline
-RANDOM_SEED = None   # None → estocástico; int → reproducible
+RANDOM_SEED = 42     # Semilla global fijada para reproducibilidad (42)
 
 OUTPUT_BASE = os.path.join(os.path.dirname(__file__), "resultados")
 

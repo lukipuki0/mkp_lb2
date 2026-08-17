@@ -38,7 +38,7 @@ from plots import (
 INSTANCE_FILE  = os.path.join("instancias", "mknapcb1.txt")   # <-- cambia el TXT aqui
 
 MAX_ITERS   = 1000   # iteraciones totales por instancia
-RANDOM_SEED = None   # None -> no fijar semilla; int -> reproducible
+RANDOM_SEED = 42     # Semilla global fijada para reproducibilidad (42)
 OUTPUT_DIR  = os.path.join("resultados", "pipeline_hibrido")
 
 # DTW Stagnation params

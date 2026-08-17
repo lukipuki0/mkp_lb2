@@ -62,7 +62,7 @@ grafico_switches            = _gantt_mod.grafico_switches
 
 N_RUNS                 = 31     # Número de ejecuciones independientes
 MAX_ITERS_POR_RUN      = 1000   # Iteraciones máximas por run
-RANDOM_SEED            = None   # None -> ejecuciones estocásticas independientes
+RANDOM_SEED            = 42     # Semilla global fijada para reproducibilidad (42)
 OUTPUT_BASE = os.path.join(os.path.dirname(__file__), "resultados")
 
 # Parámetros del Monitor DTW
@@ -90,16 +90,16 @@ def grafico_boxplot_hres2(valores: list[float], output_dir: str):
                      flierprops=dict(marker="o", color="#D32F2F", alpha=0.6))
 
     media = np.mean(valores)
-    plt.axhline(y=media, color="#388E3C", linestyle="--", linewidth=1.5, label=f"Media: {media:.4f} CNY/kWh")
+    plt.axhline(y=media, color="#388E3C", linestyle="--", linewidth=1.5, label=f"Mean: {media:.4f} CNY/kWh")
 
-    plt.title("Distribución de LCOE en 31 Runs - HRES2-H2 (WPEB)", fontsize=12, fontweight="bold")
+    plt.title("LCOE Distribution across 31 Runs - HRES2-H2 (WPEB)", fontsize=12, fontweight="bold")
     plt.ylabel("LCOE (CNY/kWh)", fontsize=11)
     plt.xticks([1], ["HRES2-H2 Hybrid DTW"])
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.legend(loc="upper right")
     plt.tight_layout()
 
-    out_path = os.path.join(output_dir, "boxplot_lcoe_31runs.png")
+    out_path = os.path.join(output_dir, "lcoe_boxplot_31runs.png")
     plt.savefig(out_path, dpi=300)
     plt.close()
     print(f"  [boxplot] {out_path}")
@@ -151,6 +151,12 @@ def ejecutar_benchmark_hres2(
     # 1. Ejecutar Pipeline Híbrido DTW (31 Runs)
     resultados_runs = []
     for r in range(1, n_runs + 1):
+        if RANDOM_SEED is not None:
+            run_seed = RANDOM_SEED + r
+            import random
+            random.seed(run_seed)
+            np.random.seed(run_seed)
+
         print(f"  >>> RUN HYBRID DTW [{r:02d}/{n_runs:02d}] en progreso...")
         res = ejecutar_pipeline(
             func       = func,

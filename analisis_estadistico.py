@@ -217,7 +217,7 @@ def realizar_analisis_estadistico(
             bp["boxes"][i].set_linewidth(2.5)
             bp["boxes"][i].set_edgecolor("black")
 
-    ax.set_title(f"Comparación Estadística — {titulo_benchmark} ({n_runs} Runs, Ranking Friedman)",
+    ax.set_title(f"Statistical Comparison — {titulo_benchmark} ({n_runs} Runs, Friedman Ranking)",
                  fontsize=12, fontweight="bold")
     ax.set_ylabel(metrica_label, fontsize=11)
     ax.set_xticks(range(1, len(algs_sorted) + 1))

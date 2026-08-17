@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 from mkp_core.data_loader import cargar_instancias, seleccionar_instancia
 from mkp_core.problem     import MKPInstance
 from dtw_stagnation       import StagnationConfig
-from hybrid_mkp.orchestrator import ejecutar_pipeline, COLORES_MH
+from hybrid_mkp.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
 from analisis_estadistico import realizar_analisis_estadistico
 from plots import (
     grafico_convergencia,
@@ -49,7 +49,7 @@ MKNAPCB_NUM = 1
 # Parámetros de ejecución
 N_RUNS       = 31     # Repeticiones independientes por instancia
 MAX_ITERS    = 1000   # Condición de parada por iteraciones
-RANDOM_SEED  = None
+RANDOM_SEED  = 42     # Semilla global fijada para reproducibilidad (42)
 OUTPUT_BASE  = os.path.join("resultados", "batch_mkp")
 
 # Parámetros de Stagnation (DTW)
@@ -87,14 +87,14 @@ def grafico_boxplot_runs(
 
     if valor_opt > 0:
         ax.axhline(valor_opt, color="#4CAF50", linestyle="--", linewidth=1.5,
-                   label=f"Óptimo conocido = {valor_opt:.1f}")
+                   label=f"Known Optimum = {valor_opt:.1f}")
 
     mu = np.mean(valores)
-    ax.scatter([1], [mu], color="#FFEB3B", zorder=5, s=60, label=f"Media = {mu:.1f}")
+    ax.scatter([1], [mu], color="#FFEB3B", zorder=5, s=60, label=f"Mean = {mu:.1f}")
 
-    ax.set_title(f"Distribución de {N_RUNS} Runs\n{nombre_inst}", fontsize=11, fontweight="bold")
-    ax.set_xlabel("Pipeline Híbrido DTW", fontsize=10)
-    ax.set_ylabel("Mejor valor final (maximización)", fontsize=10)
+    ax.set_title(f"{N_RUNS} Runs Distribution\n{nombre_inst}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Hybrid DTW Pipeline", fontsize=10)
+    ax.set_ylabel("Final Best Value (Maximization)", fontsize=10)
     ax.legend(fontsize=8, loc="lower right")
     ax.grid(axis="y", alpha=0.3)
 
@@ -128,6 +128,12 @@ def procesar_instancia(
     resultados_runs: list = []
 
     for run_idx in range(1, n_runs + 1):
+        if RANDOM_SEED is not None:
+            run_seed = RANDOM_SEED + run_idx
+            import random
+            random.seed(run_seed)
+            np.random.seed(run_seed)
+
         if verbose:
             print(f"\n  --- Run {run_idx:2d}/{n_runs} | {nombre} ---", flush=True)
 
@@ -359,15 +365,37 @@ def procesar_instancia(
             f.write(f"Gap mejor          : {gap_mejor:.2f}%\n")
         f.write(f"Switches medios    : {switches_medio:.1f}\n")
 
-    # ── Análisis Estadístico de los N_RUNS del Pipeline Híbrido ─────────────
+    # ── 2. Ejecutar Metaheurísticas Standalone Comparativas (N_RUNS cada una) ──
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    resultados_dict = {"Hybrid DTW": valores_finales}
+
+    sep = "=" * 62
+    print(f"\n{sep}")
+    print(f"  EJECUTANDO BENCHMARKS STANDALONE PARA ANÁLISIS ESTADÍSTICO ({n_runs} RUNS POR MH) — {nombre}")
+    print(sep)
+
+    for mh in standalone_mhs:
+        print(f"  > Ejecutando {mh} Standalone ({n_runs} runs x {max_iters} iters)...")
+        vals_mh = []
+        for r in range(1, n_runs + 1):
+            if RANDOM_SEED is not None:
+                run_seed = RANDOM_SEED + r
+                random.seed(run_seed)
+                np.random.seed(run_seed)
+            res_std = ejecutar_mh_standalone(inst, mh, max_iters=max_iters)
+            vals_mh.append(res_std.mejor_valor)
+        resultados_dict[mh] = vals_mh
+        print(f"    {mh:<4s} | Media: {np.mean(vals_mh):.1f} | Max: {np.max(vals_mh):.1f}")
+
+    # ── Análisis Estadístico Inferencial Comparativo (Hybrid DTW vs cada MH) ──
     realizar_analisis_estadistico(
-        resultados_dict      = {"Hybrid DTW": valores_finales},
+        resultados_dict      = resultados_dict,
         output_dir           = output_dir,
         algoritmo_referencia = "Hybrid DTW",
-        metrica_label        = "Fitness (Maximización MKP)",
-        titulo_benchmark     = f"Batch MKP — {nombre}",
+        metrica_label        = f"Fitness (Maximization) — {nombre}",
+        titulo_benchmark     = f"{nombre}",
         minimizacion         = False,
-        boxplot_filename     = "boxplot_estadistico.png",
+        boxplot_filename     = "mhs_comparative_boxplot.png",
         csv_filename         = "analisis_estadistico_pvalues.csv",
         md_filename          = "analisis_estadistico_pvalues.md",
     )

@@ -3,7 +3,7 @@ plots/convergencia.py
 ---------------------
 Gráfico de convergencia global del pipeline coloreado por metaheurística.
 
-Genera: convergencia_fitness.png
+Genera: fitness_convergence.png
 """
 
 import os
@@ -76,8 +76,8 @@ def grafico_convergencia(
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    path = os.path.join(output_dir, "convergencia_fitness.png")
+    path = os.path.join(output_dir, "fitness_convergence.png")
     fig.savefig(path, dpi=150)
     plt.close(fig)
-    print(f"  [plot] convergencia_fitness.png  -> '{path}'")
+    print(f"  [plot] fitness_convergence.png   -> '{path}'")
     return path

@@ -133,14 +133,14 @@ def procesar_instancia_mkp(
         color = COLORES_ALGO.get(name, "#333333")
         ax.plot(r.historial, label=name, color=color, linewidth=2)
     if inst.valor_optimo and inst.valor_optimo > 0:
-        ax.axhline(inst.valor_optimo, color="red", linestyle="--", alpha=0.7, label=f"Óptimo ({inst.valor_optimo})")
-    ax.set_title(f"Convergencia MKP - {inst_name} (n={inst.n}, m={inst.m})", fontsize=13, fontweight="bold")
-    ax.set_xlabel("Iteración")
-    ax.set_ylabel("Fitness / Valor Ganancia (Maximización)")
+        ax.axhline(inst.valor_optimo, color="red", linestyle="--", alpha=0.7, label=f"Optimum ({inst.valor_optimo})")
+    ax.set_title(f"MKP Convergence - {inst_name} (n={inst.n}, m={inst.m})", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Fitness / Profit Value (Maximization)")
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.legend(loc="lower right")
     fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, "01_convergencia_comparativa.png"), dpi=150)
+    fig.savefig(os.path.join(output_dir, "01_comparative_convergence.png"), dpi=150)
     plt.close(fig)
 
     # Gráfico 2: Instantáneo
@@ -149,13 +149,13 @@ def procesar_instancia_mkp(
         color = COLORES_ALGO.get(name, "#333333")
         if hasattr(r, "historial_inst") and r.historial_inst:
             ax.plot(r.historial_inst, label=name, color=color, alpha=0.5, linewidth=1)
-    ax.set_title(f"Fitness Instantáneo MKP - {inst_name}", fontsize=13, fontweight="bold")
-    ax.set_xlabel("Iteración")
-    ax.set_ylabel("Fitness de la Iteración")
+    ax.set_title(f"MKP Instantaneous Fitness - {inst_name}", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Iteration Fitness")
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.legend(loc="lower right")
     fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, "02_instantaneo_comparativo.png"), dpi=150)
+    fig.savefig(os.path.join(output_dir, "02_comparative_instantaneous.png"), dpi=150)
     plt.close(fig)
 
     mejores_valores = {k: v.mejor_valor for k, v in dict_res.items()}
@@ -238,14 +238,14 @@ def procesar_funcion_continua(
     for name, r in dict_res.items():
         color = COLORES_ALGO.get(name, "#333333")
         ax.plot(r.historial, label=name, color=color, linewidth=2)
-    ax.axhline(func.optimum, color="red", linestyle="--", alpha=0.7, label=f"Óptimo ({func.optimum:.1f})")
-    ax.set_title(f"Convergencia CEC2022 - {func.name} (Dim={func.n_dim})", fontsize=13, fontweight="bold")
-    ax.set_xlabel("Iteración")
-    ax.set_ylabel("Fitness (Minimización)")
+    ax.axhline(func.optimum, color="red", linestyle="--", alpha=0.7, label=f"Optimum ({func.optimum:.1f})")
+    ax.set_title(f"CEC2022 Convergence - {func.name} (Dim={func.n_dim})", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Fitness (Minimization)")
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.legend(loc="upper right")
     fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, "01_convergencia_comparativa.png"), dpi=150)
+    fig.savefig(os.path.join(output_dir, "01_comparative_convergence.png"), dpi=150)
     plt.close(fig)
 
     # Gráfico 2: Instantáneo
@@ -254,13 +254,13 @@ def procesar_funcion_continua(
         color = COLORES_ALGO.get(name, "#333333")
         if hasattr(r, "historial_inst") and r.historial_inst:
             ax.plot(r.historial_inst, label=name, color=color, alpha=0.5, linewidth=1)
-    ax.set_title(f"Fitness Instantáneo CEC2022 - {func.name}", fontsize=13, fontweight="bold")
-    ax.set_xlabel("Iteración")
-    ax.set_ylabel("Fitness de la Iteración")
+    ax.set_title(f"CEC2022 Instantaneous Fitness - {func.name}", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Iteration Fitness")
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.legend(loc="upper right")
     fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, "02_instantaneo_comparativo.png"), dpi=150)
+    fig.savefig(os.path.join(output_dir, "02_comparative_instantaneous.png"), dpi=150)
     plt.close(fig)
 
     mejores_valores = {k: v.mejor_valor for k, v in dict_res.items()}

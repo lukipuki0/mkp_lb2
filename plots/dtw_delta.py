@@ -92,10 +92,7 @@ def grafico_dtw_delta(
             legend_patches.append(mpatches.Patch(color=col, label=sw.mh_nombre))
             seen.add(sw.mh_nombre)
 
-    # Línea en cero: separación exploración/explotación
-    ax.axhline(y=0, color="black", linestyle="-", linewidth=2.0, alpha=0.6,
-               label="Threshold (Delta=0)")
-    legend_patches.append(mpatches.Patch(color="black", label="Threshold (Delta=0)"))
+
 
 
     ax.set_title("DTW Delta per Iteration  [+ = stagnation | - = active improvement]",

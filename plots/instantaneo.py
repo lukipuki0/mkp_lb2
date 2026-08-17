@@ -4,7 +4,7 @@ plots/instantaneo.py
 Gráfico de convergencia que superpone el fitness instantáneo (ruidoso)
 con el mejor fitness histórico (escalera).
 
-Genera: convergencia_instantanea.png
+Genera: instantaneous_convergence.png
 """
 
 import os
@@ -88,8 +88,8 @@ def grafico_instantaneo(
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    path = os.path.join(output_dir, "convergencia_instantanea.png")
+    path = os.path.join(output_dir, "instantaneous_convergence.png")
     fig.savefig(path, dpi=150)
     plt.close(fig)
-    print(f"  [plot] convergencia_instantanea.png -> '{path}'")
+    print(f"  [plot] instantaneous_convergence.png -> '{path}'")
     return path

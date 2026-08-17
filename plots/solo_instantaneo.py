@@ -4,7 +4,7 @@ plots/solo_instantaneo.py
 Gráfico de convergencia que muestra ÚNICAMENTE el fitness instantáneo
 evaluado en cada iteración (el "ruido" de exploración).
 
-Genera: solo_instantaneo.png
+Genera: instantaneous_fitness_only.png
 """
 
 import os
@@ -82,8 +82,8 @@ def grafico_solo_instantaneo(
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    path = os.path.join(output_dir, "solo_instantaneo.png")
+    path = os.path.join(output_dir, "instantaneous_fitness_only.png")
     fig.savefig(path, dpi=150)
     plt.close(fig)
-    print(f"  [plot] solo_instantaneo.png      -> '{path}'")
+    print(f"  [plot] instantaneous_fitness_only.png -> '{path}'")
     return path

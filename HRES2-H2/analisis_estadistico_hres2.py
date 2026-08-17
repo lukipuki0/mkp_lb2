@@ -166,13 +166,13 @@ def realizar_analisis_estadistico_completo(
         patch.set_facecolor(col)
         patch.set_alpha(0.7)
 
-    plt.title(f"Comparación Estadistica de LCOE en {n_runs} Runs (Ranking Friedman)", fontsize=13, fontweight="bold")
+    plt.title(f"LCOE Statistical Comparison across {n_runs} Runs (Friedman Ranking)", fontsize=13, fontweight="bold")
     plt.ylabel("LCOE (CNY/kWh)", fontsize=11)
     plt.xticks(rotation=25, ha="right", fontsize=10)
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.tight_layout()
 
-    boxplot_comp_path = os.path.join(output_dir, "boxplot_comparativo_mhs.png")
+    boxplot_comp_path = os.path.join(output_dir, "mhs_comparative_boxplot.png")
     plt.savefig(boxplot_comp_path, dpi=300)
     plt.close()
     print(f"\n  [plot] {boxplot_comp_path}")

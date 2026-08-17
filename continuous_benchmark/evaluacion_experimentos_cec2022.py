@@ -215,20 +215,20 @@ def ejecutar_experimentos():
 
             plt.plot(range(1, MAX_ITERS + 1), plot_data, label=alg, color=color, linewidth=2)
 
-        title_scale = " (Escala Logarítmica f(x)-bias)" if is_log else " (Escala Lineal)"
-        plt.title(f"Convergencia {func.name}{title_scale}", fontsize=12, fontweight="bold")
-        plt.xlabel("Iteración", fontsize=10)
-        plt.ylabel("Fitness (Valor f(x))" if not is_log else "Error Log (f(x) - f*)", fontsize=10)
+        title_scale = " (Log Scale f(x)-bias)" if is_log else " (Linear Scale)"
+        plt.title(f"Convergence {func.name}{title_scale}", fontsize=12, fontweight="bold")
+        plt.xlabel("Iteration", fontsize=10)
+        plt.ylabel("Fitness (f(x) Value)" if not is_log else "Log Error (f(x) - f*)", fontsize=10)
         
         if is_log:
             plt.yscale("log")
             
-        plt.axhline(y=func.optimum if not is_log else 1e-12, color="red", linestyle="--", alpha=0.6, label="Óptimo/Bias")
+        plt.axhline(y=func.optimum if not is_log else 1e-12, color="red", linestyle="--", alpha=0.6, label="Optimum/Bias")
         plt.grid(True, which="both", linestyle=":", alpha=0.6)
         plt.legend(fontsize=10)
         plt.tight_layout()
 
-        plot_path = os.path.join(PLOTS_DIR, f"convergencia_{f_key}_{func.name}.png")
+        plot_path = os.path.join(PLOTS_DIR, f"convergence_{f_key}_{func.name}.png")
         plt.savefig(plot_path, dpi=300)
         plt.close()
 

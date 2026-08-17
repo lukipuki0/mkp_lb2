@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dtw_stagnation import StagnationConfig
 from continuous_benchmark.funciones_cec2022 import get_test_functions, ContinuousFunction
-from continuous_benchmark.orchestrator import ejecutar_pipeline, COLORES_MH
+from continuous_benchmark.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
 from analisis_estadistico import realizar_analisis_estadistico
 from continuous_benchmark.plots import (
     grafico_convergencia,
@@ -47,7 +47,7 @@ from continuous_benchmark.plots import (
 
 MAX_ITERS_POR_FUNCION  = 1000    # iteraciones totales por funcion por run
 N_RUNS                 = 31      # repeticiones independientes por funcion
-RANDOM_SEED            = None    # None -> semilla aleatoria en cada run
+RANDOM_SEED            = 42      # Semilla global fijada para reproducibilidad (42)
 OUTPUT_BASE            = os.path.join("resultados", "benchmark_continuo")
 DIMENSION              = 10      # dimensionalidad de las funciones
 
@@ -85,15 +85,15 @@ def grafico_boxplot_runs(
     )
 
     ax.axhline(valor_opt, color="#4CAF50", linestyle="--", linewidth=1.5,
-               label=f"Optimo conocido = {valor_opt:.4f}")
+               label=f"Known Optimum = {valor_opt:.4f}")
 
     mu  = np.mean(valores)
     med = np.median(valores)
-    ax.scatter([1], [mu],  color="#FFEB3B", zorder=5, s=60, label=f"Media = {mu:.4f}")
+    ax.scatter([1], [mu],  color="#FFEB3B", zorder=5, s=60, label=f"Mean = {mu:.4f}")
 
-    ax.set_title(f"Distribucion de {N_RUNS} Runs\n{func_name}", fontsize=11, fontweight="bold")
-    ax.set_xlabel("Pipeline Hibrido DTW", fontsize=10)
-    ax.set_ylabel("Mejor valor final (minimizacion)", fontsize=10)
+    ax.set_title(f"{N_RUNS} Runs Distribution\n{func_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Hybrid DTW Pipeline", fontsize=10)
+    ax.set_ylabel("Final Best Value (Minimization)", fontsize=10)
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(axis="y", alpha=0.3)
 
@@ -112,16 +112,25 @@ def procesar_funcion(
     n_runs     : int,
     stag_cfg   : StagnationConfig,
     output_dir : str,
+    cec_label  : str = "",
 ) -> dict:
-    """Ejecuta el pipeline n_runs veces para una funcion CEC y guarda artefactos."""
+    """Ejecuta el pipeline n_runs veces para una funcion CEC y compara vs cada MH standalone."""
     os.makedirs(output_dir, exist_ok=True)
+    if not cec_label:
+        cec_label = func.name
 
     valores_finales   : list[float] = []
     n_switches_runs   : list[int]   = []
     resultados_runs   : list        = []
 
     for run_idx in range(1, n_runs + 1):
-        print(f"\n  --- Run {run_idx:2d}/{n_runs} | {func.name} ---", flush=True)
+        if RANDOM_SEED is not None:
+            run_seed = RANDOM_SEED + run_idx
+            import random
+            random.seed(run_seed)
+            np.random.seed(run_seed)
+
+        print(f"\n  --- Run {run_idx:2d}/{n_runs} | {cec_label} ({func.name}) ---", flush=True)
 
         resultado = ejecutar_pipeline(
             func      = func,
@@ -143,7 +152,7 @@ def procesar_funcion(
 
     sep = "=" * 62
     print(f"\n{sep}")
-    print(f"  RESUMEN {n_runs} RUNS - {func.name}")
+    print(f"  RESUMEN {n_runs} RUNS HYBRID DTW - {cec_label} ({func.name})")
     print(sep)
     print(f"  Media   : {media:.6f}")
     print(f"  Std     : {std:.6f}")
@@ -153,9 +162,31 @@ def procesar_funcion(
     print(f"  Optimo  : {func.optimum:.6f}")
     print()
 
+    # ── 2. Ejecutar Metaheurísticas Standalone Comparativas (N_RUNS cada una) ──
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    resultados_dict = {"Hybrid DTW": valores_finales}
+
+    print(f"\n{sep}")
+    print(f"  EJECUTANDO BENCHMARKS STANDALONE PARA ANÁLISIS ESTADÍSTICO ({n_runs} RUNS POR MH) — {cec_label}")
+    print(sep)
+
+    for mh in standalone_mhs:
+        print(f"  > Ejecutando {mh} Standalone ({n_runs} runs x {max_iters} iters)...")
+        vals_mh = []
+        for r in range(1, n_runs + 1):
+            if RANDOM_SEED is not None:
+                run_seed = RANDOM_SEED + r
+                import random
+                random.seed(run_seed)
+                np.random.seed(run_seed)
+            res_std = ejecutar_mh_standalone(func, mh, max_iters=max_iters)
+            vals_mh.append(res_std.mejor_valor)
+        resultados_dict[mh] = vals_mh
+        print(f"    {mh:<4s} | Media: {np.mean(vals_mh):.6f} | Min: {np.min(vals_mh):.6f} | Max: {np.max(vals_mh):.6f}")
+
     # ── Boxplot ───────────────────────────────────────────────────────────
     grafico_boxplot_runs(
-        func_name  = func.name,
+        func_name  = cec_label,
         valores    = valores_finales,
         valor_opt  = func.optimum,
         output_dir = output_dir,
@@ -180,7 +211,7 @@ def procesar_funcion(
     # Reporte TXT del mejor run
     report_path = os.path.join(best_run_dir, "resumen_pipeline_best_run.txt")
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write(f"Funcion            : {func.name} (Mejor Run #{best_run_idx + 1:02d})\n")
+        f.write(f"Funcion            : {cec_label} ({func.name}) (Mejor Run #{best_run_idx + 1:02d})\n")
         f.write(f"Dimension          : {func.n_dim}\n")
         f.write(f"Limites            : [{func.lb}, {func.ub}]\n")
         f.write(f"Optimo conocido    : {func.optimum:.6f}\n")
@@ -249,7 +280,7 @@ def procesar_funcion(
 
     with open(txt_best_path, "w", encoding="utf-8") as f_dtw:
         f_dtw.write("======================================================================================================================================================================================\n")
-        f_dtw.write(f"  HISTORIAL DETALLADO DE TODAS LAS MÉTRICAS DTW POR ITERACIÓN — MEJOR RUN (#{best_run_idx + 1:02d}) — {func.name}\n")
+        f_dtw.write(f"  HISTORIAL DETALLADO DE TODAS LAS MÉTRICAS DTW POR ITERACIÓN — MEJOR RUN (#{best_run_idx + 1:02d}) — {cec_label} ({func.name})\n")
         f_dtw.write("======================================================================================================================================================================================\n\n")
         f_dtw.write(
             f"  {'Iter':>6}  {'Epoch':>5}  {'MH':<6}  {'Tipo':<12}  {'Fit Best':>14}  {'Fit Inst':>14}  "
@@ -281,17 +312,17 @@ def procesar_funcion(
                 streak= info.get("trigger_streak", 0)
                 win_n = info.get("n", 0)
 
-                if not ready: estado_str = f"Llenando ventana (W={win_n})"
-                elif fire:    estado_str = "[!] ESTANCAMIENTO (Fire)"
-                else:         estado_str = "Explotacion activa"
+                fi_s = f"{fi:14.6f}" if not (isinstance(fi, float) and np.isnan(fi)) else "      --      "
+                d1_s = f"{d1:14.6f}" if not (isinstance(d1, float) and np.isnan(d1)) else "      --      "
+                d2_s = f"{d2:14.6f}" if not (isinstance(d2, float) and np.isnan(d2)) else "      --      "
+                dl_s = f"{delta:+14.6f}" if not (isinstance(delta, float) and np.isnan(delta)) else "      --      "
+                tc_s = f"{tc:12.6f}" if not (isinstance(tc, float) and np.isnan(tc)) else "    --    "
+                tr_s = f"{tr:12.6f}" if not (isinstance(tr, float) and np.isnan(tr)) else "    --    "
+                td_s = f"{td:14.6f}" if not (isinstance(td, float) and np.isnan(td)) else "      --      "
 
-                d1_s  = f"{d1:14.6f}" if (isinstance(d1, float) and not np.isnan(d1)) else f"{'--':>14}"
-                d2_s  = f"{d2:14.6f}" if (isinstance(d2, float) and not np.isnan(d2)) else f"{'--':>14}"
-                dl_s  = f"{delta:+14.6f}" if (isinstance(delta, float) and not np.isnan(delta)) else f"{'--':>14}"
-                fi_s  = f"{fi:14.6f}" if (isinstance(fi, float) and not np.isnan(fi)) else f"{'--':>14}"
-                tc_s  = f"{tc:12.6f}" if (isinstance(tc, float) and not np.isnan(tc)) else f"{'--':>12}"
-                tr_s  = f"{tr:12.6f}" if (isinstance(tr, float) and not np.isnan(tr)) else f"{'--':>12}"
-                td_s  = f"{td:14.6f}" if (isinstance(td, float) and not np.isnan(td)) else f"{'--':>14}"
+                if not ready: estado_str = "Llenando ventana (W=30)"
+                elif fire:    estado_str = "[!] ESTANCAMIENTO (Fire)"
+                else:         estado_str = "[OK] Explotacion activa"
 
                 f_dtw.write(
                     f"  {idx + 1:6d}  {ep_idx:5d}  {sw.mh_nombre:<6}  {sw.tipo:<12}  {fit:14.6f}  {fi_s}  "
@@ -320,9 +351,9 @@ def procesar_funcion(
         output_dir   = best_run_dir,
     )
 
-    # ── Análisis Estadístico de los N_RUNS del Pipeline Híbrido ─────────────
+    # ── Análisis Estadístico Inferencial Comparativo (Hybrid DTW vs cada MH) ──
     realizar_analisis_estadistico(
-        resultados_dict      = {"Hybrid DTW": valores_finales},
+        resultados_dict      = resultados_dict,
         output_dir           = output_dir,
         algoritmo_referencia = "Hybrid DTW",
         metrica_label        = f"Fitness — {func.name} (Minimización)",
@@ -380,9 +411,9 @@ def grafico_boxplot_global(
 
     ax.set_xticks(range(1, n + 1))
     ax.set_xticklabels(nombres, rotation=40, ha="right", fontsize=8)
-    ax.set_title(f"Boxplot Global — {resumen_global[0]['n_runs']} Runs por Funcion CEC2022",
+    ax.set_title(f"Global Boxplot — {resumen_global[0]['n_runs']} Runs per CEC2022 Function",
                  fontsize=12, fontweight="bold")
-    ax.set_ylabel("Mejor valor final (minimizacion)", fontsize=10)
+    ax.set_ylabel("Final Best Value (Minimization)", fontsize=10)
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
 
@@ -432,18 +463,20 @@ def main() -> None:
     resumen_global: list[dict] = []
 
     for idx, func in enumerate(funciones, 1):
+        cec_label = f"CEC {idx}"
         print(f"\n{'=' * 62}")
-        print(f"  [{idx}/{len(funciones)}] {func.name} (Dim={func.n_dim})")
+        print(f"  [{idx}/{len(funciones)}] {cec_label}: {func.name} (Dim={func.n_dim})")
         print(f"{'=' * 62}")
 
-        func_dir = os.path.join(batch_dir, func.name)
+        func_dir = os.path.join(batch_dir, f"CEC_{idx:02d}_{func.name}")
 
         resumen = procesar_funcion(
-            func      = func,
-            max_iters = MAX_ITERS_POR_FUNCION,
-            n_runs    = N_RUNS,
-            stag_cfg  = stag_cfg,
+            func       = func,
+            max_iters  = MAX_ITERS_POR_FUNCION,
+            n_runs     = N_RUNS,
+            stag_cfg   = stag_cfg,
             output_dir = func_dir,
+            cec_label  = cec_label,
         )
         resumen_global.append(resumen)
 

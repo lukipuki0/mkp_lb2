@@ -353,3 +353,42 @@ def _ejecutar_mh(
 
     else:
         raise ValueError(f"MH desconocida: '{mh_nombre}'")
+
+
+def ejecutar_mh_standalone(inst: MKPInstance, mh_nombre: str, max_iters: int = 1000):
+    """Ejecuta una única metaheurística de forma standalone sobre una instancia MKP."""
+    if mh_nombre == "GA":
+        params = GAParams(pop_size=30, generations=max_iters, use_stagnation=False)
+        return _ga_epoch(inst, params, verbose=False)
+    elif mh_nombre == "PSO":
+        params = PSOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _pso_epoch(inst, params, verbose=False)
+    elif mh_nombre == "GWO":
+        params = GWOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _gwo_epoch(inst, params, verbose=False)
+    elif mh_nombre == "WOA":
+        params = WOAParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _woa_epoch(inst, params, verbose=False)
+    elif mh_nombre == "EHO":
+        params = EHOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _eho_epoch(inst, params, verbose=False)
+    elif mh_nombre == "ACO":
+        params = ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _aco_epoch(inst, params, verbose=False)
+    elif mh_nombre == "ABC":
+        params = ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False)
+        return _abc_epoch(inst, params, verbose=False)
+    elif mh_nombre == "SA":
+        params = SAParams(T_inicial=5000.0, T_final=1.0, alpha=0.97, iter_por_T=max(1, max_iters // 20), use_stagnation=False)
+        return _sa_epoch(inst, params, verbose=False)
+    elif mh_nombre == "TS":
+        params = TSParams(iterations=max_iters, use_stagnation=False)
+        return _ts_epoch(inst, params, verbose=False)
+    elif mh_nombre == "ILS":
+        params = ILSParams(iterations=max_iters, use_stagnation=False)
+        return _ils_epoch(inst, params, verbose=False)
+    elif mh_nombre == "VNS":
+        params = VNSParams(iterations=max_iters, use_stagnation=False)
+        return _vns_epoch(inst, params, verbose=False)
+    else:
+        raise ValueError(f"Metaheurística standalone no soportada: '{mh_nombre}'")
