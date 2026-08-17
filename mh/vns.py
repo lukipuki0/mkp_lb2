@@ -44,6 +44,7 @@ class VNSEpochResult:
     historial_inst:    list[float] = field(default_factory=list)  # fitness de sol_actual al final de cada iteración
     mejor_solucion:    list[int] = field(default_factory=list)
     dtw_deltas:        list[float] = field(default_factory=list)
+    dtw_info_hist:     list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -123,6 +124,7 @@ def ejecutar_epoch(
     historial = []
     historial_inst = []
     dtw_deltas = []
+    dtw_info_hist = []
     stag_fires = 0
     
     fn_shaking = get_operator(params.neighborhood_op)
@@ -132,7 +134,6 @@ def ejecutar_epoch(
         monitor = StagnationMonitor(cfg=params.stag_cfg)
         
     k = 1
-    it = 0
     for it in range(params.iterations):
         # 1. Shaking (Perturbación con tamaño k)
         vecino, _ = fn_shaking(sol_actual, inst, k)
@@ -159,8 +160,10 @@ def ejecutar_epoch(
         historial_inst.append(val_actual)
         
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -175,19 +178,23 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {it + 1} -> ABORT")
                 break
+
+        dtw_info_hist.append(dtw_info)
                 
     return VNSEpochResult(
         epoch_idx=epoch_idx,
         mejor_valor=mejor_val,
-        iteraciones=it + 1,
+        iteraciones=len(historial),
         stagnation_fires=stag_fires,
         historial=historial,
         historial_inst=historial_inst,
         mejor_solucion=mejor_sol,
         dtw_deltas=dtw_deltas,
+        dtw_info_hist=dtw_info_hist,
     )
 
 

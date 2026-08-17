@@ -53,6 +53,7 @@ class WOAEpochResult:
     historial_inst   : list[float] = field(default_factory=list)  # fitness del líder (mejor ballena de la iteración)
     mejor_solucion   : list[int]  = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -76,158 +77,136 @@ class WOAResult:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _inicializar_ballenas(
-    inst: MKPInstance,
-    pop_size: int,
-    v_max: float,
-) -> tuple[np.ndarray, list[list[int]], list[float]]:
-    """Genera la población inicial: posiciones continuas + soluciones binarias factibles."""
+def _inicializar_poblacion(inst: MKPInstance, pop_size: int) -> tuple[np.ndarray, list[list[int]], list[float]]:
     n = inst.n
-    posiciones = np.random.uniform(-v_max, v_max, size=(pop_size, n))
+    posiciones = np.random.uniform(-1.0, 1.0, size=(pop_size, n))
     poblacion_bin = []
-    fitnesses     = []
-
+    fitnesses = []
     for i in range(pop_size):
-        sol = [random.randint(0, 1) for _ in range(n)]
-        sol, val = reparar_solucion(sol, inst)
+        sol_raw = [1 if pos > 0 else 0 for pos in posiciones[i]]
+        sol, val = reparar_solucion(sol_raw, inst)
         poblacion_bin.append(sol)
         fitnesses.append(val)
-
     return posiciones, poblacion_bin, fitnesses
 
 
-def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tuple[list[int], float]:
-    """Crea una copia de `sol` con bits invertidos al azar y la repara."""
-    copia = list(sol)
-    n = len(copia)
-    if n_flips <= 0:
-        n_flips = random.randint(1, 3)
-    indices = random.sample(range(n), min(n_flips, n))
-    for idx in indices:
+def _crear_ballena(sol: list[int], val: float) -> tuple[np.ndarray, list[int], float]:
+    pos = np.where(np.array(sol) == 1, 1.0, -1.0)
+    return pos, sol.copy(), val
+
+
+def _mutar_solucion(sol: list[int], inst: MKPInstance) -> tuple[list[int], float]:
+    n = inst.n
+    copia = sol.copy()
+    n_flips = random.randint(1, max(1, n // 10))
+    for idx in random.sample(range(n), n_flips):
         copia[idx] = 1 - copia[idx]
-    copia, val = reparar_solucion(copia, inst)
-    return copia, val
+    return reparar_solucion(copia, inst)
 
 
-# ── Epoch individual ─────────────────────────────────────────────────────────
+# ── Epoch ─────────────────────────────────────────────────────────────────────
 
 def ejecutar_epoch(
-    inst      : MKPInstance,
-    params    : WOAParams,
-    epoch_idx : int = 0,
-    verbose   : bool = True,
-    sol_inyectada: list[int] | None = None,
+    inst          : MKPInstance,
+    params        : WOAParams,
+    epoch_idx     : int = 0,
+    verbose       : bool = True,
+    sol_inyectada : list[int] | None = None,
 ) -> WOAEpochResult:
-    """Ejecuta un epoch completo de WOA con detección de estancamiento (abort)."""
+    """Ejecuta un único epoch del WOA."""
+    posiciones, poblacion_bin, fitnesses = _inicializar_poblacion(inst, params.pop_size)
 
-    pop_size = params.pop_size
-    n = inst.n
-
-    # Inicializar población de ballenas
-    posiciones, poblacion_bin, fitnesses = _inicializar_ballenas(
-        inst, pop_size, params.v_max,
-    )
-
-    # Inyectar solución del orquestador según el modo de inyección
+    # Inyección
     if sol_inyectada is not None:
-        sol_rep = list(sol_inyectada)
-        sol_rep, val_rep = reparar_solucion(sol_rep, inst)
+        sol_rep, val_rep = reparar_solucion(sol_inyectada, inst)
         mode = params.injection_mode
 
         if mode == "random":
             peor_idx = min(range(len(fitnesses)), key=lambda i: fitnesses[i])
-            poblacion_bin[peor_idx] = sol_rep
-            fitnesses[peor_idx] = val_rep
+            pos, sol, val = _crear_ballena(sol_rep, val_rep)
+            posiciones[peor_idx]    = pos
+            poblacion_bin[peor_idx] = sol
+            fitnesses[peor_idx]     = val
 
         elif mode == "mutated":
-            poblacion_bin[0] = sol_rep
-            fitnesses[0] = val_rep
-            for i in range(1, pop_size):
+            pos, sol, val = _crear_ballena(sol_rep, val_rep)
+            posiciones[0] = pos; poblacion_bin[0] = sol; fitnesses[0] = val
+            for i in range(1, params.pop_size):
                 msol, mval = _mutar_solucion(sol_rep, inst)
-                poblacion_bin[i] = msol
-                fitnesses[i] = mval
+                mpos, msol, mval = _crear_ballena(msol, mval)
+                posiciones[i] = mpos; poblacion_bin[i] = msol; fitnesses[i] = mval
 
         elif mode == "mixed":
-            poblacion_bin[0] = sol_rep
-            fitnesses[0] = val_rep
-            n_mutados = pop_size // 2
+            pos, sol, val = _crear_ballena(sol_rep, val_rep)
+            posiciones[0] = pos; poblacion_bin[0] = sol; fitnesses[0] = val
+            n_mutados = params.pop_size // 2
             for i in range(1, n_mutados):
                 msol, mval = _mutar_solucion(sol_rep, inst)
-                poblacion_bin[i] = msol
-                fitnesses[i] = mval
+                mpos, msol, mval = _crear_ballena(msol, mval)
+                posiciones[i] = mpos; poblacion_bin[i] = msol; fitnesses[i] = mval
 
-    best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
+    best_idx  = max(range(len(fitnesses)), key=lambda i: fitnesses[i])
     mejor_val = fitnesses[best_idx]
     mejor_sol = poblacion_bin[best_idx].copy()
 
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
-    # Estado dinámico de los parámetros G
     G1 = params.G1_i
     G2 = params.G2_i
     G3 = params.G3_i
 
-    # Inicializar monitor
     monitor: StagnationMonitor | None = None
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
+    pop_size = params.pop_size
+
     for it in range(params.iterations):
-        # Parámetro 'a' disminuye linealmente de 2 a 0
-        a = 2.0 - it * (2.0 / params.iterations)
+        a  = 2.0 - 2.0 * (it / max(1, params.iterations - 1))
+        a2 = -1.0 + it * (-1.0 / max(1, params.iterations - 1))
 
-        X_best = posiciones[best_idx].copy()
+        X_best = posiciones[best_idx]
 
-        # Actualizar cada ballena
         for i in range(pop_size):
-            if i == best_idx:
-                continue
+            r1 = random.random()
+            r2 = random.random()
 
-            X_i = posiciones[i]
+            A = 2.0 * a * r1 - a
+            C = 2.0 * r2
 
             p = random.random()
-            r = np.random.random(n)
-            A = 2.0 * a * r - a
-            C = 2.0 * np.random.random(n)
+            l = (a2 - 1.0) * random.random() + 1.0
 
             if p < 0.5:
-                # Escalar para determinar explorar o explotar
-                A_scalar = 2.0 * a * random.random() - a
-                if abs(A_scalar) < 1.0:
-                    # Encircling prey (explotación)
-                    D = np.abs(C * X_best - X_i)
-                    X_new = X_best - A * D
+                if abs(A) < 1.0:
+                    D_leader = np.abs(C * X_best - posiciones[i])
+                    X_new = X_best - A * D_leader
                 else:
-                    # Search for prey (exploración - usando una ballena aleatoria)
-                    rand_idx = random.choice([idx for idx in range(pop_size) if idx != i])
+                    rand_idx = random.randint(0, pop_size - 1)
                     X_rand = posiciones[rand_idx]
-                    D = np.abs(C * X_rand - X_i)
-                    X_new = X_rand - A * D
+                    D_rand = np.abs(C * X_rand - posiciones[i])
+                    X_new = X_rand - A * D_rand
             else:
-                # Spiral bubble-net attack (explotación en espiral)
-                D_prime = np.abs(X_best - X_i)
-                l = random.uniform(-1.0, 1.0)
-                X_new = D_prime * np.exp(params.b * l) * np.cos(2.0 * np.pi * l) + X_best
+                D_leader = np.abs(X_best - posiciones[i])
+                X_new = D_leader * np.exp(params.b * l) * np.cos(2.0 * np.pi * l) + X_best
 
-            # Limitar posiciones al espacio continuo permitido
             X_new = np.clip(X_new, -params.v_max, params.v_max)
             posiciones[i] = X_new
 
-            # Binarizar posición usando LB2
+            # Binarización LB2
             nueva_sol, nueva_val = binarizar_posicion(
                 X_new, poblacion_bin[i], inst,
                 G1, G2, G3, params.v_max,
             )
 
-            # Selección Greedy
             if nueva_val >= fitnesses[i]:
                 poblacion_bin[i] = nueva_sol
                 fitnesses[i]     = nueva_val
 
-        # Recalcular mejor ballena
         best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
         fit_best_actual = fitnesses[best_idx]
 
@@ -238,12 +217,11 @@ def ejecutar_epoch(
         historial.append(mejor_val)
         historial_inst.append(fit_best_actual)
 
-        if verbose:
-            print(f"  [WOA MKP] Iter {it+1:3d}/{params.iterations} | Mejor: {mejor_val:10.1f} | IterBest: {fit_best_actual:10.1f}")
-
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -258,6 +236,7 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
@@ -266,10 +245,12 @@ def ejecutar_epoch(
             G2 = interpolar_G(it, params.iterations, params.G2_i, params.G2_f)
             G3 = interpolar_G(it, params.iterations, params.G3_i, params.G3_f)
 
+        dtw_info_hist.append(dtw_info)
+
     return WOAEpochResult(
         epoch_idx        = epoch_idx,
         mejor_valor      = mejor_val,
-        iteraciones      = it + 1,
+        iteraciones      = len(historial),
         stagnation_fires = stag_fires,
         historial        = historial,
         historial_inst   = historial_inst,

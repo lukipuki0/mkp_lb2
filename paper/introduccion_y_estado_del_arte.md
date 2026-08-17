@@ -39,51 +39,65 @@ La metodología integra:
 
 ## 2. ESTADO DEL ARTE Y TRABAJOS RELACIONADOS (State of the Art / Related Work)
 
-El diseño de algoritmos metaheurísticos híbridos se ha convertido en una disciplina central en la investigación operacional moderna. A continuación, se revisan las principales líneas de investigación y la brecha tecnológica existente.
+El diseño de metaheurísticas híbridas y colaborativas se ha consolidado como un paradigma fundamental en la investigación operacional moderna para resolver problemas de optimización np-duros y no convexos. A continuación, se presentan las bases teóricas, taxonomías y la brecha en la literatura.
 
 ```mermaid
 graph TD
-    A[Hibridación Metaheurística] --> B[Híbridos Población - Trayectoria]
-    A --> C[Mecanismos de Control y Switching]
-    A --> D[Aplicaciones Tecno-Económicas HRES-H2]
+    A[Optimizadores Complejos] --> B[Metaheurísticas Híbridas - HM]
+    A --> C[Metaheurísticas Colaborativas - CM]
+    A --> D[Control Adaptativo por DTW - PROPUESTO]
     
-    B --> B1[Explotación Local ILS/SA + Exploración Global PSO/GWO/WOA]
-    C --> C1[Reglas Estáticas por Iteración]
-    C --> C2[Control Adaptativo por DTW - PROPUESTO]
-    D --> D1[Optimización Tecno-Económica LCOE / LCOH]
+    B --> B1[High-Level Relay Hybrids - HLRH]
+    B --> B2[Complementariedad Población - Trayectoria]
+    
+    C --> C1[Cooperación Multi-Algoritmo y Memoria Compartida]
+    C --> C2[Inyección Adaptativa de Soluciones Elitistas]
+    
+    D --> D1[Switching Dinámico por Detección de Estancamiento]
+    D --> D2[Aplicación Multidominio Discreto, Continuo y HRES2-H2]
 ```
 
-### 2.1. Metaheurísticas Híbridas y Co-Evolución (Pop-Trajectory Hybrids)
-La combinación de algoritmos basados en poblaciones con métodos de trayectoria (Local Search, Simulated Annealing, ILS) ha sido ampliamente documentada en la literatura ([Talbi, 2009](https://doi.org/10.1002/9780470496916); [Blum & Roli, 2003](https://doi.org/10.1145/937503.937505)). 
+### 2.1. Taxonomía de Metaheurísticas Híbridas (Hybrid Metaheuristics - HM)
+De acuerdo con las taxonomías unificadas de [Talbi (2002, 2009)](https://doi.org/10.1002/9780470496916), [Blum & Roli (2003)](https://doi.org/10.1145/937503.937505) y [Raidl (2006)](https://doi.org/10.1007/11844297_1), las metaheurísticas híbridas se clasifican según la arquitectura de integración y el nivel de control:
 
-- En el ámbito combinatorio (MKP), trabajos previos ([Chu & Beasley, 1998](https://doi.org/10.1023/A:1009642405419); [Drake et al., 2016](https://doi.org/10.1016/j.cor.2015.10.010)) demuestran que las heurísticas por sí solas tienden a estancarse rápidamente en restricciones de multidimensión elevadas.
-- En optimización continua (CEC Benchmarks), la evaluación estandarizada descrita por [Kumar et al. (2022)](https://github.com/P-N-Suganthan/CEC2022) demuestra que la diversidad posicional se degrada exponencialmente en funciones no separables y rotadas.
+1. **Clasificación por Nivel de Integración (High-Level vs. Low-Level):**
+   - *Low-Level Hybrids (LLH):* Un operador interno de una metaheurística es reemplazado por otro algoritmo completo (ej. incorporar una búsqueda local interna en cada individuo de un Algoritmo Genético).
+   - *High-Level Hybrids (HLH):* Los algoritmos conservan su independencia modular y colaboran mediante esquemas de control externo. El framework propuesto pertenece a esta categoría, preservando la autonomía de cada módulo (`PSO`, `GA`, `GWO`, `DE`, `ACO`, `ABC`, `EHO`, `WOA`, `ILS`, `SA`).
 
-*Brecha identificada:* La mayoría de las arquitecturas híbridas emplean esquemas rígidos (ej. ejecutar $N$ iteraciones fijas de PSO y luego $M$ iteraciones de SA), ignorando si el algoritmo activo aún mantiene una tasa de mejora óptima.
+2. **Clasificación por Modo de Ejecución (Relay / Secuencial vs. Co-evolutivo / Paralelo):**
+   - *Relay Hybrids (HLRH):* Los algoritmos se ejecutan en secuencia o rotación, transmitiendo la mejor solución encontrada de una metaheurística a la siguiente. 
+   - *Sinergia Población-Trayectoria:* La combinación de métodos poblacionales (alta exploración global) con métodos de trayectoria (alta intensificación local en el espacio de búsqueda) permite mitigar el estancamiento prematuro ([Chu & Beasley, 1998](https://doi.org/10.1023/A:1009642405419); [Drake et al., 2016](https://doi.org/10.1016/j.cor.2015.10.010)).
 
-### 2.2. Detección de Estancamiento y Control de Operadores en Tiempo Real
-El control adaptativo de parámetros y la rotación de operadores se han abordado mediante:
+### 2.2. Metaheurísticas Colaborativas y Sistemas Multi-Algoritmo (Collaborative Metaheuristics - CM)
+Las metaheurísticas colaborativas o cooperativas ([Crainic & Toulouse, 2003, 2010](https://doi.org/10.1007/978-1-4419-1665-5_25); [El-Abd & Kamel, 2005](https://doi.org/10.1007/11546241_73); [Alba, 2005](https://doi.org/10.1007/b106656)) se definen como sistemas compuestos por múltiples metaheurísticas autónomas (homogéneas o heterogéneas) que intercambian información diagnóstica o de soluciones para acelerar el proceso de búsqueda global.
+
+- **Mecanismos de Transferencia e Inyección de Memoria:** El intercambio de información puede realizarse mediante estructuras de memoria compartida o migración asíncrona de soluciones elitistas. En nuestro diseño colaborativo, la transferencia de la mejor solución global ($x_{best}$) al activar el siguiente solver actúa como una *inyección de memoria guiada*, reorientando la población o el punto de inicio de la nueva metaheurística sin destruir su diversidad.
+- **Cuello de Botella de la Colaboración Tradicional:** En la literatura de metaheurísticas colaborativas, el protocolo de intercambio suele ser rígido (ej. migración cada $K$ iteraciones estáticas o al agotar un número fijo de evaluaciones de función). Esto conduce a dos problemas críticos: (a) *Colaboración prematura*, interrumpiendo fases de exploración eficientes; o (b) *Colaboración tardía*, desperdiciando recursos computacionales en zonas estancadas.
+
+### 2.3. Detección de Estancamiento y Control Adaptativo de Conmutación vía DTW
+Para resolver el problema del *"cuándo conmutar"* en arquitecturas híbridas y colaborativas, la literatura ha explorado indicadores de diversidad y paciencia. Sin embargo:
 1. **Criterios de Diversidad Poblacional:** Medición de varianza o distancia euclidiana entre individuos. Desventaja: Elevado costo computacional en dimensiones altas ($O(N^2 \cdot D)$).
 2. **Umbrales Fijos de Fitness:** Conteo de iteraciones sin mejora (patience counters). Desventaja: Sensibles al ruido y propensos a falsos positivos en zonas de gradiente suave.
-3. **Dynamic Time Warping (DTW) en Optimización:** Introducido originalmente para el alineamiento elástico de series temporales ([Berndt & Clifford, 1994](https://www.aaai.org/Papers/Workshops/1994/WS-94-03/WS94-03-031.pdf); [Keogh & Pazzani, 2001](https://doi.org/10.1145/502512.502515)). Su aplicación como **métrica de similitud de convergencia** para detectar la transición entre exploración activa y estancamiento crítico constituye un área emergente poco explorada en la literatura de metaheurísticas.
+3. **Dynamic Time Warping (DTW) como Mecanismo de Control:** Desarrollado originalmente para el alineamiento elástico de series temporales ([Berndt & Clifford, 1994](https://www.aaai.org/Papers/Workshops/1994/WS-94-03/WS94-03-031.pdf); [Keogh & Pazzani, 2001](https://doi.org/10.1145/502512.502515)). Su uso como **indicador dinámico de estancamiento en tiempo real** permite evaluar el perfil de mejora en una ventana deslizante frente a una trayectoria teórica de referencia ($D_1$ vs $D_2$), activando el traspaso colaborativo entre algoritmos con máxima precisión temporal.
 
-### 2.3. Aplicación en Sistemas de Energía Renovable e Hidrógeno Verde (HRES2-H2)
+### 2.4. Aplicación en Sistemas de Energía Renovable e Hidrógeno Verde (HRES2-H2)
 La optimización de Microredes Híbridas de Energía Renovable con almacenamiento en Hidrógeno (HRES2-H2) requiere resolver simultáneamente el dimensionamiento de componentes (potencia eólica, solar PV, capacidad del electrolizador, baterías) y las reglas de despacho horario durante 8,760 horas al año ([Bhandari et al., 2014](https://doi.org/10.1016/j.jclepro.2013.07.048); [Marchenko & Solomin, 2015](https://doi.org/10.1016/j.ijhydene.2015.05.074)).
 
 - Autores en la literatura reciente ([Li et al., 2021](https://doi.org/10.1016/j.enconman.2021.114587); [Rezaei et al., 2023](https://doi.org/10.1016/j.jclepro.2022.135316)) aplican algoritmos individuales como PSO o GA para minimizar el Coste Nivelado de Energía (LCOE) o de Hidrógeno (LCOH).
 - Sin embargo, las funciones de fitness en HRES2-H2 exhiben una naturaleza no convexa, con severas restricciones técnicas (límite de excedente a red AGSR $\le 20\%$, demanda ininterrumpida de $H_2$). Los algoritmos tradicionales muestran una alta variabilidad entre ejecuciones y frecuente estancamiento en subóptimos.
 
-### 2.4. Validación Estadística Inferencial No Paramétrica
+### 2.5. Validación Estadística Inferencial No Paramétrica
 Para descartar diferencias estocásticas accidentales en benchmarks de optimización, el uso de pruebas no paramétricas ([Derrac et al., 2011](https://doi.org/10.1016/j.swevo.2011.02.002); [García et al., 2010](https://doi.org/10.1007/s10489-008-0159-9)) se ha consolidado como el estándar metodológico exigido por la comunidad científica.
 
-### 2.5. Síntesis de la Brecha en la Literatura (Research Gap Summary)
+### 2.6. Síntesis de la Brecha en la Literatura (Research Gap Summary)
 
 | Dimensión | Enfoques Existentes en la Literatura | Enfoque Propuesto (Este Trabajo) |
 |---|---|---|
-| **Estrategia de Rotación** | Iteraciones fijas / Cambio estático. | **Rotación Adaptativa guiada por DTW/DDTW** según dinámica de convergencia. |
-| **Arquitectura de Pools** | Monolítica o hibridación 1 a 1 (ej. PSO+SA). | **Doble Pool Alternante:** Poblacional (PSO, GWO, WOA, EHO, ACO, ABC) $\leftrightarrow$ Trayectoria (ILS, SA). |
-| **Validación Multidominio** | Limitada a un solo dominio (solo MKP o solo CEC). | **Multidominio:** Discreto (MKP), Continuo (CEC2022) y Físico/Industrial (HRES2-H2). |
-| **Validación Estadística** | Pruebas $t$-Student o medias simples. | **Pruebas No Paramétricas:** Shapiro-Wilk, Wilcoxon, Mann-Whitney U y Friedman Rank Test. |
+| **Paradigma Metaheurístico** | Algoritmos monolíticos aislados o híbridos 1-a-1 fijos (ej. PSO+SA). | **Framework Híbrido-Colaborativo de Alto Nivel (HLRH)** con doble pool alternante (Poblacional $\leftrightarrow$ Trayectoria). |
+| **Protocolo Colaborativo** | Reglas de intercambio estáticas o migración por iteraciones fijas ($K$). | **Colaboración Adaptativa guiada por DTW/DDTW** con inyección dinámica de memoria en el reinicio de solvers. |
+| **Detección de Estancamiento** | Paciencia simple / conteo de iteraciones sin mejora o umbrales estáticos. | **Monitoreo elástico DTW ($D_1$ vs $D_2$)** con umbrales adaptativos por percentiles ($P_{low}, P_{high}$). |
+| **Validación Multidominio** | Orientada a un solo tipo de problema (solo discreto o solo continuo). | **Validación Multidominio Unificada:** Combinatorio Discreto (MKP), Continuo Paramétrico (CEC2022) e Ingeniería Real (HRES2-H2). |
+| **Validación Estadística** | Medias simples o pruebas $t$-Student asumiendo normalidad. | **Inferencia No Paramétrica Completa:** Shapiro-Wilk, Wilcoxon Signed-Rank, Mann-Whitney U y Test de Friedman. |
 
 ---
 

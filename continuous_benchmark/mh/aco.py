@@ -41,6 +41,7 @@ class ACOEpochResult:
     historial_inst   : list[float] = field(default_factory=list)
     mejor_solucion   : list[float] = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
     monitor: StagnationMonitor | None = None
@@ -163,15 +165,19 @@ def ejecutar_epoch(
         historial_inst.append(fit_iter_best)
 
         # Stagnation monitor (pasamos -gbest_val para minimización)
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(-gbest_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [ACO Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
+        dtw_info_hist.append(dtw_info)
 
     return ACOEpochResult(
         epoch_idx        = epoch_idx,
@@ -182,4 +188,5 @@ def ejecutar_epoch(
         historial_inst   = historial_inst,
         mejor_solucion   = gbest_pos.tolist(),
         dtw_deltas       = dtw_deltas,
+        dtw_info_hist    = dtw_info_hist,
     )

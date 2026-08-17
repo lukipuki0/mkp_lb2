@@ -264,7 +264,120 @@ def ejecutar_benchmark_hres2(
         f_run.write(f"Electrolizador MW   : {best_config['electrolyzer_mw']:.1f} MW ({best_config['n_el_units']} unidades)\n")
         f_run.write(f"Batería MW          : {best_config['battery_mw']:.1f} MW ({best_config['battery_duration_h']} h)\n")
 
-    print(f"\n  [info] Gráficos y detalles del mejor run guardados en: '{best_run_dir}'")
+    # CSV y TXT Historial Detallado DTW del Mejor Run
+    csv_best_path = os.path.join(best_run_dir, "historial_dtw.csv")
+    txt_best_path = os.path.join(best_run_dir, "historial_dtw_detalle.txt")
+
+    deltas          = best_res.dtw_deltas_global
+    inst_hist       = getattr(best_res, 'historial_inst_global', []) or []
+    dtw_info_global = getattr(best_res, 'dtw_info_global', []) or []
+
+    with open(csv_best_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "iteracion", "epoch", "mh", "tipo", "lcoe_best", "lcoe_instantaneo",
+            "dtw_ready", "dtw_fire", "D1_vs_ramp", "D2_vs_const", "dtw_delta",
+            "theta_c", "theta_r", "theta_delta", "no_improve_len", "trigger_streak",
+            "window_n", "estado_dtw"
+        ])
+        offset = 0
+        for ep_idx, sw in enumerate(best_res.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(best_res.historial_global):
+                    break
+                fit  = best_res.historial_global[idx]
+                fi   = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                if not ready:
+                    estado_str = "Llenando ventana"
+                elif fire:
+                    estado_str = "ESTANCAMIENTO (Fire)"
+                else:
+                    estado_str = "Explotacion activa"
+
+                writer.writerow([
+                    idx + 1, ep_idx, sw.mh_nombre, sw.tipo, fit,
+                    "" if (isinstance(fi, float) and np.isnan(fi)) else fi,
+                    ready, fire,
+                    "" if (isinstance(d1, float) and np.isnan(d1)) else d1,
+                    "" if (isinstance(d2, float) and np.isnan(d2)) else d2,
+                    "" if (isinstance(delta, float) and np.isnan(delta)) else delta,
+                    "" if (isinstance(tc, float) and np.isnan(tc)) else tc,
+                    "" if (isinstance(tr, float) and np.isnan(tr)) else tr,
+                    "" if (isinstance(td, float) and np.isnan(td)) else td,
+                    no_imp, streak, win_n, estado_str
+                ])
+            offset += n_seg
+
+    with open(txt_best_path, "w", encoding="utf-8") as f_dtw:
+        f_dtw.write("======================================================================================================================================================================================\n")
+        f_dtw.write(f"  HISTORIAL DETALLADO DE TODAS LAS MÉTRICAS DTW POR ITERACIÓN — MEJOR RUN (#{best_run_idx + 1:02d})\n")
+        f_dtw.write("======================================================================================================================================================================================\n\n")
+        f_dtw.write(
+            f"  {'Iter':>6}  {'Epoch':>5}  {'MH':<6}  {'Tipo':<12}  {'LCOE Best':>14}  {'LCOE Inst':>14}  "
+            f"{'Ready':>6}  {'Fire':>6}  {'D1 (Ramp)':>14}  {'D2 (Const)':>14}  {'Delta DTW':>14}  "
+            f"{'theta_c':>12}  {'theta_r':>12}  {'theta_delta':>14}  {'no_imp':>6}  {'streak':>6}  {'n_win':>6}  {'Estado DTW':<24}\n"
+        )
+        f_dtw.write("  " + "-" * 210 + "\n")
+
+        offset = 0
+        for ep_idx, sw in enumerate(best_res.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(best_res.historial_global):
+                    break
+                fit  = best_res.historial_global[idx]
+                fi   = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                if not ready: estado_str = f"Llenando ventana (W={win_n})"
+                elif fire:    estado_str = "[!] ESTANCAMIENTO (Fire)"
+                else:         estado_str = "Explotacion activa"
+
+                d1_s  = f"{d1:14.6f}" if (isinstance(d1, float) and not np.isnan(d1)) else f"{'--':>14}"
+                d2_s  = f"{d2:14.6f}" if (isinstance(d2, float) and not np.isnan(d2)) else f"{'--':>14}"
+                dl_s  = f"{delta:+14.6f}" if (isinstance(delta, float) and not np.isnan(delta)) else f"{'--':>14}"
+                fi_s  = f"{fi:14.6f}" if (isinstance(fi, float) and not np.isnan(fi)) else f"{'--':>14}"
+                tc_s  = f"{tc:12.6f}" if (isinstance(tc, float) and not np.isnan(tc)) else f"{'--':>12}"
+                tr_s  = f"{tr:12.6f}" if (isinstance(tr, float) and not np.isnan(tr)) else f"{'--':>12}"
+                td_s  = f"{td:14.6f}" if (isinstance(td, float) and not np.isnan(td)) else f"{'--':>14}"
+
+                f_dtw.write(
+                    f"  {idx + 1:6d}  {ep_idx:5d}  {sw.mh_nombre:<6}  {sw.tipo:<12}  {fit:14.6f}  {fi_s}  "
+                    f"{str(ready):>6}  {str(fire):>6}  {d1_s}  {d2_s}  {dl_s}  "
+                    f"{tc_s}  {tr_s}  {td_s}  {no_imp:6d}  {streak:6d}  {win_n:6d}  {estado_str:<24}\n"
+                )
+            offset += n_seg
+
+    print(f"\n  [info] Gráficos y archivos DTW del mejor run guardados en: '{best_run_dir}'")
 
 
     print(f"\n{banner}")

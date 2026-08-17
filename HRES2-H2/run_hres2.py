@@ -182,6 +182,42 @@ def main() -> None:
         print(f"  {i:<3} {sw.mh_nombre:<5} {sw.tipo:<14} {sw.mejor_valor:>12.6f}"
               f"  {sw.t_inicio:>6.1f}s  {sw.t_fin:>6.1f}s  {sw.n_iters:>6}")
 
+    # ── Muestra de resultados DTW por iteración en consola ──────────────────
+    print(f"\n{sep}")
+    print("  RESULTADOS DTW POR ITERACIÓN")
+    print(sep)
+    print(f"  {'Iter':>6}  {'MH':<6}  {'Tipo':<12}  {'LCOE (Best)':>12}  {'Delta DTW':>14}  {'Estado DTW':<24}")
+    print("  " + "-" * 80)
+
+    offset = 0
+    for sw in resultado.log_switches:
+        n_seg = sw.n_iters
+        mh_nombre = sw.mh_nombre
+        tipo = sw.tipo
+
+        for i_local in range(n_seg):
+            idx = offset + i_local
+            if idx >= len(resultado.historial_global):
+                break
+            fit = resultado.historial_global[idx]
+            d = resultado.dtw_deltas_global[idx] if idx < len(resultado.dtw_deltas_global) else float("nan")
+
+            if isinstance(d, float) and np.isnan(d):
+                delta_str = "      --      "
+                estado_str = "Llenando ventana (W=30)"
+            elif d > 0:
+                delta_str = f"{d:+14.6f}"
+                estado_str = "[!] ESTANCAMIENTO (Fire)"
+            else:
+                delta_str = f"{d:+14.6f}"
+                estado_str = "[OK] Explotacion activa"
+
+
+            print(f"  {idx + 1:6d}  {mh_nombre:<6}  {tipo:<12}  {fit:12.6f}  {delta_str:>14}  {estado_str:<24}")
+
+        offset += n_seg
+
+
     # ── TXT Resumen ───────────────────────────────────────────────────────
     txt_path = os.path.join(output_dir, "resumen_run.txt")
     with open(txt_path, "w", encoding="utf-8") as f:
@@ -206,19 +242,131 @@ def main() -> None:
                     f" | {sw.t_inicio:.1f}s-{sw.t_fin:.1f}s | iters={sw.n_iters}\n")
     print(f"\n  [txt] {txt_path}")
 
-    # ── CSV historial ─────────────────────────────────────────────────────
+    # ── CSV y TXT Historial Detallado DTW (TODAS LAS MÉTRICAS) ─────────────
     csv_path = os.path.join(output_dir, "historial_dtw.csv")
-    deltas    = resultado.dtw_deltas_global
-    inst_hist = resultado.historial_inst_global
+    dtw_txt_path = os.path.join(output_dir, "historial_dtw_detalle.txt")
+
+    deltas          = resultado.dtw_deltas_global
+    inst_hist       = resultado.historial_inst_global
+    dtw_info_global = getattr(resultado, 'dtw_info_global', []) or []
+
+    # 1. Escribir CSV
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["iteracion", "lcoe_best", "dtw_delta", "lcoe_instantaneo"])
-        for i, fit in enumerate(resultado.historial_global):
-            d   = deltas[i]   if i < len(deltas)    else ""
-            d_s = "" if (isinstance(d, float) and np.isnan(d)) else d
-            fi  = inst_hist[i] if i < len(inst_hist) else ""
-            writer.writerow([i, fit, d_s, fi])
+        writer.writerow([
+            "iteracion", "epoch", "mh", "tipo", "lcoe_best", "lcoe_instantaneo",
+            "dtw_ready", "dtw_fire", "D1_vs_ramp", "D2_vs_const", "dtw_delta",
+            "theta_c", "theta_r", "theta_delta", "no_improve_len", "trigger_streak",
+            "window_n", "estado_dtw"
+        ])
+
+        offset = 0
+        for ep_idx, sw in enumerate(resultado.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(resultado.historial_global):
+                    break
+                fit = resultado.historial_global[idx]
+                fi  = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                if not ready:
+                    estado_str = "Llenando ventana"
+                elif fire:
+                    estado_str = "ESTANCAMIENTO (Fire)"
+                else:
+                    estado_str = "Explotacion activa"
+
+                writer.writerow([
+                    idx + 1, ep_idx, sw.mh_nombre, sw.tipo, fit,
+                    "" if (isinstance(fi, float) and np.isnan(fi)) else fi,
+                    ready, fire,
+                    "" if (isinstance(d1, float) and np.isnan(d1)) else d1,
+                    "" if (isinstance(d2, float) and np.isnan(d2)) else d2,
+                    "" if (isinstance(delta, float) and np.isnan(delta)) else delta,
+                    "" if (isinstance(tc, float) and np.isnan(tc)) else tc,
+                    "" if (isinstance(tr, float) and np.isnan(tr)) else tr,
+                    "" if (isinstance(td, float) and np.isnan(td)) else td,
+                    no_imp, streak, win_n, estado_str
+                ])
+            offset += n_seg
+
     print(f"  [csv] {csv_path}")
+
+    # 2. Escribir TXT Detallado
+    with open(dtw_txt_path, "w", encoding="utf-8") as f_dtw:
+        f_dtw.write("======================================================================================================================================================================================\n")
+        f_dtw.write("  HISTORIAL DETALLADO DE TODAS LAS MÉTRICAS DTW POR ITERACIÓN — HRES2-H2 PIPELINE\n")
+        f_dtw.write(f"  Timestamp: {timestamp}\n")
+        f_dtw.write("======================================================================================================================================================================================\n\n")
+        f_dtw.write(
+            f"  {'Iter':>6}  {'Epoch':>5}  {'MH':<6}  {'Tipo':<12}  {'LCOE Best':>14}  {'LCOE Inst':>14}  "
+            f"{'Ready':>6}  {'Fire':>6}  {'D1 (Ramp)':>14}  {'D2 (Const)':>14}  {'Delta DTW':>14}  "
+            f"{'theta_c':>12}  {'theta_r':>12}  {'theta_delta':>14}  {'no_imp':>6}  {'streak':>6}  {'n_win':>6}  {'Estado DTW':<24}\n"
+        )
+        f_dtw.write("  " + "-" * 210 + "\n")
+
+        offset = 0
+        for ep_idx, sw in enumerate(resultado.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(resultado.historial_global):
+                    break
+                fit  = resultado.historial_global[idx]
+                fi   = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                fi_str    = f"{fi:14.6f}" if not (isinstance(fi, float) and np.isnan(fi)) else "      --      "
+                d1_str    = f"{d1:14.6f}" if not (isinstance(d1, float) and np.isnan(d1)) else "      --      "
+                d2_str    = f"{d2:14.6f}" if not (isinstance(d2, float) and np.isnan(d2)) else "      --      "
+                delta_str = f"{delta:+14.6f}" if not (isinstance(delta, float) and np.isnan(delta)) else "      --      "
+                tc_str    = f"{tc:12.6f}" if not (isinstance(tc, float) and np.isnan(tc)) else "    --    "
+                tr_str    = f"{tr:12.6f}" if not (isinstance(tr, float) and np.isnan(tr)) else "    --    "
+                td_str    = f"{td:14.6f}" if not (isinstance(td, float) and np.isnan(td)) else "      --      "
+
+                if not ready:
+                    estado_str = "Llenando ventana (W=30)"
+                elif fire:
+                    estado_str = "[!] ESTANCAMIENTO (Fire)"
+                else:
+                    estado_str = "[OK] Explotacion activa"
+
+                f_dtw.write(
+                    f"  {idx + 1:6d}  {ep_idx:5d}  {sw.mh_nombre:<6}  {sw.tipo:<12}  {fit:14.6f}  {fi_str:>14}  "
+                    f"{str(ready):>6}  {str(fire):>6}  {d1_str:>14}  {d2_str:>14}  {delta_str:>14}  "
+                    f"{tc_str:>12}  {tr_str:>12}  {td_str:>14}  {no_imp:6d}  {streak:6d}  {win_n:6d}  {estado_str:<24}\n"
+                )
+            offset += n_seg
+
+    print(f"  [txt] {dtw_txt_path}")
+
+
 
     # ── Gráficos ──────────────────────────────────────────────────────────
     print("\n  Generando gráficos...")

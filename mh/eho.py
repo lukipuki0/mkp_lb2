@@ -53,6 +53,7 @@ class EHOEpochResult:
     historial_inst   : list[float] = field(default_factory=list)  # fitness del mejor elk esta iteración
     mejor_solucion   : list[int]   = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -173,6 +174,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
     # Estado dinámico de los parámetros G
@@ -272,8 +274,10 @@ def ejecutar_epoch(
         historial_inst.append(mejor_actual_val)
 
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -288,6 +292,7 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
@@ -297,15 +302,18 @@ def ejecutar_epoch(
             G2 = interpolar_G(it, params.iterations, params.G2_i, params.G2_f)
             G3 = interpolar_G(it, params.iterations, params.G3_i, params.G3_f)
 
+        dtw_info_hist.append(dtw_info)
+
     return EHOEpochResult(
         epoch_idx        = epoch_idx,
         mejor_valor      = mejor_val,
-        iteraciones      = params.iterations,
+        iteraciones      = len(historial),
         stagnation_fires = stag_fires,
         historial        = historial,
         historial_inst   = historial_inst,
         mejor_solucion   = mejor_sol,
         dtw_deltas       = dtw_deltas,
+        dtw_info_hist    = dtw_info_hist,
     )
 
 

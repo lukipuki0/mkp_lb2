@@ -18,6 +18,29 @@ Este documento contiene la lista completa de referencias bibliográficas citadas
    - **DOI:** [10.1145/937503.937505](https://doi.org/10.1145/937503.937505)  
    - **Enlace:** [ACM Digital Library](https://dl.acm.org/doi/10.1145/937503.937505)
 
+3. **Raidl, G. R.** (2006).  
+   A unified view on hybrid metaheuristics.  
+   *Hybrid Metaheuristics (LNCS 4030)*, Springer, 1–12.  
+   - **DOI:** [10.1007/11844297_1](https://doi.org/10.1007/11844297_1)  
+   - **Enlace:** [SpringerLink](https://link.springer.com/chapter/10.1007/11844297_1)
+
+4. **Crainic, T. G., & Toulouse, M.** (2010).  
+   Parallel metaheuristics.  
+   *Handbook of Metaheuristics*, Springer, 497–541.  
+   - **DOI:** [10.1007/978-1-4419-1665-5_17](https://doi.org/10.1007/978-1-4419-1665-5_17)  
+   - **Enlace:** [SpringerLink](https://link.springer.com/chapter/10.1007/978-1-4419-1665-5_17)
+
+5. **El-Abd, M., & Kamel, M. S.** (2005).  
+   A taxonomy of cooperative swarm intelligence algorithms.  
+   *Ant Colony Optimization and Swarm Intelligence (LNCS 3642)*, Springer, 62–73.  
+   - **DOI:** [10.1007/11546241_73](https://doi.org/10.1007/11546241_73)  
+   - **Enlace:** [SpringerLink](https://link.springer.com/chapter/10.1007/11546241_73)
+
+6. **Alba, E. (Ed.)** (2005).  
+   *Parallel Metaheuristics: A New Class of Algorithms*. John Wiley & Sons.  
+   - **DOI:** [10.1007/b106656](https://doi.org/10.1007/b106656)  
+   - **Enlace:** [Wiley Online Library](https://onlinelibrary.wiley.com/doi/book/10.1002/0471739383)
+
 ---
 
 ## 2. Dynamic Time Warping (DTW / DDTW) y Análisis de Series Temporales

@@ -59,6 +59,7 @@ class ABCEpochResult:
     historial_inst   : list[float] = field(default_factory=list)
     mejor_solucion   : list[int]   = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -82,12 +83,12 @@ class ABCResult:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _inicializar_fuentes(
+def _inicializar_poblacion(
     inst: MKPInstance,
     pop_size: int,
     v_max: float,
-) -> tuple[np.ndarray, list[list[int]], list[float], np.ndarray]:
-    """Genera las fuentes de alimento iniciales (posiciones continuas, soluciones binarias, fitnesses y trials)."""
+) -> tuple[np.ndarray, list[list[int]], list[float]]:
+    """Genera la población inicial: posiciones continuas + soluciones binarias factibles."""
     n = inst.n
     posiciones = np.random.uniform(-v_max, v_max, size=(pop_size, n))
     poblacion_bin = []
@@ -99,8 +100,7 @@ def _inicializar_fuentes(
         poblacion_bin.append(sol)
         fitnesses.append(val)
 
-    trials = np.zeros(pop_size, dtype=int)
-    return posiciones, poblacion_bin, fitnesses, trials
+    return posiciones, poblacion_bin, fitnesses
 
 
 def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tuple[list[int], float]:
@@ -119,24 +119,25 @@ def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tupl
 # ── Epoch individual ─────────────────────────────────────────────────────────
 
 def ejecutar_epoch(
-    inst          : MKPInstance,
-    params        : ABCParams,
-    epoch_idx     : int = 0,
-    verbose       : bool = True,
-    sol_inyectada : list[int] | None = None,
+    inst      : MKPInstance,
+    params    : ABCParams,
+    epoch_idx : int = 0,
+    verbose   : bool = True,
+    sol_inyectada: list[int] | None = None,
 ) -> ABCEpochResult:
-    """Ejecuta un epoch completo del ABC con las 4 fases especificadas y monitor DTW."""
+    """Ejecuta un epoch completo del ABC con detección de estancamiento (abort)."""
 
-    n = inst.n
     pop_size = params.pop_size
-    limit = params.limit if params.limit is not None else int(pop_size * n / 2)
+    n = inst.n
+    limit = params.limit if params.limit is not None else pop_size * n
 
-    # 1. Fase de Inicialización
-    posiciones, poblacion_bin, fitnesses, trials = _inicializar_fuentes(
-        inst, pop_size, params.v_max
+    # Inicializar fuentes de alimento (abejas empleadas)
+    posiciones, poblacion_bin, fitnesses = _inicializar_poblacion(
+        inst, pop_size, params.v_max,
     )
+    trials = np.zeros(pop_size, dtype=int)
 
-    # Inyección de solución si aplica
+    # Inyectar solución del orquestador si aplica
     if sol_inyectada is not None:
         sol_rep = list(sol_inyectada)
         sol_rep, val_rep = reparar_solucion(sol_rep, inst)
@@ -146,28 +147,23 @@ def ejecutar_epoch(
             peor_idx = min(range(len(fitnesses)), key=lambda i: fitnesses[i])
             poblacion_bin[peor_idx] = sol_rep
             fitnesses[peor_idx] = val_rep
-            trials[peor_idx] = 0
 
         elif mode == "mutated":
             poblacion_bin[0] = sol_rep
             fitnesses[0] = val_rep
-            trials[0] = 0
             for i in range(1, pop_size):
                 msol, mval = _mutar_solucion(sol_rep, inst)
                 poblacion_bin[i] = msol
                 fitnesses[i] = mval
-                trials[i] = 0
 
         elif mode == "mixed":
             poblacion_bin[0] = sol_rep
             fitnesses[0] = val_rep
-            trials[0] = 0
             n_mutados = pop_size // 2
             for i in range(1, n_mutados):
                 msol, mval = _mutar_solucion(sol_rep, inst)
                 poblacion_bin[i] = msol
                 fitnesses[i] = mval
-                trials[i] = 0
 
     best_idx = max(range(pop_size), key=lambda i: fitnesses[i])
     mejor_val = fitnesses[best_idx]
@@ -176,96 +172,78 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
-    # Estado dinámico de los parámetros G (transición lineal)
+    # Estado dinámico de los parámetros G
     G1 = params.G1_i
     G2 = params.G2_i
     G3 = params.G3_i
 
+    # Monitor de estancamiento
     monitor: StagnationMonitor | None = None
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
     for it in range(params.iterations):
-
-        # 2. Fase de Abejas Empleadas
+        # 1. Fase de Abejas Empleadas
         for i in range(pop_size):
-            # Seleccionar vecina k != i
-            k_candidates = [idx for idx in range(pop_size) if idx != i]
-            k = random.choice(k_candidates)
-
-            # Seleccionar dimensión j
-            j = random.randint(0, n - 1)
-
+            k = random.choice([idx for idx in range(pop_size) if idx != i])
             phi = random.uniform(-1.0, 1.0)
-            v_i = posiciones[i].copy()
-            v_i[j] = v_i[j] + phi * (v_i[j] - posiciones[k][j])
+            v_i = posiciones[i] + phi * (posiciones[i] - posiciones[k])
             v_i = np.clip(v_i, -params.v_max, params.v_max)
 
-            # Binarización LB2 + Reparación greedy
-            sol_prop, val_prop = binarizar_posicion(
+            sol_cand, val_cand = binarizar_posicion(
                 v_i, poblacion_bin[i], inst,
-                G1, G2, G3, params.v_max
+                G1, G2, G3, params.v_max,
             )
 
-            # Selección codiciosa
-            if val_prop >= fitnesses[i]:
-                posiciones[i] = v_i
-                poblacion_bin[i] = sol_prop
-                fitnesses[i] = val_prop
-                trials[i] = 0
+            if val_cand > fitnesses[i]:
+                posiciones[i]    = v_i
+                poblacion_bin[i] = sol_cand
+                fitnesses[i]     = val_cand
+                trials[i]        = 0
             else:
                 trials[i] += 1
 
-        # 3. Fase de Abejas Observadoras
-        max_fit = max(fitnesses)
-        if max_fit > 0:
-            probs = np.array([0.9 * (fit / max_fit) + 0.1 for fit in fitnesses])
+        # 2. Fase de Abejas Observadoras (Onlooker Bees)
+        total_fit = sum(fitnesses)
+        if total_fit > 0:
+            probs = [f / total_fit for f in fitnesses]
         else:
-            probs = np.full(pop_size, 1.0 / pop_size)
-        probs_sum = np.sum(probs)
-        if probs_sum > 0:
-            probs = probs / probs_sum
+            probs = [1.0 / pop_size] * pop_size
 
         for _ in range(pop_size):
-            # Seleccionar fuente i mediante ruleta basada en P_i
-            i = np.random.choice(pop_size, p=probs)
-
-            k_candidates = [idx for idx in range(pop_size) if idx != i]
-            k = random.choice(k_candidates)
-
-            j = random.randint(0, n - 1)
+            i = np.random.choice(range(pop_size), p=probs)
+            k = random.choice([idx for idx in range(pop_size) if idx != i])
             phi = random.uniform(-1.0, 1.0)
-            v_i = posiciones[i].copy()
-            v_i[j] = v_i[j] + phi * (v_i[j] - posiciones[k][j])
+            v_i = posiciones[i] + phi * (posiciones[i] - posiciones[k])
             v_i = np.clip(v_i, -params.v_max, params.v_max)
 
-            sol_prop, val_prop = binarizar_posicion(
+            sol_cand, val_cand = binarizar_posicion(
                 v_i, poblacion_bin[i], inst,
-                G1, G2, G3, params.v_max
+                G1, G2, G3, params.v_max,
             )
 
-            if val_prop >= fitnesses[i]:
-                posiciones[i] = v_i
-                poblacion_bin[i] = sol_prop
-                fitnesses[i] = val_prop
-                trials[i] = 0
+            if val_cand > fitnesses[i]:
+                posiciones[i]    = v_i
+                poblacion_bin[i] = sol_cand
+                fitnesses[i]     = val_cand
+                trials[i]        = 0
             else:
                 trials[i] += 1
 
-        # Actualizar mejor global de la colonia
-        best_idx_iter = max(range(pop_size), key=lambda idx: fitnesses[idx])
-        fit_iter_best = fitnesses[best_idx_iter]
+        # Recalcular mejor de la iteración
+        iter_best_idx = max(range(pop_size), key=lambda idx: fitnesses[idx])
+        fit_iter_best = fitnesses[iter_best_idx]
 
         if fit_iter_best > mejor_val:
             mejor_val = fit_iter_best
-            mejor_sol = poblacion_bin[best_idx_iter].copy()
+            mejor_sol = poblacion_bin[iter_best_idx].copy()
 
-        # 4. Fase de Abejas Exploradoras (Scouts)
+        # 3. Fase de Abejas Exploradoras (Scout Bees)
         for i in range(pop_size):
             if trials[i] >= limit:
-                # Reinicializar aleatoriamente la fuente desatendida
                 posiciones[i] = np.random.uniform(-params.v_max, params.v_max, size=n)
                 random_sol = [random.randint(0, 1) for _ in range(n)]
                 sol_rep, val_rep = reparar_solucion(random_sol, inst)
@@ -280,12 +258,11 @@ def ejecutar_epoch(
         historial.append(mejor_val)
         historial_inst.append(fit_iter_best)
 
-        if verbose:
-            print(f"  [ABC MKP] Iter {it+1:3d}/{params.iterations} | Mejor: {mejor_val:10.1f} | IterBest: {fit_iter_best:10.1f}")
-
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -300,6 +277,7 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [ABC Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
@@ -307,6 +285,8 @@ def ejecutar_epoch(
             G1 = interpolar_G(it, params.iterations, params.G1_i, params.G1_f)
             G2 = interpolar_G(it, params.iterations, params.G2_i, params.G2_f)
             G3 = interpolar_G(it, params.iterations, params.G3_i, params.G3_f)
+
+        dtw_info_hist.append(dtw_info)
 
     return ABCEpochResult(
         epoch_idx        = epoch_idx,
@@ -317,6 +297,7 @@ def ejecutar_epoch(
         historial_inst   = historial_inst,
         mejor_solucion   = mejor_sol,
         dtw_deltas       = dtw_deltas,
+        dtw_info_hist    = dtw_info_hist,
     )
 
 

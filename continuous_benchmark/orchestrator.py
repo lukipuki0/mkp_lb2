@@ -65,6 +65,7 @@ class PipelineResult:
     historial_global      : list[float]
     historial_inst_global : list[float]
     dtw_deltas_global     : list[float]
+    dtw_info_global       : list[dict]
     log_switches          : list[SwitchLog]
     valor_optimo          : float
 
@@ -102,6 +103,7 @@ def ejecutar_pipeline(
     historial_global  : list[float] = []
     historial_inst_global : list[float] = []
     dtw_deltas_global : list[float] = []
+    dtw_info_global   : list[dict]  = []
     log_switches      : list[SwitchLog] = []
 
     epoch_ctr   = 0
@@ -164,6 +166,11 @@ def ejecutar_pipeline(
         padded    = [float('nan')] * (n_hist - n_deltas) + list(mh_deltas)
         dtw_deltas_global.extend(padded)
 
+        mh_dtw_info = getattr(resultado, 'dtw_info_hist', []) or []
+        if len(mh_dtw_info) < n_hist:
+            mh_dtw_info = mh_dtw_info + [{}] * (n_hist - len(mh_dtw_info))
+        dtw_info_global.extend(mh_dtw_info)
+
         t_mh_fin = time.time() - t_inicio
         n_iters  = len(resultado.historial)
 
@@ -207,6 +214,7 @@ def ejecutar_pipeline(
         historial_global      = historial_global,
         historial_inst_global = historial_inst_global,
         dtw_deltas_global     = dtw_deltas_global,
+        dtw_info_global       = dtw_info_global,
         log_switches          = log_switches,
         valor_optimo          = func.optimum,
     )

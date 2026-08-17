@@ -18,4 +18,3 @@ __all__ = [
     "grafico_dtw_delta",
     "grafico_switches",
 ]
-

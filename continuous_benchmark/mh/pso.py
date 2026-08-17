@@ -41,6 +41,7 @@ class PSOEpochResult:
     historial_inst   : list[float] = field(default_factory=list)
     mejor_solucion   : list[float] = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,8 +49,7 @@ class PSOEpochResult:
 def _mutar_solucion(sol: np.ndarray, lb: float, ub: float, n_dim: int) -> np.ndarray:
     copia = sol.copy()
     n_perturb = random.randint(1, max(1, n_dim // 10))
-    indices = random.sample(range(n_dim), n_perturb)
-    for idx in indices:
+    for idx in random.sample(range(n_dim), n_perturb):
         copia[idx] = np.random.uniform(lb, ub)
     return copia
 
@@ -116,6 +116,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
     v_max = (ub - lb) * 0.2
 
@@ -150,16 +151,19 @@ def ejecutar_epoch(
         historial.append(gbest_val)
         historial_inst.append(fit_iter)
 
-        # Stagnation (pasamos -gbest_val para que el monitor detecte meseta en minimizacion)
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(-gbest_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [PSO Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
+        dtw_info_hist.append(dtw_info)
 
     return PSOEpochResult(
         epoch_idx        = epoch_idx,

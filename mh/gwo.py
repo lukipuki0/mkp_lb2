@@ -51,6 +51,7 @@ class GWOEpochResult:
     historial_inst   : list[float] = field(default_factory=list)  # fitness del lobo Alpha
     mejor_solucion   : list[int]  = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -74,91 +75,82 @@ class GWOResult:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _inicializar_manada(
-    inst: MKPInstance,
-    pop_size: int,
-    v_max: float,
-) -> tuple[np.ndarray, list[list[int]], list[float]]:
-    """Genera la manada inicial: posiciones continuas + soluciones binarias factibles."""
+def _inicializar_poblacion(inst: MKPInstance, pop_size: int) -> tuple[np.ndarray, list[list[int]], np.ndarray]:
+    """Genera la población inicial continua y binaria reparada."""
     n = inst.n
-    posiciones = np.random.uniform(-v_max, v_max, size=(pop_size, n))
+    posiciones = np.random.uniform(-1.0, 1.0, size=(pop_size, n))
     poblacion_bin = []
-    fitnesses     = []
+    fitnesses = []
 
     for i in range(pop_size):
-        sol = [random.randint(0, 1) for _ in range(n)]
-        sol, val = reparar_solucion(sol, inst)
+        sol_raw = [1 if pos > 0 else 0 for pos in posiciones[i]]
+        sol, val = reparar_solucion(sol_raw, inst)
         poblacion_bin.append(sol)
         fitnesses.append(val)
 
-    return posiciones, poblacion_bin, fitnesses
+    return posiciones, poblacion_bin, np.array(fitnesses)
 
 
-def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tuple[list[int], float]:
-    """Crea una copia de `sol` con bits invertidos al azar y la repara."""
-    copia = list(sol)
-    n = len(copia)
-    if n_flips <= 0:
-        n_flips = random.randint(1, 3)
-    indices = random.sample(range(n), min(n_flips, n))
-    for idx in indices:
+def _obtener_jerarquia(fitnesses: np.ndarray) -> tuple[int, int, int]:
+    """Retorna los índices de Alpha, Beta y Delta (los 3 mejores)."""
+    indices_ordenados = np.argsort(fitnesses)[::-1]  # orden descendente (maximización)
+    return indices_ordenados[0], indices_ordenados[1], indices_ordenados[2]
+
+
+def _crear_lobo(sol: list[int], val: float) -> tuple[np.ndarray, list[int], float]:
+    pos = np.where(np.array(sol) == 1, 1.0, -1.0)
+    return pos, sol.copy(), val
+
+
+def _mutar_solucion(sol: list[int], inst: MKPInstance) -> tuple[list[int], float]:
+    n = inst.n
+    copia = sol.copy()
+    n_flips = random.randint(1, max(1, n // 10))
+    for idx in random.sample(range(n), n_flips):
         copia[idx] = 1 - copia[idx]
-    copia, val = reparar_solucion(copia, inst)
-    return copia, val
+    return reparar_solucion(copia, inst)
 
 
-def _obtener_jerarquia(fitnesses: list[float]) -> tuple[int, int, int]:
-    """Devuelve los índices de Alpha, Beta y Delta (los 3 mejores lobos)."""
-    indices = sorted(range(len(fitnesses)), key=lambda i: fitnesses[i], reverse=True)
-    return indices[0], indices[1], indices[2]
-
-
-# ── Epoch individual ─────────────────────────────────────────────────────────
+# ── Epoch ─────────────────────────────────────────────────────────────────────
 
 def ejecutar_epoch(
-    inst      : MKPInstance,
-    params    : GWOParams,
-    epoch_idx : int = 0,
-    verbose   : bool = True,
-    sol_inyectada: list[int] | None = None,
+    inst          : MKPInstance,
+    params        : GWOParams,
+    epoch_idx     : int = 0,
+    verbose       : bool = True,
+    sol_inyectada : list[int] | None = None,
 ) -> GWOEpochResult:
-    """Ejecuta un epoch completo del GWO con detección de estancamiento (abort)."""
+    """Ejecuta un único epoch del GWO."""
+    posiciones, poblacion_bin, fitnesses = _inicializar_poblacion(inst, params.pop_size)
 
-    pop_size = params.pop_size
-    n = inst.n
-
-    # Inicializar manada
-    posiciones, poblacion_bin, fitnesses = _inicializar_manada(
-        inst, pop_size, params.v_max,
-    )
-
-    # Inyectar solución del orquestador según el modo de inyección
+    # Inyección de solución
     if sol_inyectada is not None:
-        sol_rep = list(sol_inyectada)
-        sol_rep, val_rep = reparar_solucion(sol_rep, inst)
+        sol_rep, val_rep = reparar_solucion(sol_inyectada, inst)
         mode = params.injection_mode
 
         if mode == "random":
-            peor_idx = min(range(len(fitnesses)), key=lambda i: fitnesses[i])
-            poblacion_bin[peor_idx] = sol_rep
-            fitnesses[peor_idx] = val_rep
+            peor_idx = int(np.argmin(fitnesses))
+            pos, sol, val = _crear_lobo(sol_rep, val_rep)
+            posiciones[peor_idx]    = pos
+            poblacion_bin[peor_idx] = sol
+            fitnesses[peor_idx]     = val
 
         elif mode == "mutated":
-            poblacion_bin[0] = sol_rep
-            fitnesses[0] = val_rep
-            for i in range(1, pop_size):
+            pos, sol, val = _crear_lobo(sol_rep, val_rep)
+            posiciones[0] = pos; poblacion_bin[0] = sol; fitnesses[0] = val
+            for i in range(1, params.pop_size):
                 msol, mval = _mutar_solucion(sol_rep, inst)
-                poblacion_bin[i] = msol
-                fitnesses[i] = mval
+                mpos, msol, mval = _crear_lobo(msol, mval)
+                posiciones[i] = mpos; poblacion_bin[i] = msol; fitnesses[i] = mval
 
         elif mode == "mixed":
-            poblacion_bin[0] = sol_rep
-            fitnesses[0] = val_rep
-            n_mutados = pop_size // 2
+            pos, sol, val = _crear_lobo(sol_rep, val_rep)
+            posiciones[0] = pos; poblacion_bin[0] = sol; fitnesses[0] = val
+            n_mutados = params.pop_size // 2
             for i in range(1, n_mutados):
                 msol, mval = _mutar_solucion(sol_rep, inst)
-                poblacion_bin[i] = msol
-                fitnesses[i] = mval
+                mpos, msol, mval = _crear_lobo(msol, mval)
+                posiciones[i] = mpos; poblacion_bin[i] = msol; fitnesses[i] = mval
 
     alpha_idx, beta_idx, delta_idx = _obtener_jerarquia(fitnesses)
     mejor_val = fitnesses[alpha_idx]
@@ -167,6 +159,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
     # Estado dinámico de los parámetros G
@@ -174,49 +167,37 @@ def ejecutar_epoch(
     G2 = params.G2_i
     G3 = params.G3_i
 
-    # Inicializar monitor
     monitor: StagnationMonitor | None = None
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
     for it in range(params.iterations):
-        # Coeficiente 'a' del GWO: decrece linealmente de 2 a 0
-        a = 2.0 - it * (2.0 / params.iterations)
+        a = 2.0 - 2.0 * (it / max(1, params.iterations - 1))  # decae linealmente de 2 a 0
 
-        # Posiciones de los líderes
-        X_alpha = posiciones[alpha_idx].copy()
-        X_beta  = posiciones[beta_idx].copy()
-        X_delta = posiciones[delta_idx].copy()
+        X_alpha = posiciones[alpha_idx]
+        X_beta  = posiciones[beta_idx]
+        X_delta = posiciones[delta_idx]
 
-        # Actualizar cada lobo
-        for i in range(pop_size):
-            if i in (alpha_idx, beta_idx, delta_idx):
-                continue
-
-            X_i = posiciones[i]
-
-            # Coeficientes aleatorios para cada líder
-            r1_a, r2_a = np.random.random(n), np.random.random(n)
-            r1_b, r2_b = np.random.random(n), np.random.random(n)
-            r1_d, r2_d = np.random.random(n), np.random.random(n)
-
-            A1 = 2.0 * a * r1_a - a
-            C1 = 2.0 * r2_a
-            A2 = 2.0 * a * r1_b - a
-            C2 = 2.0 * r2_b
-            A3 = 2.0 * a * r1_d - a
-            C3 = 2.0 * r2_d
-
-            # Posiciones guiadas por los 3 líderes
-            D_alpha = np.abs(C1 * X_alpha - X_i)
-            D_beta  = np.abs(C2 * X_beta  - X_i)
-            D_delta = np.abs(C3 * X_delta - X_i)
-
+        for i in range(params.pop_size):
+            # Posición vs Alpha
+            r1, r2 = np.random.rand(inst.n), np.random.rand(inst.n)
+            A1, C1 = 2.0 * a * r1 - a, 2.0 * r2
+            D_alpha = np.abs(C1 * X_alpha - posiciones[i])
             X1 = X_alpha - A1 * D_alpha
-            X2 = X_beta  - A2 * D_beta
+
+            # Posición vs Beta
+            r1, r2 = np.random.rand(inst.n), np.random.rand(inst.n)
+            A2, C2 = 2.0 * a * r1 - a, 2.0 * r2
+            D_beta = np.abs(C2 * X_beta - posiciones[i])
+            X2 = X_beta - A2 * D_beta
+
+            # Posición vs Delta
+            r1, r2 = np.random.rand(inst.n), np.random.rand(inst.n)
+            A3, C3 = 2.0 * a * r1 - a, 2.0 * r2
+            D_delta = np.abs(C3 * X_delta - posiciones[i])
             X3 = X_delta - A3 * D_delta
 
-            # Nueva posición continua (promedio de las 3 guías)
+            # Nueva posición promedio en espacio continuo
             X_new = (X1 + X2 + X3) / 3.0
             X_new = np.clip(X_new, -params.v_max, params.v_max)
             posiciones[i] = X_new
@@ -245,8 +226,10 @@ def ejecutar_epoch(
         historial_inst.append(fit_alpha_actual)
 
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -261,6 +244,7 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
@@ -270,10 +254,12 @@ def ejecutar_epoch(
             G2 = interpolar_G(it, params.iterations, params.G2_i, params.G2_f)
             G3 = interpolar_G(it, params.iterations, params.G3_i, params.G3_f)
 
+        dtw_info_hist.append(dtw_info)
+
     return GWOEpochResult(
         epoch_idx        = epoch_idx,
         mejor_valor      = mejor_val,
-        iteraciones      = params.iterations,
+        iteraciones      = len(historial),
         stagnation_fires = stag_fires,
         historial        = historial,
         historial_inst   = historial_inst,

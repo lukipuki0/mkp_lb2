@@ -48,6 +48,7 @@ class SAEpochResult:
     stagnation_fires:  int = 0
     dtw_deltas:        list[float] = field(default_factory=list)
     historial_inst:    list[float] = field(default_factory=list)  # val_actual al fin de cada T
+    dtw_info_hist:     list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -95,6 +96,7 @@ def ejecutar_epoch(
     historial:      list[float] = []
     historial_inst: list[float] = []
     dtw_deltas:     list[float] = []
+    dtw_info_hist:  list[dict]  = []
     iteraciones = 0
     stag_fires  = 0
 
@@ -130,8 +132,10 @@ def ejecutar_epoch(
         historial_inst.append(val_actual)  # val_actual = última solución aceptada (puede ser peor)
         iteraciones += 1
 
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -146,10 +150,12 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ iter {iteraciones} -> ABORT")
                 break  # Sale del bucle while
 
+        dtw_info_hist.append(dtw_info)
         T *= params.alpha   # Enfriamiento geométrico
 
     return SAEpochResult(
@@ -162,6 +168,7 @@ def ejecutar_epoch(
         T_final_alcanzada=T,
         stagnation_fires=stag_fires,
         dtw_deltas=dtw_deltas,
+        dtw_info_hist=dtw_info_hist,
     )
 
 

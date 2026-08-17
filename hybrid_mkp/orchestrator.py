@@ -67,6 +67,7 @@ class SwitchLog:
     t_fin        : float
     n_iters      : int    # iteraciones/generaciones ejecutadas
     dtw_deltas   : list   = None  # historial de deltas DTW de este turno
+    dtw_info_hist: list   = None  # historial de dicts DTW de este turno
 
 
 @dataclass
@@ -77,8 +78,9 @@ class PipelineResult:
     historial_global     : list[float]   # mejor valor por iteración acumulada
     historial_inst_global: list[float]   # fitness instantáneo
     dtw_deltas_global    : list[float]   # delta DTW por iteración (donde hay datos)
-    log_switches         : list[SwitchLog]
-    valor_optimo         : float
+    dtw_info_global      : list[dict]    = field(default_factory=list)  # dict DTW por iteración
+    log_switches         : list[SwitchLog] = field(default_factory=list)
+    valor_optimo         : float         = 0.0
 
     @property
     def gap_pct(self) -> float | None:
@@ -128,6 +130,7 @@ def ejecutar_pipeline(
     historial_global : list[float] = []
     historial_inst_global : list[float] = []
     dtw_deltas_global: list[float] = []
+    dtw_info_global  : list[dict] = []
     log_switches     : list[SwitchLog] = []
 
     turno        = "poblacional"
@@ -185,6 +188,9 @@ def ejecutar_pipeline(
         historial_global.extend(resultado.historial)
         historial_inst_global.extend(getattr(resultado, 'historial_inst', []) or [])
 
+        mh_info_hist = getattr(resultado, 'dtw_info_hist', []) or []
+        dtw_info_global.extend(mh_info_hist)
+
         # Alinear dtw_deltas con historial: rellenar NaN al inicio (ventana no lista)
         mh_deltas = getattr(resultado, 'dtw_deltas', []) or []
         n_hist    = len(resultado.historial)
@@ -196,13 +202,14 @@ def ejecutar_pipeline(
         n_iters  = len(resultado.historial)
 
         log_switches.append(SwitchLog(
-            mh_nombre   = mh,
-            tipo        = tipo,
-            mejor_valor = resultado.mejor_valor,
-            t_inicio    = t_mh_inicio,
-            t_fin       = t_mh_fin,
-            n_iters     = n_iters,
-            dtw_deltas  = mh_deltas,
+            mh_nombre    = mh,
+            tipo         = tipo,
+            mejor_valor  = resultado.mejor_valor,
+            t_inicio     = t_mh_inicio,
+            t_fin        = t_mh_fin,
+            n_iters      = n_iters,
+            dtw_deltas   = mh_deltas,
+            dtw_info_hist= mh_info_hist,
         ))
 
         if verbose:
@@ -230,6 +237,7 @@ def ejecutar_pipeline(
         historial_global      = historial_global,
         historial_inst_global = historial_inst_global,
         dtw_deltas_global     = dtw_deltas_global,
+        dtw_info_global       = dtw_info_global,
         log_switches          = log_switches,
         valor_optimo          = inst.valor_optimo,
     )

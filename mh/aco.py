@@ -50,6 +50,7 @@ class ACOEpochResult:
     historial_inst   : list[float] = field(default_factory=list)  # mejor fitness de la iteración
     mejor_solucion   : list[int]   = field(default_factory=list)
     dtw_deltas       : list[float] = field(default_factory=list)
+    dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -137,19 +138,21 @@ def _construir_solucion_hormiga(
         if not validos:
             break
 
-        # Selección probabilística por ruleta
-        sum_w = sum(pesos_seleccion)
-        if sum_w <= 0 or np.isnan(sum_w):
-            elegido = random.choice(validos)
+        # Calcular deseabilidad tau^alpha * eta^beta
+        deseabilidades = (tau[candidatos] ** alpha) * (eta[candidatos] ** beta)
+        suma_des = np.sum(deseabilidades)
+
+        if suma_des <= 0:
+            probs = np.ones(len(candidatos)) / len(candidatos)
         else:
-            probs = [w / sum_w for w in pesos_seleccion]
-            elegido = random.choices(validos, weights=probs, k=1)[0]
+            probs = deseabilidades / suma_des
 
-        sol[elegido] = 1
-        consumo += pesos[:, elegido]
-        candidatos.remove(elegido)
+        # Selección por ruleta
+        elem = np.random.choice(candidatos, p=probs)
+        sol[elem] = 1
+        candidatos.remove(elem)
 
-    # Reparar y garantizar maximalidad/factibilidad
+    # Reparar la solución completa para garantizar factibilidad y optimizar peso sobrante
     sol_rep, val_rep = reparar_solucion(sol, inst)
     return sol_rep, val_rep
 
@@ -163,27 +166,24 @@ def ejecutar_epoch(
     verbose       : bool = True,
     sol_inyectada : list[int] | None = None,
 ) -> ACOEpochResult:
-    """Ejecuta un epoch completo de ACO con detección de estancamiento (abort)."""
+    """Ejecuta un epoch completo del ACO con detección de estancamiento (abort)."""
 
-    n = inst.n
     pop_size = params.pop_size
+    n = inst.n
 
-    # Información heurística constante por instancia
+    # Matriz/Vector de feromonas e información heurística
+    tau = _inicializar_feromonas(n, params.tau_0)
     eta = _calcular_heuristica(inst)
 
-    # Matriz de feromonas inicializada a tau_max (MMAS)
-    tau = np.full(n, params.tau_max, dtype=float)
-
-    poblacion_bin: list[list[int]] = []
-    fitnesses: list[float] = []
-
-    # Construcción inicial de la colonia
+    # Inicialización de la colonia (hormigas)
+    poblacion_bin = []
+    fitnesses     = []
     for _ in range(pop_size):
-        sol, val = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
-        poblacion_bin.append(sol)
-        fitnesses.append(val)
+        sol_k, val_k = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
+        poblacion_bin.append(sol_k)
+        fitnesses.append(val_k)
 
-    # Inyección de solución del orquestador si aplica
+    # Inyectar solución del orquestador si se proporciona
     if sol_inyectada is not None:
         sol_rep = list(sol_inyectada)
         sol_rep, val_rep = reparar_solucion(sol_rep, inst)
@@ -223,6 +223,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
     # Monitor de estancamiento
@@ -255,7 +256,8 @@ def ejecutar_epoch(
         tau = (1.0 - params.rho) * tau
 
         # Depósito proporcional a la calidad del mejor global del epoch (o de la iteración)
-        deposito = params.rho * (mejor_val / max(1.0, inst.valor_optimo if inst.valor_optimo > 0 else mejor_val))
+        valor_base = inst.valor_optimo if inst.valor_optimo > 0 else mejor_val
+        deposito = params.rho * (mejor_val / max(1.0, valor_base))
         for j in range(n):
             if mejor_sol[j] == 1:
                 tau[j] += deposito
@@ -267,8 +269,10 @@ def ejecutar_epoch(
         historial_inst.append(fit_iter_best)
 
         # ── Stagnation check ──────────────────────────────────────────────
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -279,13 +283,16 @@ def ejecutar_epoch(
                 elif 0 <= dlt <= td: estado = "Explorar poco"
                 elif -td <= dlt < 0: estado = "Explotar poco"
                 else: estado = "Explotar mucho"
-                print(f"i={it:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | best={mejor_val:.1f}")
+                print(f"i={it:03d} | Estado: {estado:<15} | Delta={dlt:6.1f} | Th_d={td:6.1f} | d1={status.get('D1_vs_ramp', 0.0):.3f} | d2={status.get('D2_vs_const', 0.0):.3f} | best={mejor_val:.1f}")
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
-                    print(f"    [Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
+                    print(f"    [Stagnation] Fire #{stag_fires} @ iter {it + 1} -> ABORT")
                 break
+
+        dtw_info_hist.append(dtw_info)
 
     return ACOEpochResult(
         epoch_idx        = epoch_idx,
@@ -296,6 +303,7 @@ def ejecutar_epoch(
         historial_inst   = historial_inst,
         mejor_solucion   = mejor_sol,
         dtw_deltas       = dtw_deltas,
+        dtw_info_hist    = dtw_info_hist,
     )
 
 

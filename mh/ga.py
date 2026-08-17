@@ -50,6 +50,7 @@ class GAEpochResult:
     historial_inst  : list[float] = field(default_factory=list)  # fitness best de cada gen
     mejor_solucion  : list[int]  = field(default_factory=list)
     dtw_deltas      : list[float] = field(default_factory=list)
+    dtw_info_hist   : list[dict]  = field(default_factory=list)
 
 
 @dataclass
@@ -147,6 +148,7 @@ def ejecutar_epoch(
     historial      = []
     historial_inst = []
     dtw_deltas     = []
+    dtw_info_hist  = []
     stag_fires     = 0
 
     fn_cx  = get_crossover(params.crossover_op)
@@ -200,8 +202,10 @@ def ejecutar_epoch(
         historial_inst.append(fit_gen_actual)  # puede ser <= mejor_val
 
         # -- Stagnation check --
+        dtw_info = {}
         if monitor is not None:
             status = monitor.update(mejor_val)
+            dtw_info = status.copy()
             if status.get("ready"):
                 dtw_deltas.append(status.get("delta", 0.0))
 
@@ -216,19 +220,23 @@ def ejecutar_epoch(
 
             if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [Stagnation] Fire #{stag_fires} @ gen {gen + 1} -> ABORT")
                 break
 
+        dtw_info_hist.append(dtw_info)
+
     return GAEpochResult(
         epoch_idx        = epoch_idx,
         mejor_valor      = mejor_val,
-        generaciones     = params.generations,
+        generaciones     = len(historial),
         stagnation_fires = stag_fires,
         historial        = historial,
         historial_inst   = historial_inst,
         mejor_solucion   = mejor_sol,
         dtw_deltas       = dtw_deltas,
+        dtw_info_hist    = dtw_info_hist,
     )
 
 

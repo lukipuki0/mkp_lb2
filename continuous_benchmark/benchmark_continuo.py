@@ -118,7 +118,7 @@ def procesar_funcion(
 
     valores_finales   : list[float] = []
     n_switches_runs   : list[int]   = []
-    resultado_run1    = None
+    resultados_runs   : list        = []
 
     for run_idx in range(1, n_runs + 1):
         print(f"\n  --- Run {run_idx:2d}/{n_runs} | {func.name} ---", flush=True)
@@ -131,10 +131,7 @@ def procesar_funcion(
         )
         valores_finales.append(resultado.mejor_valor_global)
         n_switches_runs.append(resultado.n_switches)
-
-        # Guardar artefactos solo del primer run
-        if run_idx == 1:
-            resultado_run1 = resultado
+        resultados_runs.append(resultado)
 
     # ── Estadisticas descriptivas ─────────────────────────────────────────
     vals = np.array(valores_finales)
@@ -173,50 +170,155 @@ def procesar_funcion(
             writer.writerow([i, v, ns])
     print(f"  [csv] Resultados de runs en '{csv_runs_path}'")
 
-    # ── Reporte TXT del run 1 + estadisticas ─────────────────────────────
-    report_path = os.path.join(output_dir, "resumen_pipeline.txt")
+    # ── Identificar el MEJOR RUN entre los N_RUNS (Minimización) ─────────
+    best_run_idx = int(np.argmin(valores_finales))
+    best_res     = resultados_runs[best_run_idx]
+
+    best_run_dir = os.path.join(output_dir, f"best_run_{best_run_idx + 1:02d}")
+    os.makedirs(best_run_dir, exist_ok=True)
+
+    # Reporte TXT del mejor run
+    report_path = os.path.join(best_run_dir, "resumen_pipeline_best_run.txt")
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write(f"Funcion            : {func.name}\n")
+        f.write(f"Funcion            : {func.name} (Mejor Run #{best_run_idx + 1:02d})\n")
         f.write(f"Dimension          : {func.n_dim}\n")
         f.write(f"Limites            : [{func.lb}, {func.ub}]\n")
-        f.write(f"N_Runs             : {n_runs}\n")
-        f.write(f"Max Iters / Run    : {max_iters}\n\n")
-        f.write(f"Optimo conocido    : {func.optimum:.6f}\n\n")
-        f.write(f"--- Estadisticas descriptivas ({n_runs} runs) ---\n")
-        f.write(f"  Media   : {media:.6f}\n")
-        f.write(f"  Std     : {std:.6f}\n")
-        f.write(f"  Mediana : {mediana:.6f}\n")
-        f.write(f"  Mejor   : {mejor:.6f}\n")
-        f.write(f"  Peor    : {peor:.6f}\n\n")
-        f.write("--- Valores por run ---\n")
-        for i, v in enumerate(valores_finales, 1):
-            f.write(f"  Run {i:2d}: {v:.6f}\n")
-    print(f"  [txt] {report_path}")
+        f.write(f"Optimo conocido    : {func.optimum:.6f}\n")
+        f.write(f"Mejor valor global : {best_res.mejor_valor_global:.6f}\n")
+        f.write(f"Total switches     : {best_res.n_switches}\n\n")
+        for i, sw in enumerate(best_res.log_switches, 1):
+            f.write(f"{i}. {sw.mh_nombre} ({sw.tipo}) | mejor={sw.mejor_valor:.6f}"
+                    f" | {sw.t_inicio:.1f}s-{sw.t_fin:.1f}s | iters={sw.n_iters}\n")
 
-    # ── Graficos del Run 1 ────────────────────────────────────────────────
-    if resultado_run1 is not None:
-        run1_dir = os.path.join(output_dir, "run_01_graficos")
-        os.makedirs(run1_dir, exist_ok=True)
-        print("\n  Generando graficos del Run 1...")
-        grafico_convergencia(
-            historial_global = resultado_run1.historial_global,
-            log_switches     = resultado_run1.log_switches,
-            colores_mh       = COLORES_MH,
-            valor_optimo     = resultado_run1.valor_optimo,
-            output_dir       = run1_dir,
-        )
-        grafico_dtw_delta(
+    # CSV y TXT Detallado DTW del Mejor Run
+    csv_best_path = os.path.join(best_run_dir, "historial_dtw.csv")
+    txt_best_path = os.path.join(best_run_dir, "historial_dtw_detalle.txt")
 
-            dtw_deltas_global = resultado_run1.dtw_deltas_global,
-            log_switches      = resultado_run1.log_switches,
-            colores_mh        = COLORES_MH,
-            output_dir        = run1_dir,
+    deltas          = best_res.dtw_deltas_global
+    inst_hist       = getattr(best_res, 'historial_inst_global', []) or []
+    dtw_info_global = getattr(best_res, 'dtw_info_global', []) or []
+
+    with open(csv_best_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "iteracion", "epoch", "mh", "tipo", "fitness_best", "fitness_instantaneo",
+            "dtw_ready", "dtw_fire", "D1_vs_ramp", "D2_vs_const", "dtw_delta",
+            "theta_c", "theta_r", "theta_delta", "no_improve_len", "trigger_streak",
+            "window_n", "estado_dtw"
+        ])
+        offset = 0
+        for ep_idx, sw in enumerate(best_res.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(best_res.historial_global):
+                    break
+                fit  = best_res.historial_global[idx]
+                fi   = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                if not ready: estado_str = "Llenando ventana"
+                elif fire:    estado_str = "ESTANCAMIENTO (Fire)"
+                else:         estado_str = "Explotacion activa"
+
+                writer.writerow([
+                    idx + 1, ep_idx, sw.mh_nombre, sw.tipo, fit,
+                    "" if (isinstance(fi, float) and np.isnan(fi)) else fi,
+                    ready, fire,
+                    "" if (isinstance(d1, float) and np.isnan(d1)) else d1,
+                    "" if (isinstance(d2, float) and np.isnan(d2)) else d2,
+                    "" if (isinstance(delta, float) and np.isnan(delta)) else delta,
+                    "" if (isinstance(tc, float) and np.isnan(tc)) else tc,
+                    "" if (isinstance(tr, float) and np.isnan(tr)) else tr,
+                    "" if (isinstance(td, float) and np.isnan(td)) else td,
+                    no_imp, streak, win_n, estado_str
+                ])
+            offset += n_seg
+
+    with open(txt_best_path, "w", encoding="utf-8") as f_dtw:
+        f_dtw.write("======================================================================================================================================================================================\n")
+        f_dtw.write(f"  HISTORIAL DETALLADO DE TODAS LAS MÉTRICAS DTW POR ITERACIÓN — MEJOR RUN (#{best_run_idx + 1:02d}) — {func.name}\n")
+        f_dtw.write("======================================================================================================================================================================================\n\n")
+        f_dtw.write(
+            f"  {'Iter':>6}  {'Epoch':>5}  {'MH':<6}  {'Tipo':<12}  {'Fit Best':>14}  {'Fit Inst':>14}  "
+            f"{'Ready':>6}  {'Fire':>6}  {'D1 (Ramp)':>14}  {'D2 (Const)':>14}  {'Delta DTW':>14}  "
+            f"{'theta_c':>12}  {'theta_r':>12}  {'theta_delta':>14}  {'no_imp':>6}  {'streak':>6}  {'n_win':>6}  {'Estado DTW':<24}\n"
         )
-        grafico_switches(
-            log_switches = resultado_run1.log_switches,
-            colores_mh   = COLORES_MH,
-            output_dir   = run1_dir,
-        )
+        f_dtw.write("  " + "-" * 210 + "\n")
+
+        offset = 0
+        for ep_idx, sw in enumerate(best_res.log_switches, 1):
+            n_seg = sw.n_iters
+            for i_local in range(n_seg):
+                idx = offset + i_local
+                if idx >= len(best_res.historial_global):
+                    break
+                fit  = best_res.historial_global[idx]
+                fi   = inst_hist[idx] if idx < len(inst_hist) else float("nan")
+                info = dtw_info_global[idx] if idx < len(dtw_info_global) else {}
+
+                ready = info.get("ready", False)
+                fire  = info.get("fire", False)
+                d1    = info.get("D1_vs_ramp", float("nan"))
+                d2    = info.get("D2_vs_const", float("nan"))
+                delta = info.get("delta", deltas[idx] if idx < len(deltas) else float("nan"))
+                tc    = info.get("theta_c", float("nan"))
+                tr    = info.get("theta_r", float("nan"))
+                td    = info.get("theta_delta", float("nan"))
+                no_imp= info.get("no_improve_len", 0)
+                streak= info.get("trigger_streak", 0)
+                win_n = info.get("n", 0)
+
+                if not ready: estado_str = f"Llenando ventana (W={win_n})"
+                elif fire:    estado_str = "[!] ESTANCAMIENTO (Fire)"
+                else:         estado_str = "Explotacion activa"
+
+                d1_s  = f"{d1:14.6f}" if (isinstance(d1, float) and not np.isnan(d1)) else f"{'--':>14}"
+                d2_s  = f"{d2:14.6f}" if (isinstance(d2, float) and not np.isnan(d2)) else f"{'--':>14}"
+                dl_s  = f"{delta:+14.6f}" if (isinstance(delta, float) and not np.isnan(delta)) else f"{'--':>14}"
+                fi_s  = f"{fi:14.6f}" if (isinstance(fi, float) and not np.isnan(fi)) else f"{'--':>14}"
+                tc_s  = f"{tc:12.6f}" if (isinstance(tc, float) and not np.isnan(tc)) else f"{'--':>12}"
+                tr_s  = f"{tr:12.6f}" if (isinstance(tr, float) and not np.isnan(tr)) else f"{'--':>12}"
+                td_s  = f"{td:14.6f}" if (isinstance(td, float) and not np.isnan(td)) else f"{'--':>14}"
+
+                f_dtw.write(
+                    f"  {idx + 1:6d}  {ep_idx:5d}  {sw.mh_nombre:<6}  {sw.tipo:<12}  {fit:14.6f}  {fi_s}  "
+                    f"{str(ready):>6}  {str(fire):>6}  {d1_s}  {d2_s}  {dl_s}  "
+                    f"{tc_s}  {tr_s}  {td_s}  {no_imp:6d}  {streak:6d}  {win_n:6d}  {estado_str:<24}\n"
+                )
+            offset += n_seg
+
+    print(f"\n  Generando graficos y telemetría DTW del Mejor Run (#{best_run_idx + 1:02d})...")
+    grafico_convergencia(
+        historial_global = best_res.historial_global,
+        log_switches     = best_res.log_switches,
+        colores_mh       = COLORES_MH,
+        valor_optimo     = best_res.valor_optimo,
+        output_dir       = best_run_dir,
+    )
+    grafico_dtw_delta(
+        dtw_deltas_global = best_res.dtw_deltas_global,
+        log_switches      = best_res.log_switches,
+        colores_mh        = COLORES_MH,
+        output_dir        = best_run_dir,
+    )
+    grafico_switches(
+        log_switches = best_res.log_switches,
+        colores_mh   = COLORES_MH,
+        output_dir   = best_run_dir,
+    )
 
     # ── Análisis Estadístico de los N_RUNS del Pipeline Híbrido ─────────────
     realizar_analisis_estadistico(

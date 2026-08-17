@@ -37,31 +37,55 @@ def grafico_dtw_delta(
     -------
     str : Ruta absoluta del archivo generado.
     """
-    datos_reales = [d for d in dtw_deltas_global
-                    if d != "" and not (isinstance(d, float) and math.isnan(d))]
-    if not datos_reales:
+    xs_validos = []
+    ys_validos = []
+    offset = 0
+    for sw in log_switches:
+        n_seg = sw.n_iters
+        seg_d = dtw_deltas_global[offset: offset + n_seg]
+        for idx, val in enumerate(seg_d):
+            if val != "" and not (isinstance(val, float) and math.isnan(val)):
+                xs_validos.append(offset + idx)
+                ys_validos.append(val)
+        offset += n_seg
+
+    if not ys_validos:
         print("  [plot] dtw_delta.png  -> sin datos suficientes, omitido.")
         return ""
 
     fig, ax = plt.subplots(figsize=(14, 5))
 
-    offset = 0
     legend_patches = []
     seen = set()
-
     dibujar_lineas = len(log_switches) < 50
 
+    offset = 0
     for sw in log_switches:
         n_seg = sw.n_iters
         if n_seg == 0:
             continue
-        seg_d = dtw_deltas_global[offset: offset + n_seg]
-        xs_d  = range(offset, offset + len(seg_d))
-        col   = colores_mh.get(sw.mh_nombre, "gray")
+        col = colores_mh.get(sw.mh_nombre, "gray")
 
-        ax.plot(xs_d, seg_d, color=col, linewidth=2.5, alpha=0.85)
+        # Puntos del segmento actual
+        seg_xs = [x for x in range(offset, offset + n_seg) if x in xs_validos]
+        seg_ys = [ys_validos[xs_validos.index(x)] for x in seg_xs]
+
+        if seg_xs:
+            # Para conectar sin huecos con el punto válido anterior
+            prev_indices = [i for i, x in enumerate(xs_validos) if x < seg_xs[0]]
+            if prev_indices:
+                last_prev_idx = prev_indices[-1]
+                plot_xs = [xs_validos[last_prev_idx]] + seg_xs
+                plot_ys = [ys_validos[last_prev_idx]] + seg_ys
+            else:
+                plot_xs = seg_xs
+                plot_ys = seg_ys
+
+            ax.plot(plot_xs, plot_ys, color=col, linewidth=2.5, alpha=0.85)
+
         if dibujar_lineas:
             ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
+
         offset += n_seg
 
         if sw.mh_nombre not in seen:
@@ -72,12 +96,14 @@ def grafico_dtw_delta(
                label="Threshold (Delta=0)")
     legend_patches.append(mpatches.Patch(color="black", label="Threshold (Delta=0)"))
 
+
     ax.set_title("HRES2-H2 DTW Delta per Iteration  [+ = stagnation | - = active improvement]",
                  fontsize=18, fontweight="bold")
     ax.set_xlabel("Accumulated Iterations", fontsize=18)
     ax.set_ylabel("DTW Delta", fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
-    ax.legend(handles=legend_patches, loc="upper right", fontsize=15)
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=15)
+
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
