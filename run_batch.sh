@@ -1,13 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=batch_mkp
+#SBATCH --job-name=hybrid_mkp   # Nombre que verás en la cola
 #SBATCH --partition=CPU
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
-#SBATCH --time=48:00:00
-#SBATCH --output=slurm_%j.out
-#SBATCH --error=slurm_%j.err
+#SBATCH --cpus-per-task=20           # 4 CPUs para procesar datos (cargar imágenes)
+#SBATCH --mem=32G                   # 16 GB de RAM del sistema (no de video)
+#SBATCH --output=./.hpc/logs/hybrid_mkp%j.log   # Archivo donde se guardará lo que imprima el script (%j es el ID del trabajo)
+#SBATCH --error=./.hpc/errors/hybrid_mkp%j.error        # Archivo donde se guardarán los errores si falla
+#SBATCH --qos=normal               #QOS de HPC
 
 # Cargar entorno de conda
 source ~/miniconda3/etc/profile.d/conda.sh

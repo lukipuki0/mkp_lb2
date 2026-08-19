@@ -61,7 +61,7 @@ STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
 STAG_PATIENCE    = 3
-STAG_USE_DDTW    = False
+STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
@@ -369,7 +369,7 @@ def procesar_instancia(
         f.write(f"Switches medios    : {switches_medio:.1f}\n")
 
     # ── 2. Ejecutar Metaheurísticas Standalone Comparativas (N_RUNS cada una) ──
-    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ILS", "SA"]
     resultados_dict = {"Hybrid DTW": valores_finales}
 
     sep = "=" * 62
