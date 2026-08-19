@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from continuous_benchmark.funciones_cec2022 import get_test_functions, ContinuousFunction
 from mkp_core.data_loader import cargar_instancias
 from mkp_core.problem import MKPInstance
+from dtw_stagnation import StagnationConfig
 
 from mh.woa import WOAParams as WOAMKPParams, ejecutar_epoch as woa_mkp_epoch
 from mh.abc import ABCParams as ABCMKPParams, ejecutar_epoch as abc_mkp_epoch
@@ -55,6 +56,7 @@ POP_SIZE = 30
 NUM_INSTANCIAS_MKP = 5   # Primeras N instancias de MKP a evaluar por corrida
 OUTPUT_BASE = os.path.join("resultados", "mezclas_mh", "woa_abc")
 RANDOM_SEED = 42
+STAG_USE_DDTW = False
 
 COLORES_ALGO = {
     "WOA Puro": "#2196F3",               # Azul
@@ -86,7 +88,7 @@ def procesar_instancia_mkp(
     p_b = VariantBParams(pop_size=POP_SIZE, iterations=iterations)
     p_c = VariantCParams(pop_size=POP_SIZE, iterations=iterations)
     p_mdg = MDGWABCParams(pop_size=POP_SIZE, iterations=iterations)
-    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations)
+    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations, stag_cfg=StagnationConfig(window=10, patience=3, min_slope=0.01, plateau_max=5, use_ddtw=STAG_USE_DDTW))
 
     dict_res = {}
     algos = [
@@ -190,7 +192,7 @@ def procesar_funcion_continua(
     p_b = VariantBParams(pop_size=POP_SIZE, iterations=iterations)
     p_c = VariantCParams(pop_size=POP_SIZE, iterations=iterations)
     p_mdg = MDGWABCParams(pop_size=POP_SIZE, iterations=iterations)
-    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations)
+    p_d = DTWWOAABCParams(pop_size=POP_SIZE, iterations=iterations, stag_cfg=StagnationConfig(window=10, patience=3, min_slope=0.01, plateau_max=5, use_ddtw=STAG_USE_DDTW))
 
     dict_res = {}
     algos = [
@@ -285,8 +287,9 @@ def ejecutar_benchmark_completo():
         random.seed(RANDOM_SEED)
         np.random.seed(RANDOM_SEED)
 
+    dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+    run_dir   = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
 
     # Carpetas separadas solicitadas por el usuario
     mkp_root_dir = os.path.join(run_dir, "mkp")

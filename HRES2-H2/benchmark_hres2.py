@@ -3,7 +3,7 @@ HRES2-H2/benchmark_hres2.py
 ---------------------------
 Benchmark de Ejecución Múltiple (31 Runs Independientes) para el sistema HRES2-H2
 usando el Orquestador Híbrido de Metaheurísticas por Rotación DTW.
-Pool Activo: PSO, GWO, WOA, EHO, ACO, ABC, ILS, SA (Excluye GA).
+Pool Activo: PSO, GWO, WOA, EHO, ACO, ABC, ILS, SA, TS, VNS (Excluye GA).
 """
 
 from __future__ import annotations
@@ -29,7 +29,16 @@ wpeb_model = importlib.import_module("HRES2-H2.wpeb_model")
 HRES2Function = wpeb_model.HRES2Function
 decode_solution = wpeb_model.decode_solution
 
-from continuous_benchmark.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
+import importlib.util as _ilu_orch
+_orch_spec = _ilu_orch.spec_from_file_location(
+    "hres2_orchestrator",
+    os.path.join(os.path.dirname(__file__), "orchestrator.py")
+)
+_orch_mod = _ilu_orch.module_from_spec(_orch_spec)
+_orch_spec.loader.exec_module(_orch_mod)
+ejecutar_pipeline_hres2        = _orch_mod.ejecutar_pipeline_hres2
+ejecutar_mh_standalone_hres2   = _orch_mod.ejecutar_mh_standalone_hres2
+COLORES_MH                     = _orch_mod.COLORES_MH
 import importlib
 analisis_mod = importlib.import_module("HRES2-H2.analisis_estadistico_hres2")
 realizar_analisis_estadistico_completo = analisis_mod.realizar_analisis_estadistico_completo
@@ -71,7 +80,7 @@ STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.0
 STAG_PLATEAU_MAX = 15
 STAG_PATIENCE    = 3
-STAG_USE_DDTW    = False
+STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
@@ -114,8 +123,9 @@ def ejecutar_benchmark_hres2(
 ) -> dict:
     """Ejecuta 31 runs independientes del pipeline híbrido y standalone en HRES2-H2."""
     if output_dir is None:
+        dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+        output_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
 
     os.makedirs(output_dir, exist_ok=True)
     func = HRES2Function()
@@ -139,7 +149,7 @@ def ejecutar_benchmark_hres2(
     print(f"  Runs independientes : {n_runs}")
     print(f"  Max Iters / Run     : {max_iters}")
     print(f"  Pool Poblacional    : PSO, GWO, WOA, EHO, ACO, ABC")
-    print(f"  Pool Trayectoria    : ILS, SA")
+    print(f"  Pool Trayectoria    : ILS, SA, TS, VNS")
     print(f"  Carpeta de salida   : {output_dir}")
     print(banner)
 
@@ -158,11 +168,11 @@ def ejecutar_benchmark_hres2(
             np.random.seed(run_seed)
 
         print(f"  >>> RUN HYBRID DTW [{r:02d}/{n_runs:02d}] en progreso...")
-        res = ejecutar_pipeline(
-            func       = func,
-            max_iters  = max_iters,
-            stag_cfg   = stag_cfg,
-            verbose    = False,
+        res = ejecutar_pipeline_hres2(
+            func              = func,
+            max_iters         = max_iters,
+            stag_cfg          = stag_cfg,
+            verbose           = False,
         )
 
         best_lcoe = res.mejor_valor_global
@@ -202,7 +212,7 @@ def ejecutar_benchmark_hres2(
               f"Switches: {res.n_switches}")
 
     # 2. Ejecutar Metaheurísticas Standalone Comparativas (31 Runs cada una)
-    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA", "TS", "VNS"]
     resultados_dict = {"Hybrid DTW": valores_lcoe}
 
     print(f"\n{banner}")
@@ -213,7 +223,7 @@ def ejecutar_benchmark_hres2(
         print(f"  > Ejecutando {mh} Standalone ({n_runs} runs x {max_iters} iters)...")
         vals_mh = []
         for r in range(n_runs):
-            res_std = ejecutar_mh_standalone(func, mh, max_iters=max_iters)
+            res_std = ejecutar_mh_standalone_hres2(func, mh, max_iters=max_iters)
             vals_mh.append(res_std.mejor_valor)
         resultados_dict[mh] = vals_mh
         print(f"    {mh:<4s} | Media: {np.mean(vals_mh):.6f} | Min: {np.min(vals_mh):.6f} | Max: {np.max(vals_mh):.6f}")

@@ -1,0 +1,11 @@
+DETALLE MEJOR RUN (Run #01)
+LCOE                : 0.267159 CNY/kWh
+LCOH                : 17.631389 CNY/kg
+AGSR (Grid Surplus) : 20.00%
+H2 Anual Producido  : 8,862,879.4 kg
+Factor Cap. Elz     : 75.93%
+Total Switches      : 22
+Potencia Eólica     : 174.47 MW
+Potencia Solar PV   : 25.53 MW
+Electrolizador MW   : 70.0 MW (14 unidades)
+Batería MW          : 50.0 MW (4.0 h)

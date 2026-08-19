@@ -200,7 +200,7 @@ def realizar_analisis_estadistico(
     vals_sorted = [resultados_dict[alg] for alg in algs_sorted]
 
     fig, ax = plt.subplots(figsize=(max(10, len(algs_sorted) * 1.5), 6))
-    bp = ax.boxplot(vals_sorted, patch_artist=True, labels=algs_sorted, widths=0.5,
+    bp = ax.boxplot(vals_sorted, patch_artist=True, tick_labels=algs_sorted, widths=0.5,
                     medianprops=dict(color="#FF5722", linewidth=2),
                     whiskerprops=dict(linewidth=1.2),
                     capprops=dict(linewidth=2),

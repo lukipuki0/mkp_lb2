@@ -452,8 +452,9 @@ def main() -> None:
         p_high           = STAG_P_HIGH,
     )
 
+    dtw_mode   = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp  = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    batch_dir  = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+    batch_dir  = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
     os.makedirs(batch_dir, exist_ok=True)
 
     banner = "=" * 62

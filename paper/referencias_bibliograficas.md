@@ -41,6 +41,18 @@ Este documento contiene la lista completa de referencias bibliográficas citadas
    - **DOI:** [10.1007/b106656](https://doi.org/10.1007/b106656)  
    - **Enlace:** [Wiley Online Library](https://onlinelibrary.wiley.com/doi/book/10.1002/0471739383)
 
+7. **Mladenović, N., & Hansen, P.** (1997).  
+   Variable neighborhood search.  
+   *Computers & Operations Research*, 24(11), 1097–1100.  
+   - **DOI:** [10.1016/S0305-0548(97)00031-2](https://doi.org/10.1016/S0305-0548(97)00031-2)  
+   - **Enlace:** [ScienceDirect](https://doi.org/10.1016/S0305-0548(97)00031-2)
+
+8. **Glover, F.** (1986).  
+   Future paths for integer programming and links to artificial intelligence.  
+   *Computers & Operations Research*, 13(5), 533–549.  
+   - **DOI:** [10.1016/0305-0548(86)90048-1](https://doi.org/10.1016/0305-0548(86)90048-1)  
+   - **Enlace:** [ScienceDirect](https://doi.org/10.1016/0305-0548(86)90048-1)
+
 ---
 
 ## 2. Dynamic Time Warping (DTW / DDTW) y Análisis de Series Temporales

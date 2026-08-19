@@ -1,8 +1,8 @@
 """
-continuous_benchmark/mh/sa.py
-------------------------------
-Simulated Annealing (SA) para optimización continua y mixta (minimización).
-Implementa enfriamiento geométrico, probabilidad Metropolis y monitor DTW.
+HRES2-H2/mh/sa.py
+------------------
+Simulated Annealing (SA) para HRES2-H2 (minimizacion continua mixta).
+Enfriamiento geometrico + criterio Metropolis + operadores HRES2.
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ from dtw_stagnation import StagnationConfig, StagnationMonitor
 class SAParams:
     iterations     : int   = 300
     epochs         : int   = 1
-    t_initial      : float = 10.0   # Temperatura inicial
-    cooling_rate   : float = 0.96   # Factor de enfriamiento geométrico alpha
-    step_size      : float = 0.05   # Amplitud inicial de paso
+    t_initial      : float = 10.0
+    cooling_rate   : float = 0.96
+    step_size      : float = 0.05
     use_stagnation : bool  = True
     stag_cfg       : StagnationConfig | None = None
 
@@ -42,8 +42,8 @@ class SAEpochResult:
     dtw_info_hist    : list[dict]  = field(default_factory=list)
 
 
-def _generar_vecino_4d(x: np.ndarray, lb: np.ndarray, ub: np.ndarray, step_scale: float) -> np.ndarray:
-    n = len(x)
+def _generar_vecino(x: np.ndarray, lb: np.ndarray, ub: np.ndarray, step_scale: float) -> np.ndarray:
+    """Genera un vecino con operadores mixtos HRES2."""
     vecino = x.copy()
     op = random.choice(["continuous", "battery", "electrolyzer", "balanced"])
 
@@ -51,19 +51,13 @@ def _generar_vecino_4d(x: np.ndarray, lb: np.ndarray, ub: np.ndarray, step_scale
         dim = 0
         rango = ub[dim] - lb[dim]
         vecino[dim] += np.random.normal(0, step_scale * rango)
-
     elif op == "battery":
         if random.random() < 0.5:
-            step = random.choice([-5.0, 5.0])
-            vecino[2] += step
+            vecino[2] += random.choice([-5.0, 5.0])
         else:
-            step = random.choice([-1.0, 1.0])
-            vecino[3] += step
-
+            vecino[3] += random.choice([-1.0, 1.0])
     elif op == "electrolyzer":
-        step = random.choice([-1.0, 1.0])
-        vecino[1] += step
-
+        vecino[1] += random.choice([-1.0, 1.0])
     elif op == "balanced":
         rango = ub[0] - lb[0]
         delta_w = np.random.normal(0, step_scale * rango)
@@ -85,43 +79,31 @@ def ejecutar_epoch(
     lb = getattr(func, "lb_vector", np.full(n, func.lb))
     ub = getattr(func, "ub_vector", np.full(n, func.ub))
 
-    if sol_inyectada is not None:
-        x_curr = np.clip(sol_inyectada, lb, ub)
-    else:
-        x_curr = np.random.uniform(lb, ub)
-
+    x_curr = np.clip(sol_inyectada, lb, ub) if sol_inyectada is not None else np.random.uniform(lb, ub)
     val_curr = func.func(x_curr)
     mejor_sol = x_curr.copy()
     mejor_val = val_curr
 
-    historial      = []
-    historial_inst = []
-    dtw_deltas     = []
-    dtw_info_hist  = []
-    stag_fires     = 0
+    historial, historial_inst, dtw_deltas, dtw_info_hist = [], [], [], []
+    stag_fires = 0
+    temp = params.t_initial
 
-    monitor: StagnationMonitor | None = None
+    monitor = None
     if params.use_stagnation and params.stag_cfg:
         monitor = StagnationMonitor(cfg=params.stag_cfg)
 
-    temp = params.t_initial
-
     for it in range(params.iterations):
         step_scale = max(0.005, params.step_size * (temp / params.t_initial))
-        vecino = _generar_vecino_4d(x_curr, lb, ub, step_scale)
+        vecino = _generar_vecino(x_curr, lb, ub, step_scale)
         val_vecino = func.func(vecino)
 
         delta = val_vecino - val_curr
-
-        # Criterio Metropolis
         if delta < 0 or random.random() < math.exp(-delta / max(1e-8, temp)):
             x_curr = vecino.copy()
             val_curr = val_vecino
 
-        # Enfriar
         temp *= params.cooling_rate
 
-        # Actualizar mejor histórico
         if val_curr < mejor_val:
             mejor_val = val_curr
             mejor_sol = x_curr.copy()
@@ -144,13 +126,7 @@ def ejecutar_epoch(
         dtw_info_hist.append(dtw_info)
 
     return SAEpochResult(
-        epoch_idx        = epoch_idx,
-        mejor_valor      = mejor_val,
-        iteraciones      = len(historial),
-        stagnation_fires = stag_fires,
-        historial        = historial,
-        historial_inst   = historial_inst,
-        mejor_solucion   = mejor_sol.tolist(),
-        dtw_deltas       = dtw_deltas,
-        dtw_info_hist    = dtw_info_hist,
+        epoch_idx=epoch_idx, mejor_valor=mejor_val, iteraciones=len(historial),
+        stagnation_fires=stag_fires, historial=historial, historial_inst=historial_inst,
+        mejor_solucion=mejor_sol.tolist(), dtw_deltas=dtw_deltas, dtw_info_hist=dtw_info_hist,
     )

@@ -48,7 +48,7 @@ from continuous_benchmark.plots import (
 MAX_ITERS_POR_FUNCION  = 1000    # iteraciones totales por funcion por run
 N_RUNS                 = 31      # repeticiones independientes por funcion
 RANDOM_SEED            = 42      # Semilla global fijada para reproducibilidad (42)
-OUTPUT_BASE            = os.path.join("resultados", "benchmark_continuo")
+OUTPUT_BASE            = os.path.join(os.path.dirname(__file__), "resultados")
 DIMENSION              = 10      # dimensionalidad de las funciones
 
 # DTW Stagnation params
@@ -57,7 +57,7 @@ STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.0
 STAG_PLATEAU_MAX = 15
 STAG_PATIENCE    = 3
-STAG_USE_DDTW    = False
+STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
@@ -163,7 +163,7 @@ def procesar_funcion(
     print()
 
     # ── 2. Ejecutar Metaheurísticas Standalone Comparativas (N_RUNS cada una) ──
-    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO"]
     resultados_dict = {"Hybrid DTW": valores_finales}
 
     print(f"\n{sep}")
@@ -385,21 +385,18 @@ def grafico_boxplot_global(
     output_dir     : str,
 ) -> None:
     """Genera un boxplot multi-funcion comparando los N_RUNS runs de cada una."""
-    nombres   = [r["nombre"].replace("F1_", "").replace("F2_", "").replace("F3_", "")
-                 .replace("F4_", "").replace("F5_", "").replace("F6_", "")
-                 .replace("F7_", "").replace("F8_", "").replace("F9_", "")
-                 .replace("F10_", "").replace("F11_", "").replace("F12_", "")
-                 .split("_")[0][:12]
-                 for r in resumen_global]
+    nombres   = [f"CEC {i}" for i in range(1, len(resumen_global) + 1)]
     datos = [r["valores_runs"] for r in resumen_global]
     n = len(datos)
 
-    fig, ax = plt.subplots(figsize=(max(10, n * 1.5), 6))
+    fig, ax = plt.subplots(figsize=(max(10, n * 0.9), 6))
     colores = plt.cm.tab20.colors
 
     bp = ax.boxplot(
         datos,
         patch_artist=True,
+        tick_labels=nombres,
+        widths=0.5,
         medianprops=dict(color="#FF5722", linewidth=2),
         whiskerprops=dict(linewidth=1.2),
         capprops=dict(linewidth=2),
@@ -409,11 +406,10 @@ def grafico_boxplot_global(
         patch.set_facecolor(color)
         patch.set_alpha(0.75)
 
-    ax.set_xticks(range(1, n + 1))
-    ax.set_xticklabels(nombres, rotation=40, ha="right", fontsize=8)
     ax.set_title(f"Global Boxplot — {resumen_global[0]['n_runs']} Runs per CEC2022 Function",
                  fontsize=12, fontweight="bold")
     ax.set_ylabel("Final Best Value (Minimization)", fontsize=10)
+    ax.set_xlabel("CEC2022 Functions", fontsize=10)
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
 
@@ -444,8 +440,9 @@ def main() -> None:
         p_high           = STAG_P_HIGH,
     )
 
+    dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    batch_dir = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+    batch_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
     os.makedirs(batch_dir, exist_ok=True)
 
     banner = "=" * 62
@@ -552,8 +549,8 @@ def main() -> None:
 
     # ── Análisis Estadístico Global (comparación entre todas las funciones CEC) ──
     if len(resumen_global) > 1:
-        resultados_multi = {r["nombre"]: r["valores_runs"] for r in resumen_global}
-        referencia_global = resumen_global[0]["nombre"]
+        resultados_multi = {f"CEC {i}": r["valores_runs"] for i, r in enumerate(resumen_global, 1)}
+        referencia_global = "CEC 1"
         realizar_analisis_estadistico(
             resultados_dict      = resultados_multi,
             output_dir           = batch_dir,

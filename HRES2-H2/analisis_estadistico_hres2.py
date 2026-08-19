@@ -160,7 +160,7 @@ def realizar_analisis_estadistico_completo(
     algs_sorted = [d["algoritmo"] for d in tabla_resumen]
     vals_sorted = [resultados_dict[alg] for alg in algs_sorted]
 
-    bp = plt.boxplot(vals_sorted, patch_artist=True, labels=algs_sorted, widths=0.5)
+    bp = plt.boxplot(vals_sorted, patch_artist=True, tick_labels=algs_sorted, widths=0.5)
     colors = plt.cm.tab10(np.linspace(0, 1, len(algs_sorted)))
     for patch, col in zip(bp['boxes'], colors):
         patch.set_facecolor(col)

@@ -38,7 +38,15 @@ wpeb_model = importlib.import_module("HRES2-H2.wpeb_model")
 HRES2Function   = wpeb_model.HRES2Function
 decode_solution = wpeb_model.decode_solution
 
-from continuous_benchmark.orchestrator import ejecutar_pipeline, COLORES_MH
+import importlib.util as _ilu_orch
+_orch_spec = _ilu_orch.spec_from_file_location(
+    "hres2_orchestrator",
+    os.path.join(os.path.dirname(__file__), "orchestrator.py")
+)
+_orch_mod = _ilu_orch.module_from_spec(_orch_spec)
+_orch_spec.loader.exec_module(_orch_mod)
+ejecutar_pipeline_hres2 = _orch_mod.ejecutar_pipeline_hres2
+COLORES_MH             = _orch_mod.COLORES_MH
 
 # ── Importar módulo plots LOCAL de HRES2-H2 (sin conflicto con raíz) ──────────
 import importlib.util as _ilu
@@ -92,8 +100,9 @@ def main() -> None:
         random.seed(RANDOM_SEED)
         np.random.seed(RANDOM_SEED)
 
+    dtw_mode   = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp  = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+    output_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
     os.makedirs(output_dir, exist_ok=True)
 
     func = HRES2Function()
@@ -114,7 +123,7 @@ def main() -> None:
     print(f"\n{sep}")
     print("  HRES2-H2 — Una Corrida del Pipeline Híbrido DTW")
     print(f"  Pool Poblacional : PSO, GWO, WOA, EHO, ACO, ABC")
-    print(f"  Pool Trayectoria : ILS, SA")
+    print(f"  Pool Trayectoria : ILS, SA, TS, VNS")
     print(f"  Max Iteraciones  : {MAX_ITERS}")
     print(f"  Carpeta de salida: {output_dir}")
     print(sep)
@@ -140,13 +149,13 @@ def main() -> None:
             lcoe, lcoh, agsr, h2_kg, valida_str = mejor_valor, float("nan"), float("nan"), float("nan"), "ERR"
         print(f"{epoch:>5} {mh:<5} {tipo:<14} {iters_total:>6}  {lcoe:>14.6f}  {lcoh:>13.4f}  {agsr:>7.2f}  {h2_kg:>14,.0f}  {valida_str:>7}")
 
-    # ── Ejecutar pipeline ─────────────────────────────────────────────────
-    resultado = ejecutar_pipeline(
-        func              = func,
-        max_iters         = MAX_ITERS,
-        stag_cfg          = stag_cfg,
-        verbose           = False,
-        on_epoch_callback = epoch_callback,
+    # ── Ejecutar pipeline ────────────────────────────────────────────────────
+    resultado = ejecutar_pipeline_hres2(
+        func               = func,
+        max_iters          = MAX_ITERS,
+        stag_cfg           = stag_cfg,
+        verbose            = False,
+        on_epoch_callback  = epoch_callback,
     )
     print(sep_cb)
 
