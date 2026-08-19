@@ -216,7 +216,7 @@ def ejecutar_experimentos():
             plt.plot(range(1, MAX_ITERS + 1), plot_data, label=alg, color=color, linewidth=2)
 
         title_scale = " (Log Scale f(x)-bias)" if is_log else " (Linear Scale)"
-        plt.title(f"Convergence {func.name}{title_scale}", fontsize=12, fontweight="bold")
+        plt.title(f"Convergence CEC {idx}: {func.name}{title_scale}", fontsize=12, fontweight="bold")
         plt.xlabel("Iteration", fontsize=10)
         plt.ylabel("Fitness (f(x) Value)" if not is_log else "Log Error (f(x) - f*)", fontsize=10)
         

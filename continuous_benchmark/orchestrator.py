@@ -33,10 +33,11 @@ from continuous_benchmark.mh.sa  import SAParams,  ejecutar_epoch as _sa_epoch
 
 
 POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
-POOL_TRAYECTORIA = ["ILS", "SA"]
+POOL_TRAYECTORIA = []
 
 COLORES_MH = {
     "PSO": "#2196F3",
+    "GA" : "#4CAF50",
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
@@ -128,14 +129,8 @@ def ejecutar_pipeline(
 
         t_mh_inicio = time.time() - t_inicio
 
-        if fase_actual == "poblacional":
-            mh = random.choice(POOL_POBLACIONAL)
-            tipo = "poblacional"
-            fase_actual = "trayectoria"
-        else:
-            mh = random.choice(POOL_TRAYECTORIA)
-            tipo = "trayectoria"
-            fase_actual = "poblacional"
+        mh = random.choice(POOL_POBLACIONAL)
+        tipo = "poblacional"
 
 
         if verbose:

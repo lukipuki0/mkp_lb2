@@ -366,6 +366,7 @@ def procesar_funcion(
 
     return {
         "nombre":       func.name,
+        "cec_label":    cec_label,
         "n_dim":        func.n_dim,
         "valor_optimo": func.optimum,
         "media":        media,
@@ -385,12 +386,7 @@ def grafico_boxplot_global(
     output_dir     : str,
 ) -> None:
     """Genera un boxplot multi-funcion comparando los N_RUNS runs de cada una."""
-    nombres   = [r["nombre"].replace("F1_", "").replace("F2_", "").replace("F3_", "")
-                 .replace("F4_", "").replace("F5_", "").replace("F6_", "")
-                 .replace("F7_", "").replace("F8_", "").replace("F9_", "")
-                 .replace("F10_", "").replace("F11_", "").replace("F12_", "")
-                 .split("_")[0][:12]
-                 for r in resumen_global]
+    nombres = [r.get("cec_label", f"CEC {i+1}") for i, r in enumerate(resumen_global)]
     datos = [r["valores_runs"] for r in resumen_global]
     n = len(datos)
 
@@ -552,8 +548,8 @@ def main() -> None:
 
     # ── Análisis Estadístico Global (comparación entre todas las funciones CEC) ──
     if len(resumen_global) > 1:
-        resultados_multi = {r["nombre"]: r["valores_runs"] for r in resumen_global}
-        referencia_global = resumen_global[0]["nombre"]
+        resultados_multi = {r.get("cec_label", f"CEC {i+1}"): r["valores_runs"] for i, r in enumerate(resumen_global)}
+        referencia_global = list(resultados_multi.keys())[0]
         realizar_analisis_estadistico(
             resultados_dict      = resultados_multi,
             output_dir           = batch_dir,
