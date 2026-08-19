@@ -163,7 +163,7 @@ def ejecutar_pipeline(
 
         if verbose:
             elapsed = time.time() - t_inicio
-            print(f"\n  [{elapsed:06.1f}s] > {mh:4s} ({tipo}) | global = {valor_global:.1f}")
+            print(f"\n  [{elapsed:06.1f}s] > {mh:4s} | global = {valor_global:.1f}")
 
         # Ejecutar la MH con stag_strategy="abort" (termina al estancarse)
         resultado = _ejecutar_mh(

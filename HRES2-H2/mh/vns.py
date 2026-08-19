@@ -102,15 +102,19 @@ def ejecutar_epoch(
         historial.append(float(mejor_val))
         historial_inst.append(float(val_curr))
 
+        dtw_info = {}
         if monitor is not None:
-            stagnated, info = monitor.update(mejor_val)
-            dtw_deltas.append(info.get('delta', float('nan')))
-            dtw_info_hist.append(info)
-            if stagnated:
+            status = monitor.update(-mejor_val)
+            dtw_info = status.copy()
+            if status.get("ready"):
+                dtw_deltas.append(status.get("delta", 0.0))
+            if status.get("fire"):
                 stag_fires += 1
+                dtw_info_hist.append(dtw_info)
                 if verbose:
                     print(f"    [VNS Stagnation] Fire #{stag_fires} @ iter {it} -> ABORT")
                 break
+        dtw_info_hist.append(dtw_info)
 
     return VNSEpochResult(
         epoch_idx=epoch_idx, mejor_valor=mejor_val, iteraciones=len(historial),
