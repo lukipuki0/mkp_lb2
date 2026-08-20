@@ -16,7 +16,7 @@ import csv
 import random
 import datetime
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import matplotlib
@@ -357,8 +357,8 @@ def main() -> None:
 
     resumen_global = []
 
-    # Ejecución paralela con ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    # Ejecución paralela con ProcessPoolExecutor (multiprocesamiento real sin bloqueo de GIL)
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futuros = {
             executor.submit(
                 procesar_tarea_instancia,
