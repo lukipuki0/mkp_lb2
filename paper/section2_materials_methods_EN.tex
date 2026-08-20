@@ -254,7 +254,7 @@ $F_{12}$ & Composition Function 4 ($N=6$) & Composition & Highly multimodal with
 \subsection{Real-World Engineering Case Study: Hybrid Renewable Energy System with Hydrogen Storage (HRES2-H2)}
 \label{sec:hres2_case_study}
 
-As an advanced real-world benchmark, the framework is applied to the sizing and operational dispatch optimization of a grid-connected Wind--Photovoltaic--Electrolyzer--Battery (WPEB) Microgrid with Green Hydrogen Production (HRES2-H2) located in Baotou, Inner Mongolia, China ($41.70^\circ\text{N}$, $110.43^\circ\text{E}$). The study extends the physical model of Li et al.~\cite{li2024capacity} by transforming the design domain into a mixed continuous-discrete optimization problem.
+As an advanced real-world benchmark, the framework is applied to the sizing and operational dispatch optimization of a grid-connected Wind--Photovoltaic--Electrolyzer--Battery (WPEB) Microgrid with Green Hydrogen Production (HRES2-H2) located in Baotou, Inner Mongolia, China ($41.70^\circ\text{N}$, $110.43^\circ\text{E}$). The formulation extends the baseline physical model \cite{li2024capacity} by transforming the design domain into a mixed continuous-discrete optimization problem.
 
 \subsubsection{Decision Vector and System Parameterization}
 
@@ -275,15 +275,15 @@ Table~\ref{tab:hres2_decision_vars} details the decision variables and their ope
 \centering
 \caption{Decision variables for the extended HRES2-H2 techno-economic optimization problem.}
 \label{tab:hres2_decision_vars}
-\begin{tabular}{llccp{5.5cm}}
+\vspace{2mm}
+\begin{tabular}{lll}
 \toprule
-\textbf{Variable} & \textbf{Symbol} & \textbf{Type} & \textbf{Search Domain} & \textbf{Physical Units / Description} \\
+\textbf{Variable} & \textbf{Type} & \textbf{Range} \\
 \midrule
-Installed Wind Capacity & $P_{WT}$ & Continuous & $[0.0,\, 200.0]$ & MW \\
-Installed PV Capacity & $P_{PV}$ & Derived & $200.0 - P_{WT}$ & MW \\
-Electrolyzer Modules & $N_{el}$ & Integer & $\{10, 11, \dots, 20\}$ & Modules ($5\text{ MW/unit} \to [50, 100]\text{ MW}$) \\
-Battery Power Capacity & $P_{bat}$ & Discrete & $\{0, 5, 10, \dots, 50\}$ & MW (5 MW increment steps) \\
-Storage Duration & $\tau_{bat}$ & Discrete & $\{1.0,\, 2.0,\, 4.0\}$ & Hours of continuous nominal discharge \\
+\texttt{wind\_mw} & Continuous & $[0, 200]$ MW \\
+\texttt{n\_el\_units} & Integer & $[10, 20]$ units $\times$ 5 MW \\
+\texttt{battery\_mw} & Discrete & $\{0, 5, 10, \dots, 50\}$ MW \\
+\texttt{battery\_duration\_h} & Discrete & $\{1, 2, 4\}$ hours \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -345,7 +345,7 @@ NPC = \sum_{k \in \{WT, PV, EL, BAT\}} \left[ CAPEX_k + \sum_{y \in \mathcal{Y}_
 \label{eq:npc_formulation}
 \end{equation}
 
-Table~\ref{tab:hres2_costs} lists the techno-economic cost parameters adopted from Li et al.~\cite{li2024capacity}.
+Table~\ref{tab:hres2_costs} presents the techno-economic parameters and component cost breakdown \cite{li2024capacity}.
 
 \begin{table}[htbp]
 \centering
