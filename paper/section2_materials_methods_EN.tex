@@ -1,0 +1,396 @@
+\section{Materials and Methods}
+\label{sec:materials_and_methods}
+
+\subsection{Overall Architecture of the DTW-Driven Adaptive Rotational Hybrid Framework}
+\label{sec:overall_architecture}
+
+To systematically resolve the critical challenges of premature convergence, progressive diversity loss, and limited cross-domain adaptability commonly encountered in standalone metaheuristic algorithms, this work proposes an Adaptive Rotational Hybrid Metaheuristic Framework governed by a Dynamic Time Warping (DTW) and Derivative Dynamic Time Warping (DDTW) Stagnation Monitor. Conventional hybrid schemes frequently switch between exploration and exploitation phases using rigid, heuristic criteria—such as fixed iteration intervals or static stagnation counters—which inevitably lead to either premature switching (interrupting productive search trajectories) or delayed switching (wasting computational evaluations on stalled regions). In contrast, the proposed framework employs temporal elastic alignment over the recent objective-function trajectory as a mathematically rigorous and dynamic indicator of search productivity.
+
+The theoretical foundation of the framework is rooted in the principle of algorithmic complementarity dictated by the No Free Lunch (NFL) theorem \cite{wolpert1997no}. Because no single search operator uniformly dominates across diverse landscape topologies, the proposed architecture organizes eight metaheuristic algorithms into two disjoint and specialized operational pools:
+\begin{enumerate}
+    \item \textbf{Population Pool ($\mathcal{P}_{pop}$):} Comprises population-based swarm and nature-inspired metaheuristics designed for global exploration and structural diversification across the search domain.
+    \item \textbf{Trajectory Pool ($\mathcal{P}_{traj}$):} Comprises trajectory-based and local-search metaheuristics designed for fine-grained exploitation, rapid intensification, and valley-descent around promising regions.
+\end{enumerate}
+
+The execution workflow is structured into dynamic Epochs ($e = 1, 2, \dots, E$). In each epoch, an active solver $M^{(e)}$ randomly selected from the designated pool executes continuous optimization iterations on the objective function $f(\mathbf{x})$. Unlike static schedules, the duration of an epoch is intrinsically adaptive: the epoch terminates if and only if the DTW/DDTW Stagnation Monitor verifies that the recent convergence curve has entered an unpromising stagnation plateau. Upon triggering, the orchestrator freezes the active algorithm, extracts the global elite solution $\mathbf{x}_{best}^*$, alternates the pool type ($\mathcal{P}_{pop} \leftrightarrow \mathcal{P}_{traj}$), and executes the Seed Memory Injection Protocol to seamlessly initialize the successor solver without discarding accumulated evolutionary progress.
+
+Table~\ref{tab:framework_parameters} provides the operational parameters that govern the hybrid orchestrator and the DTW detection mechanism.
+
+\begin{table}[htbp]
+\centering
+\caption{Operational parameters of the DTW-driven adaptive rotational hybrid framework.}
+\label{tab:framework_parameters}
+\begin{tabular}{llcp{6.5cm}}
+\toprule
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Default Value} & \textbf{Description} \\
+\midrule
+Sliding Window Size & $W$ & $30$ & Length of recent fitness history evaluated by the monitor \\
+Sakoe--Chiba Band & $w$ & $\max(1, \lfloor 0.1 \cdot W \rfloor) = 3$ & Maximum allowable temporal distortion width \\
+Confirmation Patience & $P$ & $3$ & Consecutive alarm triggers required to force switching \\
+Plateau Tolerance & $K_{max}$ & $15$ & Iterations without local improvement to initiate evaluation \\
+Lower Percentile Threshold & $P_{low}$ & $30.0$ & Historical percentile for constant-baseline distance ($\theta_c$) \\
+Upper Percentile Threshold & $P_{high}$ & $70.0$ & Historical percentile for ramp distance ($\theta_r$) and delta ($\theta_\Delta$) \\
+Maximum Evaluations & $T_{max}$ & $1,000$ & Maximum iterations / generations per complete execution \\
+Independent Runs & $N$ & $31$ & Statistical sample size with distinct pseudo-random seeds \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Mathematical Formulation of the DTW/DDTW Stagnation Detection Engine}
+\label{sec:dtw_formulation}
+
+The stagnation detection engine operates on the sliding temporal sequence of best-so-far objective values recorded by the active solver across the most recent $W$ iterations:
+\begin{equation}
+\mathbf{X} = \left[ x_{t-W+1}, x_{t-W+2}, \dots, x_t \right] \in \mathbb{R}^W, \quad t \ge W
+\label{eq:sliding_window}
+\end{equation}
+
+\subsubsection{Dynamic Construction of Baseline Reference Sequences}
+
+To quantitatively evaluate whether $\mathbf{X}$ reflects productive convergence or an inactive plateau, the engine constructs two synthetic reference sequences of length $W$, both anchored at the initial value of the window $x_1 = x_{t-W+1}$:
+
+\begin{enumerate}
+    \item \textbf{Ideal Progress Ramp ($\mathbf{R} = [r_1, r_2, \dots, r_W]$):} Represents a steady, linear rate of improvement with minimum slope $s_{min}$:
+    \begin{equation}
+    r_k = x_1 + s_{min} \cdot (k - 1), \quad \forall k \in \{1, 2, \dots, W\}
+    \label{eq:ramp_baseline}
+    \end{equation}
+    where $s_{min}$ is adaptively computed from the instantaneous dynamic range of the window:
+    \begin{equation}
+    s_{min} = 0.01 \cdot \frac{|x_W - x_1|}{W}
+    \label{eq:adaptive_slope}
+    \end{equation}
+
+    \item \textbf{Constant Stagnation Plateau ($\mathbf{C} = [c_1, c_2, \dots, c_W]$):} Represents complete arrest of optimization progress:
+    \begin{equation}
+    c_k = x_1, \quad \forall k \in \{1, 2, \dots, W\}
+    \label{eq:constant_baseline}
+    \end{equation}
+\end{enumerate}
+
+\subsubsection{Dynamic Time Warping (DTW) with Sakoe--Chiba Band Constraint}
+
+The elastic distance between the observed trajectory $\mathbf{X}$ and a target baseline sequence $\mathbf{Y} \in \{\mathbf{R}, \mathbf{C}\}$ is calculated by dynamic programming over the cumulative cost matrix $\mathbf{D} \in \mathbb{R}^{(W+1) \times (W+1)}$. The local cell distance is governed by the recurrence relation:
+\begin{equation}
+D(i, j) = |x_i - y_j| + \min \left\{ D(i-1, j),\, D(i, j-1),\, D(i-1, j-1) \right\}
+\label{eq:dtw_recurrence}
+\end{equation}
+with boundary conditions $D(0, 0) = 0$ and $D(i, 0) = D(0, j) = +\infty$ for $i, j \ge 1$.
+
+To prevent pathological warp alignments and enforce linear-time bounded computational complexity $\mathcal{O}(W \cdot w)$, the search space of the warping path is bounded by the Sakoe--Chiba band of width $w$:
+\begin{equation}
+|i - j| \le w, \quad w = \max(1, \lfloor \gamma \cdot W \rfloor), \quad \gamma = 0.10
+\label{eq:sakoe_chiba}
+\end{equation}
+The final alignment metric corresponds to the terminal cell: $\text{DTW}(\mathbf{X}, \mathbf{Y}) = D(W, W)$.
+
+\subsubsection{Derivative Dynamic Time Warping (DDTW) Formulation}
+
+When optimization objective scales vary significantly or exhibit vertical shifts across distinct benchmark functions, standard DTW may remain sensitive to magnitude offsets. To ensure strict morphological shape-invariance, the framework implements Derivative Dynamic Time Warping (DDTW) \cite{keogh2001derivative}. The observed and reference series are mapped into their first-order finite differences:
+\begin{equation}
+\nabla x_k = x_k - x_{k-1}, \quad \text{with } \nabla x_1 = 0
+\label{eq:derivative_transform}
+\end{equation}
+The DDTW distance is then computed by applying the DTW alignment procedure directly on the derivative sequences:
+\begin{equation}
+\text{DDTW}(\mathbf{X}, \mathbf{Y}) = \text{DTW}(\nabla \mathbf{X}, \nabla \mathbf{Y})
+\label{eq:ddtw_metric}
+\end{equation}
+
+\subsubsection{Diagnostic Distance Metrics}
+
+At each iteration $t \ge W$, the monitor extracts three primary diagnostic features:
+\begin{align}
+D_1 &= \text{DTW/DDTW}(\mathbf{X}, \mathbf{R}) \label{eq:d1_dist} \\
+D_2 &= \text{DTW/DDTW}(\mathbf{X}, \mathbf{C}) \label{eq:d2_dist} \\
+\Delta &= D_1 - D_2 \label{eq:delta_metric}
+\end{align}
+Under active convergence, $\mathbf{X}$ aligns closely with $\mathbf{R}$, yielding a low $D_1$, a large $D_2$, and a negative $\Delta < 0$. Conversely, stagnation causes $\mathbf{X}$ to collapse onto $\mathbf{C}$, resulting in $D_2 \to 0$, an elevated $D_1$, and $\Delta \gg 0$.
+
+\subsection{Adaptive Thresholding via Moving Historical Percentiles}
+\label{sec:adaptive_thresholding}
+
+Static thresholding is inherently brittle when dealing with multi-domain benchmarks comprising disparate fitness landscapes (e.g., MKP with fitness in the order of $10^4$, CEC2022 in the order of $10^2$, and HRES2-H2 in sub-unit ranges). To provide scale-invariant portability, the framework maintains three cumulative memory buffers: $\mathcal{H}_{D_1}$, $\mathcal{H}_{D_2}$, and $\mathcal{H}_{\Delta}$, which store historical values of $D_1$, $D_2$, and $\Delta$ recorded throughout the current run.
+
+Once a minimum buffer warm-up size is attained ($|\mathcal{H}| \ge 10$), the dynamic classification thresholds are updated at each iteration using empirical percentile functions:
+\begin{align}
+\theta_c &= \text{Percentile}\left(\mathcal{H}_{D_2}, P_{low}\right) \label{eq:theta_c} \\
+\theta_r &= \text{Percentile}\left(\mathcal{H}_{D_1}, P_{high}\right) \label{eq:theta_r} \\
+\theta_\Delta &= \text{Percentile}\left(\mathcal{H}_{\Delta}, P_{high}\right) \label{eq:theta_delta}
+\end{align}
+where $P_{low} = 30.0$ and $P_{high} = 70.0$.
+
+The instantaneous triple stagnation condition $\text{Stagnant}(t) \in \{\text{True}, \text{False}\}$ is formally defined as:
+\begin{equation}
+\text{Stagnant}(t) \iff \left( N_{no\_improve} \ge K_{max} \right) \land \left( D_2 \le \theta_c \right) \land \left( (D_1 \ge \theta_r) \lor (\Delta \ge \theta_\Delta) \right)
+\label{eq:stagnant_condition}
+\end{equation}
+where $N_{no\_improve}$ denotes the count of consecutive iterations without strict improvement in the local elite fitness.
+
+To eliminate spurious triggers from short-term stochastic variance, a confirmation patience filter tracks the streak counter $S_t$:
+\begin{equation}
+S_t = \begin{cases}
+S_{t-1} + 1, & \text{if } \text{Stagnant}(t) = \text{True} \\
+0, & \text{if } \text{Stagnant}(t) = \text{False}
+\end{cases}
+\label{eq:streak_counter}
+\end{equation}
+The orchestrator triggers an algorithmic rotation event if and only if $S_t \ge P = 3$.
+
+\subsection{Metaheuristic Pools and Seed Memory Injection Protocol}
+\label{sec:metaheuristic_pools}
+
+\subsubsection{Algorithmic Pool Composition}
+
+The framework integrates nine representative metaheuristic solvers selected to ensure diverse algorithmic search mechanics:
+
+\paragraph{1. Population Pool ($\mathcal{P}_{pop}$ -- Global Exploration):}
+\begin{itemize}
+    \item \textbf{Particle Swarm Optimization (PSO) \cite{kennedy1995particle}:} Simulates social flocking dynamics via velocity vector updates incorporating personal best $\mathbf{p}_i$ and global best $\mathbf{g}$ attraction terms, modulated by time-varying inertia weight $w(t) \in [0.4, 0.9]$.
+    \item \textbf{Grey Wolf Optimizer (GWO) \cite{mirjalili2014grey}:} Models social hunting hierarchies guided by the leadership positions of $\alpha$, $\beta$, and $\delta$ wolves.
+    \item \textbf{Whale Optimization Algorithm (WOA) \cite{mirjalili2016whale}:} Employs bubble-net hunting maneuvers with logarithmic spiral trajectories and stochastic encircling mechanisms.
+    \item \textbf{Elephant Herding Optimization (EHO) \cite{wang2015elephant}:} Utilizes matriarch-led clan updating operators alongside male elephant separation for periphery exploration.
+    \item \textbf{Continuous Ant Colony Optimization ($\text{ACO}_{\mathbb{R}}$) \cite{dorigo2004ant}:} Samples the search domain using multi-kernel Gaussian probability density functions constructed over a pheromone-ranked solution archive.
+\end{itemize}
+
+\paragraph{2. Trajectory Pool ($\mathcal{P}_{traj}$ -- Local Exploitation):}
+\begin{itemize}
+    \item \textbf{Iterated Local Search (ILS) \cite{lourenco2003iterated}:} Iteratively combines systematic perturbation operators of tunable intensity with greedy stochastic neighborhood descent.
+    \item \textbf{Variable Neighborhood Search (VNS) \cite{mladenovic1997variable}:} Dynamically explores a hierarchical set of $k_{max}$ neighborhood structures $\mathcal{N}_k$, alternating between systematic shaking perturbations and descent-based local refinement, expanding the exploration radius during plateaus and returning to the primary fine neighborhood upon success.
+    \item \textbf{Tabu Search (TS) \cite{glover1986future}:} Employs adaptive short-term memory structures based on continuous tabu exclusion spheres ($r_{tabu}$) to prevent cyclic entrapment in previously visited local basins, complemented by an aspiration criterion that overrides tabu status whenever a candidate improves upon the global best.
+    \item \textbf{Simulated Annealing (SA) \cite{kirkpatrick1983optimization}:} Accepts uphill (inferior) moves probabilistically via the Boltzmann-Metropolis criterion $P = \exp(-\Delta f / T_k)$ governed by a geometric cooling schedule $T_k = T_0 \cdot \alpha^k$ with $\alpha = 0.95$.
+\end{itemize}
+
+\subsubsection{Seed Memory Injection Protocol ($\mathbf{x}_{best}^*$)}
+
+When the DTW monitor initiates solver rotation at epoch $e$, the orchestrator coordinates knowledge transfer via the following protocol:
+\begin{enumerate}
+    \item \textbf{Elite Extraction:} The global best solution $\mathbf{x}_{best}^* \in \mathbb{R}^D$ and its fitness $f(\mathbf{x}_{best}^*)$ are retrieved from global shared memory.
+    \item \textbf{Injection into Population Solvers ($M \in \mathcal{P}_{pop}$):} The successor population of size $N_{pop}$ is initialized through a three-tier hybrid strategy:
+    \begin{align}
+    \mathbf{x}_1^{(0)} &= \mathbf{x}_{best}^* \label{eq:elite_inj} \\
+    \mathbf{x}_i^{(0)} &= \mathbf{x}_{best}^* + \mathcal{N}\left(\mathbf{0}, \sigma^2 \mathbf{I}\right) \odot (\mathbf{U} - \mathbf{L}), \quad \forall i \in \left\{2, \dots, \left\lfloor \frac{N_{pop}}{2} \right\rfloor \right\} \label{eq:gauss_inj} \\
+    \mathbf{x}_j^{(0)} &\sim \mathcal{U}(\mathbf{L}, \mathbf{U}), \quad \forall j \in \left\{\left\lfloor \frac{N_{pop}}{2} \right\rfloor + 1, \dots, N_{pop}\right\} \label{eq:unif_inj}
+    \end{align}
+    where $\sigma = 0.05$, and $[\mathbf{L}, \mathbf{U}]$ denotes the problem bounding box. This guarantees strong local exploitation around $\mathbf{x}_{best}^*$ while maintaining background exploratory dispersion.
+    \item \textbf{Injection into Trajectory Solvers ($M \in \mathcal{P}_{traj}$):} The initial trajectory coordinate is assigned deterministically as $\mathbf{x}_0 = \mathbf{x}_{best}^*$, focusing immediate local intensification on the highest-quality basin.
+\end{enumerate}
+
+\subsection{Problem Formulation 1: Discrete Multidimensional Knapsack Problem (MKP)}
+\label{sec:mkp_formulation}
+
+The Multidimensional Knapsack Problem (MKP) is an NP-hard combinatorial optimization problem defined as:
+\begin{align}
+\max \quad & f(\mathbf{x}) = \sum_{j=1}^{n} p_j x_j \label{eq:mkp_obj} \\
+\text{subject to} \quad & \sum_{j=1}^{n} r_{ij} x_j \le b_i, \quad \forall i \in \{1, 2, \dots, m\} \label{eq:mkp_cons} \\
+& x_j \in \{0, 1\}, \quad \forall j \in \{1, 2, \dots, n\} \label{eq:mkp_vars}
+\end{align}
+where $n$ is the number of candidate items, $m$ is the number of shared resource constraints, $p_j > 0$ denotes item profit, $r_{ij} \ge 0$ is the resource consumption of item $j$ on constraint $i$, and $b_i > 0$ is the capacity limit of resource $i$.
+
+The experimental evaluation employs the standard benchmark suites from the OR-Library (MKNAPCB) \cite{chu1998genetic}, comprising instances with $n \in \{100, 250, 500\}$ items and $m \in \{5, 10, 30\}$ constraints.
+
+\subsubsection{Continuous-to-Binary Mapping and Heuristic Repair Operator}
+
+Continuous candidate vectors $\mathbf{y} \in \mathbb{R}^n$ generated by continuous-domain metaheuristics are mapped to binary decision vectors $\mathbf{x} \in \{0, 1\}^n$ using the standard sigmoid transfer function:
+\begin{equation}
+x_j = \begin{cases}
+1, & \text{if } \dfrac{1}{1 + \exp(-y_j)} \ge 0.5 \\
+0, & \text{otherwise}
+\end{cases}
+\label{eq:sigmoid_mapping}
+\end{equation}
+
+Infeasible binary configurations violating any capacity constraint $\sum_{j=1}^{n} r_{ij} x_j > b_i$ are corrected using a pseudo-utility repair and optimization operator \cite{chu1998genetic}:
+\begin{equation}
+u_j = \frac{p_j}{\displaystyle\sum_{i=1}^{m} \frac{r_{ij}}{b_i}}
+\label{eq:pseudo_utility}
+\end{equation}
+The repair procedure executes in two consecutive stages:
+\begin{enumerate}
+    \item \textbf{Feasibility Drop Phase:} While $\exists i : \sum_{j=1}^n r_{ij} x_j > b_i$, items currently included ($x_j = 1$) are iteratively removed ($x_j \leftarrow 0$) in ascending order of pseudo-utility $u_j$.
+    \item \textbf{Greedy Addition Phase:} While feasibility is preserved, excluded items ($x_j = 0$) are sequentially evaluated and added ($x_j \leftarrow 1$) in descending order of $u_j$ to maximize knapsack utilization.
+\end{enumerate}
+
+\subsection{Problem Formulation 2: Continuous IEEE CEC2022 Benchmark Suite}
+\label{sec:cec2022_formulation}
+
+To assess real-parameter continuous optimization capabilities on non-convex landscapes characterized by multi-modality, non-separable interactions, and deceptive local attractors, the framework is tested on the official IEEE CEC2022 Special Session Benchmark Suite \cite{kumar2022problem}:
+\begin{equation}
+\min \quad f(\mathbf{x}), \quad \mathbf{x} \in [-100, 100]^D, \quad D \in \{10, 20\}
+\label{eq:cec_objective}
+\end{equation}
+where $f(\mathbf{x}^*)$ defines the known theoretical global optimum $F_i^*$.
+
+Table~\ref{tab:cec2022_suite} summarizes the 12 benchmark functions comprising the suite. Performance is measured using the absolute objective error:
+\begin{equation}
+\epsilon_i = f(\mathbf{x}_{best}) - F_i^*
+\label{eq:error_metric}
+\end{equation}
+
+\begin{table}[htbp]
+\centering
+\caption{Benchmark test functions from the IEEE CEC2022 Special Session.}
+\label{tab:cec2022_suite}
+\begin{tabular}{cllp{5.5cm}c}
+\toprule
+\textbf{ID} & \textbf{Function Name} & \textbf{Class} & \textbf{Landscape Properties} & \textbf{Optimum $F_i^*$} \\
+\midrule
+$F_1$ & Shifted Sphere & Unimodal & Smooth, separable, isotropic & $300$ \\
+$F_2$ & Shifted Rosenbrock & Basic Multimodal & Ill-conditioned parabolic valley & $400$ \\
+$F_3$ & Shifted Lunacek Bi-Rastrigin & Basic Multimodal & Multi-funnel with deceptive sub-optima & $600$ \\
+$F_4$ & Non-Continuous Ackley & Basic Multimodal & Flat outer region, rugged central basin & $800$ \\
+$F_5$ & Shifted Lévy & Basic Multimodal & Step-like ridges and deceptive valleys & $900$ \\
+$F_6$ & Hybrid Function 1 ($N=3$) & Hybrid & Sub-space partitions of Rastrigin/Lévy/Sphere & $1800$ \\
+$F_7$ & Hybrid Function 2 ($N=6$) & Hybrid & Mixed non-separable multi-function blend & $2000$ \\
+$F_8$ & Hybrid Function 3 ($N=5$) & Hybrid & Highly non-separable rotated landscape & $2200$ \\
+$F_9$ & Composition Function 1 ($N=5$) & Composition & Blended Gaussian landscape with local optima & $2300$ \\
+$F_{10}$ & Composition Function 2 ($N=4$) & Composition & Asymmetric basins and rotated attractors & $2400$ \\
+$F_{11}$ & Composition Function 3 ($N=5$) & Composition & Stretched basins with non-homogeneous scaling & $2600$ \\
+$F_{12}$ & Composition Function 4 ($N=6$) & Composition & Highly multimodal with deceptive global funnel & $2700$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Real-World Engineering Case Study: Hybrid Renewable Energy System with Hydrogen Storage (HRES2-H2)}
+\label{sec:hres2_case_study}
+
+As an advanced real-world benchmark, the framework is applied to the sizing and operational dispatch optimization of a grid-connected Wind--Photovoltaic--Electrolyzer--Battery (WPEB) Microgrid with Green Hydrogen Production (HRES2-H2) located in Baotou, Inner Mongolia, China ($41.70^\circ\text{N}$, $110.43^\circ\text{E}$). The formulation extends the baseline physical model \cite{li2024capacity} by transforming the design domain into a mixed continuous-discrete optimization problem.
+
+\subsubsection{Decision Vector and System Parameterization}
+
+The total generation capacity is bounded by available land area:
+\begin{equation}
+P_{WT} + P_{PV} = P_{total} = 200.0 \text{ MW}
+\label{eq:generation_constraint}
+\end{equation}
+The 4-dimensional mixed decision vector is defined as:
+\begin{equation}
+\mathbf{x} = \left[ P_{WT},\, N_{el},\, P_{bat},\, \tau_{bat} \right]^T
+\label{eq:hres2_decision_vector}
+\end{equation}
+
+Table~\ref{tab:hres2_decision_vars} details the decision variables and their operational domains.
+
+\begin{table}[htbp]
+\centering
+\caption{Decision variables for the extended HRES2-H2 techno-economic optimization problem.}
+\label{tab:hres2_decision_vars}
+\vspace{2mm}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Type} & \textbf{Range} \\
+\midrule
+\texttt{wind\_mw} & Continuous & $[0, 200]$ MW \\
+\texttt{n\_el\_units} & Integer & $[10, 20]$ units $\times$ 5 MW \\
+\texttt{battery\_mw} & Discrete & $\{0, 5, 10, \dots, 50\}$ MW \\
+\texttt{battery\_duration\_h} & Discrete & $\{1, 2, 4\}$ hours \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Renewable Generation Physics}
+
+\paragraph{Wind Turbine Power Output:}
+Hourly wind power generation $P_{WT}(t)$ is determined from the hub-height wind velocity $v_{50m}(t)$ using a piecewise cubic characteristic power curve:
+\begin{equation}
+P_{WT}(t) = \begin{cases}
+0, & v(t) < v_{in} \text{ or } v(t) \ge v_{out} \\
+P_{rated} \cdot \dfrac{v(t)^3 - v_{in}^3}{v_{rated}^3 - v_{in}^3}, & v_{in} \le v(t) < v_{rated} \\
+P_{rated}, & v_{rated} \le v(t) < v_{out}
+\end{cases}
+\label{eq:wind_power_curve}
+\end{equation}
+where $v_{in} = 2.5\text{ m/s}$, $v_{rated} = 10.5\text{ m/s}$, $v_{out} = 25.0\text{ m/s}$, and $P_{rated} = 5.0\text{ MW}$.
+
+\paragraph{Photovoltaic Array Power Output:}
+Solar PV output $P_{PV}(t)$ is computed from global horizontal irradiance $G(t)$ and ambient temperature $T_a(t)$ considering thermal cell degradation:
+\begin{align}
+T_c(t) &= T_a(t) + \frac{G(t)}{800} \cdot (NOCT - 20) \label{eq:pv_cell_temp} \\
+P_{PV}(t) &= P_{PV,STC} \cdot \frac{G(t)}{1000} \cdot \left[ 1 + \gamma_T \cdot (T_c(t) - 25) \right] \cdot f_{dera} \label{eq:pv_power_output}
+\end{align}
+where $NOCT = 47^\circ\text{C}$, temperature coefficient $\gamma_T = -0.45\%/^\circ\text{C}$, and derating factor $f_{dera} = 0.90$.
+
+\subsubsection{Hourly Dispatch Strategy (8,760 Hours Simulation)}
+
+At each hour $t \in \{1, 2, \dots, 8760\}$, total renewable generation is $P_{gen}(t) = P_{WT}(t) + P_{PV}(t)$. The system follows a rule-based priority dispatch:
+\begin{enumerate}
+    \item \textbf{Electrolyzer Operation:} If $P_{gen}(t) \ge P_{el,min} = 0.30 \cdot P_{el}$, power is supplied to the PEM electrolyzer up to $P_{el}$. If $P_{gen}(t) < P_{el,min}$, battery discharge is utilized if available; otherwise, the electrolyzer is shut down for that hour.
+    \item \textbf{Surplus Energy Allocation:} Renewable generation exceeding electrolyzer demand charges the BESS ($SOC \le P_{bat} \cdot \tau_{bat}$) with charging efficiency $\eta_{ch} = \sqrt{\eta_{RT}} = \sqrt{0.90} \approx 0.9487$. Remaining surplus is exported to the grid ($P_{grid\_sales}$).
+    \item \textbf{Deficit Coverage:} BESS discharge with efficiency $\eta_{dis} = \sqrt{\eta_{RT}}$ supports minimum electrolyzer load during generation lulls.
+\end{enumerate}
+
+Total annual hydrogen production $m_{H_2}$ is calculated from delivered electrolyzer energy:
+\begin{equation}
+m_{H_2} = \frac{E_{el,annual} \cdot 1000 \cdot \eta_{el}}{HHV_{H_2}} \quad [\text{kg/year}]
+\label{eq:h2_production}
+\end{equation}
+where $\eta_{el} = 0.75$ and $HHV_{H_2} = 39.4\text{ kWh/kg}$.
+
+\subsubsection{Economic Formulation and Annual Grid Supply Ratio (AGSR) Constraint}
+
+The objective is to minimize the Levelized Cost of Electricity (LCOE) [CNY/kWh]:
+\begin{equation}
+\min_{\mathbf{x}} \quad \text{LCOE} = \frac{NPC \cdot CRF(r, N_{proj})}{E_{delivered,annual}}
+\label{eq:lcoe_obj}
+\end{equation}
+where the Capital Recovery Factor ($CRF$) annualizes the Net Present Cost ($NPC$) over project lifetime $N_{proj} = 25\text{ years}$ at real discount rate $r = 4.35\%$:
+\begin{equation}
+CRF(r, N) = \frac{r(1+r)^N}{(1+r)^N - 1}
+\label{eq:crf_factor}
+\end{equation}
+
+The Net Present Cost integrates initial CAPEX, discounted periodic component replacements ($REP$), and annualized O\&M:
+\begin{equation}
+NPC = \sum_{k \in \{WT, PV, EL, BAT\}} \left[ CAPEX_k + \sum_{y \in \mathcal{Y}_{rep,k}} \frac{REP_k}{(1+r)^y} + \sum_{y=1}^{N_{proj}} \frac{OM_k}{(1+r)^y} \right]
+\label{eq:npc_formulation}
+\end{equation}
+
+Table~\ref{tab:hres2_costs} presents the techno-economic parameters and component cost breakdown \cite{li2024capacity}.
+
+\begin{table}[htbp]
+\centering
+\caption{Techno-economic parameters and component cost breakdown (CNY).}
+\label{tab:hres2_costs}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Technology ($k$)} & \textbf{CAPEX [CNY/kW]} & \textbf{O\&M [CNY/kW$\cdot$yr]} & \textbf{Replacement [CNY/kW]} & \textbf{Lifetime [yr]} \\
+\midrule
+Wind Turbines (WT) & 5,917 & 40.2 & --- & 25 \\
+Solar PV (PV) & 4,633 & 17.6 & --- & 25 \\
+PEM Electrolyzer (EL) & 6,964 & 208.9 & 5,969 & 15 \\
+Battery BESS (BAT) & 2,549 & 10.0 & 500 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Annual Grid Supply Ratio (AGSR) Reliability Constraint:}
+To ensure autonomous operation and minimize external grid dependence, the proportion of annual energy sold to the grid relative to total renewable production must not exceed $20.0\%$:
+\begin{equation}
+AGSR = \frac{\displaystyle\sum_{t=1}^{8760} P_{grid\_sales}(t)}{\displaystyle\sum_{t=1}^{8760} P_{gen}(t)} \le 0.20
+\label{eq:agsr_constraint}
+\end{equation}
+Infeasible designs ($AGSR > 0.20$) receive a severe penalization:
+\begin{equation}
+f_{penalized}(\mathbf{x}) = 100.0 + 10.0 \cdot AGSR
+\label{eq:penalty_function}
+\end{equation}
+
+\subsection{Non-Parametric Statistical Inference Protocol}
+\label{sec:statistical_protocol}
+
+To ensure rigorous validation of algorithmic superiority given the inherently stochastic nature of metaheuristics, all experiments are structured following standardized statistical inference guidelines \cite{derrac2011practical,garcia2010study}:
+\begin{enumerate}
+    \item \textbf{Shapiro--Wilk Normality Test:} Evaluates the null hypothesis $H_0$ that the sample of $N=31$ independent runs is normally distributed. Rejection ($p < 0.05$) establishes the necessity of non-parametric ranking tests.
+    \item \textbf{Wilcoxon Signed-Rank Test:} Conducts paired non-parametric comparisons between the proposed DTW framework and each baseline metaheuristic at a significance level $\alpha = 0.05$. Reported metrics include positive ranks ($W^+$), negative ranks ($W^-$), and asymptotic $p$-values.
+    \item \textbf{Friedman Global Ranking Test:} Evaluates omnibus statistical significance across multi-problem datasets and establishes global mean ranks $\bar{R}_j$:
+    \begin{equation}
+    \chi_F^2 = \frac{12}{N_p \cdot K(K+1)} \sum_{j=1}^{K} \bar{R}_j^2 - 3 N_p(K+1)
+    \label{eq:friedman_stat}
+    \end{equation}
+    where $N_p$ is the number of benchmark instances and $K$ is the number of competing algorithms.
+\end{enumerate}
+
+\subsection{Computational Implementation and Reproducibility}
+\label{sec:computational_implementation}
+
+All algorithms and simulation models were implemented in Python 3.11 using vectorized NumPy routines. The 8,760-hour dispatch simulation loop (`_fast_dispatch_simulation`) was compiled with Numba JIT acceleration to ensure high evaluation throughput. Pseudo-random number generators were initialized with seed 42 to guarantee full experimental reproducibility.

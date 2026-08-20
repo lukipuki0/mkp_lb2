@@ -171,8 +171,9 @@ def main() -> None:
     todas  = cargar_instancias(INSTANCE_FILE)
     n_total = len(todas)
 
+    dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir   = os.path.join(OUTPUT_DIR, f"run_{timestamp}")
+    run_dir   = os.path.join(OUTPUT_DIR, f"run_{dtw_mode}_{timestamp}")
     os.makedirs(run_dir, exist_ok=True)
 
     # Configuracion DTW compartida para todas las instancias

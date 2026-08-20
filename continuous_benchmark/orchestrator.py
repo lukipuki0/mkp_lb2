@@ -4,9 +4,10 @@ continuous_benchmark/orchestrator.py
 Orquestador del Pipeline Hibrido de Rotacion de Metaheuristicas
 para funciones matematicas continuas (minimizacion).
 
-Rota unicamente entre MH poblacionales: GA, PSO, GWO, WOA, EHO.
-El monitor DTW detecta estancamiento y aborta el epoch para rotar
-a la siguiente MH del pool.
+Contiene SOLO metaheuristicas poblacionales: PSO, GWO, WOA, EHO, ACO, GA, ABC.
+El monitor DTW detecta estancamiento y aborta el epoch para rotar a la siguiente MH.
+
+Para HRES2-H2 (que incluye MHs de trayectoria) usar HRES2-H2/orchestrator.py.
 """
 
 from __future__ import annotations
@@ -28,12 +29,10 @@ from continuous_benchmark.mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from continuous_benchmark.mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 from continuous_benchmark.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
 from continuous_benchmark.mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
-from continuous_benchmark.mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
-from continuous_benchmark.mh.sa  import SAParams,  ejecutar_epoch as _sa_epoch
 
 
 POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
-POOL_TRAYECTORIA = []
+POOL_TRAYECTORIA = ["ILS", "SA"]
 
 COLORES_MH = {
     "PSO": "#2196F3",
@@ -41,9 +40,13 @@ COLORES_MH = {
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
-    "ABC": "#FFC107",
     "WOA": "#E040FB",
+    "GA" : "#4CAF50",
+    "ABC": "#FFC107",
+    # Trayectoria (usados en HRES2-H2)
     "ILS": "#E91E63",
+    "VNS": "#00E676",
+    "TS" : "#795548",
     "SA" : "#FF5722",
 }
 
@@ -90,7 +93,10 @@ def ejecutar_pipeline(
     stag_cfg           : StagnationConfig | None = None,
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
-    on_epoch_callback  = None,  # callable(epoch, mh, tipo, iters_total, mejor_valor, mejor_solucion)
+    on_epoch_callback  = None,
+    pool_poblacional   : list[str] | None = None,
+    pool_trayectoria   : list[str] | None = None,
+    ejecutar_mh_fn     = None,   # funcion personalizada: (mh_nombre, func, sol_global, stag_cfg, mode, epoch, verbose) -> resultado
 ) -> PipelineResult:
 
     if max_iters is None and tiempo_max is None:
@@ -98,6 +104,11 @@ def ejecutar_pipeline(
 
     if stag_cfg is None:
         stag_cfg = StagnationConfig()
+
+    if pool_poblacional is None:
+        pool_poblacional = list(POOL_POBLACIONAL)
+
+    _mh_fn = ejecutar_mh_fn if ejecutar_mh_fn is not None else _ejecutar_mh
 
     solucion_global   : np.ndarray | None = None
     valor_global      : float = float("inf")
@@ -117,8 +128,8 @@ def ejecutar_pipeline(
         print(f"  Funcion    : {func.name} (Dim={func.n_dim}, [{func.lb}, {func.ub}])")
         lim_str = f"Max Iters: {max_iters}" if max_iters is not None else f"Tiempo max: {tiempo_max}s"
         print(f"  Condicion  : {lim_str}")
-        print(f"  Pool Poblacional : {POOL_POBLACIONAL}")
-        print(f"  Pool Trayectoria : {POOL_TRAYECTORIA}")
+        print(f"  Pool Poblacional : {pool_poblacional}")
+        print(f"  Pool Trayectoria : {pool_trayectoria if pool_trayectoria else 'Ninguno'}")
         print("=" * 62)
 
     while True:
@@ -129,15 +140,21 @@ def ejecutar_pipeline(
 
         t_mh_inicio = time.time() - t_inicio
 
-        mh = random.choice(POOL_POBLACIONAL)
-        tipo = "poblacional"
+        if fase_actual == "poblacional":
+            mh = random.choice(POOL_POBLACIONAL)
+            tipo = "poblacional"
+            fase_actual = "trayectoria"
+        else:
+            mh = random.choice(POOL_TRAYECTORIA)
+            tipo = "trayectoria"
+            fase_actual = "poblacional"
 
 
         if verbose:
             elapsed = time.time() - t_inicio
             print(f"\n  [{elapsed:06.1f}s] > {mh:4s} | global = {valor_global:.6f}")
 
-        resultado = _ejecutar_mh(
+        resultado = _mh_fn(
             mh_nombre          = mh,
             func               = func,
             solucion_global    = solucion_global,
@@ -185,7 +202,6 @@ def ejecutar_pipeline(
                   f"| mejor MH: {resultado.mejor_valor:.6f} "
                   f"| global: {valor_global:.6f}")
 
-        # ── Callback opcional por época ───────────────────────────────────
         if on_epoch_callback is not None:
             on_epoch_callback(
                 epoch         = epoch_ctr,
@@ -215,7 +231,6 @@ def ejecutar_pipeline(
     )
 
 
-
 def _ejecutar_mh(
     mh_nombre          : str,
     func               ,
@@ -225,116 +240,63 @@ def _ejecutar_mh(
     epoch_idx          : int,
     verbose            : bool,
 ):
+    """Ejecuta una MH poblacional. Para trayectoria, usar HRES2-H2/orchestrator.py."""
     if mh_nombre == "GA":
-        params = GAParams(
-            pop_size=50, generations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _ga_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                         sol_inyectada=solucion_global)
+        params = GAParams(pop_size=50, generations=300, epochs=1,
+                          injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _ga_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "PSO":
-        params = PSOParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _pso_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
+        params = PSOParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _pso_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "GWO":
-        params = GWOParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _gwo_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
+        params = GWOParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _gwo_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "WOA":
-        params = WOAParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _woa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
+        params = WOAParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _woa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "EHO":
-        params = EHOParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _eho_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
+        params = EHOParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _eho_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "ACO":
-        params = ACOParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _aco_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
+        params = ACOParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _aco_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "ABC":
-        params = ABCParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
-
-    elif mh_nombre == "ILS":
-        params = ILSParams(
-            iterations=300, epochs=1,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _ils_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
-
-    elif mh_nombre == "SA":
-        params = SAParams(
-            iterations=300, epochs=1,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _sa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose,
-                         sol_inyectada=solucion_global)
+        params = ABCParams(pop_size=30, iterations=300, epochs=1,
+                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
+        return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     else:
-        raise ValueError(f"MH desconocida: '{mh_nombre}'")
+        raise ValueError(f"MH desconocida o de trayectoria: '{mh_nombre}'. "
+                         f"Las MHs de trayectoria solo estan disponibles en HRES2-H2/orchestrator.py")
 
 
 def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
-    """Ejecuta una única metaheurística de forma standalone durante max_iters iteraciones."""
-    if mh_nombre == "PSO":
-        params = PSOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _pso_epoch(func, params, verbose=False)
+    """Ejecuta una MH poblacional standalone."""
+    if mh_nombre == "GA":
+        return _ga_epoch(func, GAParams(pop_size=30, generations=max_iters, use_stagnation=False), verbose=False)
+    elif mh_nombre == "PSO":
+        return _pso_epoch(func, PSOParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "GWO":
-        params = GWOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _gwo_epoch(func, params, verbose=False)
+        return _gwo_epoch(func, GWOParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "WOA":
-        params = WOAParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _woa_epoch(func, params, verbose=False)
+        return _woa_epoch(func, WOAParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "EHO":
-        params = EHOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _eho_epoch(func, params, verbose=False)
+        return _eho_epoch(func, EHOParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "ACO":
-        params = ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _aco_epoch(func, params, verbose=False)
+        return _aco_epoch(func, ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "ABC":
-        params = ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _abc_epoch(func, params, verbose=False)
-    elif mh_nombre == "ILS":
-        params = ILSParams(iterations=max_iters, use_stagnation=False)
-        return _ils_epoch(func, params, verbose=False)
-    elif mh_nombre == "SA":
-        params = SAParams(iterations=max_iters, use_stagnation=False)
-        return _sa_epoch(func, params, verbose=False)
+        return _abc_epoch(func, ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     else:
-        raise ValueError(f"Metaheurística standalone no soportada: '{mh_nombre}'")
-
-
+        raise ValueError(f"MH poblacional no soportada: '{mh_nombre}'. "
+                         f"Para trayectoria usar HRES2-H2/orchestrator.py")

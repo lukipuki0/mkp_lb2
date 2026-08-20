@@ -43,8 +43,11 @@ from plots import (
 
 # ── Configuración y defaults ──────────────────────────────────────────────────
 
-# Cambia esta variable para seleccionar qué instancia mknapcb ejecutar (1 a 9)
-MKNAPCB_NUM = 1
+# Configuración de instancias a ejecutar:
+# - None para ejecutar TODAS las 9 familias mknapcb (mknapcb1 a mknapcb9 = 270 instancias)
+# - O un número del 1 al 9 para ejecutar solo una familia específica (30 instancias)
+MKNAPCB_SELECCION = None  # None = todas las 9 (270 instancias), o 1, 2, ..., 9
+INSTANCIAS_POR_FAMILIA = 30  # Las 30 instancias de cada archivo (0 a 29)
 
 # Parámetros de ejecución
 N_RUNS       = 31     # Repeticiones independientes por instancia
@@ -366,7 +369,7 @@ def procesar_instancia(
         f.write(f"Switches medios    : {switches_medio:.1f}\n")
 
     # ── 2. Ejecutar Metaheurísticas Standalone Comparativas (N_RUNS cada una) ──
-    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA"]
+    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ILS", "SA"]
     resultados_dict = {"Hybrid DTW": valores_finales}
 
     sep = "=" * 62
@@ -420,21 +423,20 @@ def procesar_instancia(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    mknapcb_num = MKNAPCB_NUM
-    max_iters   = MAX_ITERS
+    max_iters = MAX_ITERS
+    familias = range(1, 10) if MKNAPCB_SELECCION is None else [MKNAPCB_SELECCION]
+    n_insts_per_file = INSTANCIAS_POR_FAMILIA
 
-    if mknapcb_num < 1 or mknapcb_num > 9:
-        print(f"\n[!] Número de mknapcb inválido ({mknapcb_num}). Debe ser de 1 a 9. Usando 1.")
-        mknapcb_num = 1
-
-    instancias = [
-        {
-            "url": f"instancias/mknapcb{mknapcb_num}.txt",
-            "index": idx,
-            "nombre": f"mknapcb{mknapcb_num}_inst{idx}"
-        }
-        for idx in range(10)
-    ]
+    instancias = []
+    for f_num in familias:
+        for idx in range(n_insts_per_file):
+            instancias.append({
+                "url": f"instancias/mknapcb{f_num}.txt",
+                "index": idx,
+                "nombre": f"mknapcb{f_num}_inst{idx:02d}",
+                "familia": f"mknapcb{f_num}",
+                "sub_nom": f"inst_{idx:02d}"
+            })
 
     if RANDOM_SEED is not None:
         random.seed(RANDOM_SEED)
@@ -452,8 +454,9 @@ def main() -> None:
         p_high           = STAG_P_HIGH,
     )
 
+    dtw_mode   = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp  = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    batch_dir  = os.path.join(OUTPUT_BASE, f"run_{timestamp}")
+    batch_dir  = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
     os.makedirs(batch_dir, exist_ok=True)
 
     banner = "=" * 62
@@ -470,12 +473,14 @@ def main() -> None:
     resumen_global: list[dict] = []
 
     for idx, entry in enumerate(instancias, 1):
-        url    = entry["url"]
-        index  = entry["index"]
-        nombre = entry.get("nombre", f"inst_{idx}")
+        url      = entry["url"]
+        index    = entry["index"]
+        nombre   = entry.get("nombre", f"inst_{idx}")
+        familia  = entry.get("familia", f"mknapcb_{idx}")
+        sub_nom  = entry.get("sub_nom", f"inst_{index:02d}")
 
         print(f"\n{'-' * 62}")
-        print(f"  [{idx}/{len(instancias)}] {nombre}  (url=...{url[-15:]}, index={index})")
+        print(f"  [{idx}/{len(instancias)}] {familia}/{sub_nom} ({nombre})  (index={index})")
         print(f"{'-' * 62}")
 
         if url not in cache_urls:
@@ -486,7 +491,7 @@ def main() -> None:
         print(f"  Instancia : {inst.n} items, {inst.m} restricciones")
         print(f"  Optimo    : {inst.valor_optimo}")
 
-        inst_dir = os.path.join(batch_dir, nombre)
+        inst_dir = os.path.join(batch_dir, familia, sub_nom)
 
         resumen = procesar_instancia(
             inst       = inst,

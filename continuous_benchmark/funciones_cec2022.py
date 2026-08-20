@@ -582,7 +582,7 @@ def get_test_functions(n_dim: int = 20) -> List[ContinuousFunction]:
             
         functions.append(
             ContinuousFunction(
-                name    = f"F{num}_{names[num-1]}",
+                name    = names[num-1],
                 func    = make_func(num),
                 lb      = -100.0,
                 ub      = 100.0,

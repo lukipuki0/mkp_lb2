@@ -30,6 +30,7 @@ class ACOParams:
     alpha          : float = 1.0    # Importancia del rastro de feromonas
     beta           : float = 2.0    # Importancia de la información heurística (pseudo-utilidad)
     rho            : float = 0.1    # Tasa de evaporación de feromonas (0 < rho < 1)
+    tau_0          : float = 1.0    # Valor inicial de feromona
     tau_min        : float = 0.1    # Límite inferior de feromona (MMAS)
     tau_max        : float = 5.0    # Límite superior de feromona (MMAS)
     # Inyección de solución (pipeline híbrido)
@@ -73,6 +74,11 @@ class ACOResult:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _inicializar_feromonas(n: int, tau_0: float = 1.0) -> np.ndarray:
+    """Inicializa el vector de feromonas para cada ítem."""
+    return np.full(n, fill_value=tau_0, dtype=float)
+
 
 def _calcular_heuristica(inst: MKPInstance) -> np.ndarray:
     """Calcula la pseudo-utilidad multiconstricción (eta_j) para cada ítem."""

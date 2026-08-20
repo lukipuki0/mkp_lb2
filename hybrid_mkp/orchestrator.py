@@ -34,12 +34,11 @@ from mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
 from mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from mh.vns import VNSParams, ejecutar_epoch as _vns_epoch
 from mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
-from mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────
 
-POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
+POOL_POBLACIONAL = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO"]
 POOL_TRAYECTORIA = ["SA", "TS", "ILS", "VNS"]
 
 COLORES_MH = {
@@ -48,7 +47,6 @@ COLORES_MH = {
     "GWO": "#9C27B0",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
-    "ABC": "#FFC107",
     "SA" : "#FF5722",
     "TS" : "#FF9800",
     "ILS": "#E91E63",
@@ -165,7 +163,7 @@ def ejecutar_pipeline(
 
         if verbose:
             elapsed = time.time() - t_inicio
-            print(f"\n  [{elapsed:06.1f}s] > {mh:4s} ({tipo}) | global = {valor_global:.1f}")
+            print(f"\n  [{elapsed:06.1f}s] > {mh:4s} | global = {valor_global:.1f}")
 
         # Ejecutar la MH con stag_strategy="abort" (termina al estancarse)
         resultado = _ejecutar_mh(
@@ -310,14 +308,6 @@ def _ejecutar_mh(
         return _aco_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                           sol_inyectada=solucion_global)
 
-    elif mh_nombre == "ABC":
-        params = ABCParams(
-            pop_size=30, iterations=300, epochs=1,
-            injection_mode=pop_injection_mode,
-            use_stagnation=True, stag_cfg=stag_cfg,
-        )
-        return _abc_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
-                          sol_inyectada=solucion_global)
 
     elif mh_nombre == "SA":
         params = SAParams(
@@ -375,9 +365,6 @@ def ejecutar_mh_standalone(inst: MKPInstance, mh_nombre: str, max_iters: int = 1
     elif mh_nombre == "ACO":
         params = ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False)
         return _aco_epoch(inst, params, verbose=False)
-    elif mh_nombre == "ABC":
-        params = ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False)
-        return _abc_epoch(inst, params, verbose=False)
     elif mh_nombre == "SA":
         params = SAParams(T_inicial=5000.0, T_final=1.0, alpha=0.97, iter_por_T=max(1, max_iters // 20), use_stagnation=False)
         return _sa_epoch(inst, params, verbose=False)

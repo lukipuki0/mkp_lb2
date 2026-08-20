@@ -56,8 +56,12 @@ def grafico_switches(
     lbl_pob = f"Population-based ({'/'.join(pob_usadas)})" if pob_usadas else "Population-based"
     lbl_tra = f"Trajectory-based ({'/'.join(tra_usadas)})" if tra_usadas else "Trajectory-based"
 
-    ax.set_yticks([0, 1])
-    ax.set_yticklabels([lbl_tra, lbl_pob], fontsize=12)
+    if tra_usadas:
+        ax.set_yticks([0, 1])
+        ax.set_yticklabels([lbl_tra, lbl_pob], fontsize=12)
+    else:
+        ax.set_yticks([1])
+        ax.set_yticklabels([lbl_pob], fontsize=12)
     ax.set_xlabel("Real Time (seconds)", fontsize=14)
     ax.tick_params(axis='x', which='major', labelsize=12)
     ax.set_title("HRES2-H2 Hybrid DTW Pipeline - MH Execution Turns Gantt Chart",
