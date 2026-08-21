@@ -24,7 +24,7 @@ from dtw_stagnation     import StagnationConfig, StagnationMonitor
 @dataclass
 class ACOParams:
     """Hiperparámetros del Ant Colony Optimization (ACO)."""
-    pop_size       : int   = 30     # Número de hormigas por iteración
+    pop_size       : int   = 20     # Número de hormigas por iteración
     iterations     : int   = 300
     epochs         : int   = 10
     alpha          : float = 1.0    # Importancia del rastro de feromonas
@@ -115,52 +115,56 @@ def _mutar_solucion(sol: list[int], inst: MKPInstance, n_flips: int = 0) -> tupl
 
 def _construir_solucion_hormiga(
     inst: MKPInstance,
-    tau: np.ndarray,
-    eta: np.ndarray,
-    alpha: float,
-    beta: float,
+    deseabilidades: np.ndarray,
+    pesos: np.ndarray,
+    capacidades: np.ndarray,
 ) -> tuple[list[int], float]:
-    """Construye una solución probabilística para una hormiga basada en feromonas y heurística."""
+    """Construye una solución probabilística para una hormiga basada en feromonas y heurística (Vectorizado)."""
     n = inst.n
-    m = inst.m
-    sol = [0] * n
-    consumo = np.zeros(m, dtype=float)
-    capacidades = np.array(inst.b, dtype=float)
-    pesos = np.array(inst.r, dtype=float)
+    sol = np.zeros(n, dtype=np.int8)
+    consumo = np.zeros(inst.m, dtype=float)
+    libres = np.ones(n, dtype=bool)
 
-    candidatos = list(range(n))
-
-    while candidatos:
-        # Filtrar candidatos que quepan físicamente
-        validos = []
-        pesos_seleccion = []
-
-        for j in candidatos:
-            if np.all(consumo + pesos[:, j] <= capacidades):
-                validos.append(j)
-                w = (tau[j] ** alpha) * (eta[j] ** beta)
-                pesos_seleccion.append(w)
-
-        if not validos:
+    while True:
+        idxs = np.where(libres)[0]
+        if len(idxs) == 0:
             break
 
-        # Calcular deseabilidad tau^alpha * eta^beta
-        deseabilidades = (tau[candidatos] ** alpha) * (eta[candidatos] ** beta)
-        suma_des = np.sum(deseabilidades)
+        cap_restante = capacidades - consumo
+
+        # Filtrar ítems válidos que caben en todas las dimensiones m
+        caben = np.all(pesos[:, idxs] <= cap_restante[:, np.newaxis], axis=0)
+        validos = idxs[caben]
+
+        if len(validos) == 0:
+            break
+
+        # Probabilidad probabilística sobre candidatos válidos
+        probs = deseabilidades[validos]
+        suma_des = np.sum(probs)
 
         if suma_des <= 0:
-            probs = np.ones(len(candidatos)) / len(candidatos)
+            probs = np.ones(len(validos), dtype=float) / len(validos)
         else:
-            probs = deseabilidades / suma_des
+            probs = probs / suma_des
 
         # Selección por ruleta
-        elem = np.random.choice(candidatos, p=probs)
+        elem = np.random.choice(validos, p=probs)
         sol[elem] = 1
-        candidatos.remove(elem)
+        libres[elem] = False
+        consumo += pesos[:, elem]
 
-    # Reparar la solución completa para garantizar factibilidad y optimizar peso sobrante
-    sol_rep, val_rep = reparar_solucion(sol, inst)
-    return sol_rep, val_rep
+    # Inserción greedy para aprovechar la capacidad remanente en orden de densidad
+    cap_restante = capacidades - consumo
+    for idx in inst.indices_ascendentes[::-1]:
+        if sol[idx] == 0:
+            w = pesos[:, idx]
+            if np.all(w <= cap_restante):
+                sol[idx] = 1
+                cap_restante -= w
+
+    val_total = float(sol @ inst.p)
+    return sol.tolist(), val_total
 
 
 # ── Epoch individual ─────────────────────────────────────────────────────────
@@ -177,15 +181,22 @@ def ejecutar_epoch(
     pop_size = params.pop_size
     n = inst.n
 
+    # Convertir estructuras a numpy para cálculos vectorizados ultra-rápidos
+    pesos = np.array(inst.r, dtype=float)       # shape (m, n)
+    capacidades = np.array(inst.b, dtype=float) # shape (m,)
+
     # Matriz/Vector de feromonas e información heurística
     tau = _inicializar_feromonas(n, params.tau_0)
     eta = _calcular_heuristica(inst)
+
+    # Precalcular deseabilidad inicial (tau^alpha * eta^beta)
+    deseabilidades = (tau ** params.alpha) * (eta ** params.beta)
 
     # Inicialización de la colonia (hormigas)
     poblacion_bin = []
     fitnesses     = []
     for _ in range(pop_size):
-        sol_k, val_k = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
+        sol_k, val_k = _construir_solucion_hormiga(inst, deseabilidades, pesos, capacidades)
         poblacion_bin.append(sol_k)
         fitnesses.append(val_k)
 
@@ -243,7 +254,7 @@ def ejecutar_epoch(
         nuevos_vals = []
 
         for k in range(pop_size):
-            sol_k, val_k = _construir_solucion_hormiga(inst, tau, eta, params.alpha, params.beta)
+            sol_k, val_k = _construir_solucion_hormiga(inst, deseabilidades, pesos, capacidades)
             nuevas_sols.append(sol_k)
             nuevos_vals.append(val_k)
 
@@ -270,6 +281,9 @@ def ejecutar_epoch(
 
         # Acotar feromonas según Max-Min Ant System (MMAS)
         tau = np.clip(tau, params.tau_min, params.tau_max)
+
+        # Actualizar deseabilidades para la siguiente iteración
+        deseabilidades = (tau ** params.alpha) * (eta ** params.beta)
 
         historial.append(mejor_val)
         historial_inst.append(fit_iter_best)

@@ -1,0 +1,30 @@
+\section{Conclusions and Future Work}
+\label{sec:conclusions}
+
+This paper introduced a novel \textbf{DTW/DDTW-Driven Adaptive Rotational Hybrid Metaheuristic Framework} designed to overcome the fundamental limitations of static communication schedules in collaborative optimization. By leveraging non-linear elastic sequence alignment, the framework monitors convergence trajectories in real time, detecting search stagnation and dynamically managing rotational solver handoffs between population-based exploration pools ($\mathcal{P}_{pop}$) and single-solution trajectory exploitation pools ($\mathcal{P}_{traj}$).
+
+\subsection{Main Findings and Scientific Contributions}
+\label{sec:conclusions_findings}
+
+The primary findings of this study are summarized as follows:
+\begin{enumerate}
+    \item \textbf{Superior Convergence and Solution Quality:} Across the official IEEE CEC2022 benchmark suite ($D=10$), the proposed framework consistently outperformed seven standalone metaheuristics (PSO, GWO, WOA, EHO, ACO, ILS, SA), successfully escaping severe local minima entrapment in multimodal functions (F11 and F12).
+    \item \textbf{Optimal Techno-Economic Microgrid Sizing:} In the real-world 8,760-hour annual dispatch optimization of the stand-alone HRES2-H2 renewable energy system, the framework achieved the lowest Levelized Cost of Energy ($LCOE = 0.267160 \text{ CNY/kWh}$) and Levelized Cost of Hydrogen ($LCOH = 17.6313 \text{ CNY/kg}$) while guaranteeing a \textbf{100.0\% feasibility rate} under strict grid penetration limits ($AGSR \le 20.0\%$).
+    \item \textbf{Statistically Proven Superiority:} Non-parametric inferential statistical testing confirmed highly significant performance separation: the Wilcoxon signed-rank test rejected the null hypothesis ($p < 0.001$) against all baseline competitors, and the Friedman test placed the proposed DDTW and DTW variants at rank 1.04 and 1.48, respectively.
+    \item \textbf{Minimal Computational Overhead:} The DTW/DDTW monitoring algorithm incurs less than $0.5\%$ CPU overhead due to its bounded sliding window ($W=30, w=3$), proving suitable for high-dimensional physical engineering simulations.
+\end{enumerate}
+
+\subsection{Theoretical and Practical Implications}
+\label{sec:conclusions_implications}
+
+From a theoretical perspective, this work establishes elastic sequence alignment (DTW/DDTW) as an effective metric for monitoring metaheuristic convergence trajectories, providing a principled alternative to arbitrary fixed iteration counters. From a practical engineering standpoint, the framework offers clean energy planners a reliable, highly accurate tool for sizing complex multi-vector renewable systems with hydrogen storage under variable annual meteorological conditions.
+
+\subsection{Future Research Open Directions}
+\label{sec:conclusions_future_work}
+
+Several promising avenues for future research include:
+\begin{itemize}
+    \item \textbf{Extension to Multi-Objective Optimization (MOO):} Adapting the DTW stagnation monitor to track Pareto front spread and hypervolume convergence in multi-objective frameworks (e.g., NSGA-III or MOEA/D).
+    \item \textbf{Parallel and Distributed Execution:} Implementing asynchronous parallel communication schemes on High-Performance Computing (HPC) clusters to enable real-time collaborative swarm execution.
+    \item \textbf{Self-Tuning Hyperparameters:} Incorporating online reinforcement learning or Bayesian optimization to dynamically adjust percentile thresholds ($P_{low}, P_{high}$) during execution.
+\end{itemize}

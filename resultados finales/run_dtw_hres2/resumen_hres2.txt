@@ -3,11 +3,11 @@ Runs independientes : 31
 Max Iters / Run     : 1000
 
 Estadísticas Principales:
-  Media LCOE       : 0.267160 CNY/kWh (± 0.000005)
-  Media LCOH       : 17.631312 CNY/kg
+  Media LCOE       : 0.267160 CNY/kWh (± 0.000001)
+  Media LCOH       : 17.631382 CNY/kg
   Media AGSR       : 20.00%
   Mejor LCOE       : 0.267159 CNY/kWh (Run #1)
-  Peor LCOE        : 0.267188 CNY/kWh
+  Peor LCOE        : 0.267166 CNY/kWh
 
 Configuración Global Óptima:
   Parque Eólico    : 174.47 MW
@@ -19,34 +19,34 @@ Configuración Global Óptima:
   AGSR Óptimo      : 20.00%
 
 Detalle por Run:
-  Run 01: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
+  Run 01: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=23
   Run 02: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=24
   Run 03: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
-  Run 04: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=23
+  Run 04: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
   Run 05: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=24
   Run 06: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 07: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 08: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=19
+  Run 07: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=23
+  Run 08: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=18
   Run 09: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
   Run 10: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
-  Run 11: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=23
+  Run 11: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
   Run 12: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=24
   Run 13: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 14: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=20
-  Run 15: LCOE=0.267188 | LCOH=17.6290 | AGSR=19.98% | Wind=174.4MW, PV=25.6MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=18
-  Run 16: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 17: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=23
+  Run 14: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
+  Run 15: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=19
+  Run 16: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=20
+  Run 17: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=20
   Run 18: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
   Run 19: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 20: LCOE=0.267160 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
+  Run 20: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=18
   Run 21: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=24
   Run 22: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 23: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=25
+  Run 23: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
   Run 24: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=20
   Run 25: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
-  Run 26: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=24
-  Run 27: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 28: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
+  Run 26: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=22
+  Run 27: LCOE=0.267166 | LCOH=17.6312 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=18
+  Run 28: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=17
   Run 29: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
-  Run 30: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=21
+  Run 30: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=18
   Run 31: LCOE=0.267159 | LCOH=17.6314 | AGSR=20.00% | Wind=174.5MW, PV=25.5MW, Elz=70.0MW, Bat=50.0MW (4.0h) | Switches=20
