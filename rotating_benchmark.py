@@ -42,11 +42,11 @@ RANDOM_SEED = 42     # Semilla global fijada para reproducibilidad (42)
 OUTPUT_DIR  = os.path.join("resultados", "pipeline_hibrido")
 
 # DTW Stagnation params
-STAG_WINDOW      = 30       # Tamano de la ventana deslizante (ultimas N iteraciones evaluadas)
+STAG_WINDOW      = 40       # Tamano de la ventana deslizante (ultimas N iteraciones evaluadas)
 STAG_BAND        = 0        # Banda Sakoe-Chiba para DTW. 0 = auto (10% de la ventana)
 STAG_MIN_SLOPE   = 0.5      # Pendiente de la rampa ideal. 0.0 = auto (1% del progreso en la ventana)
 STAG_PLATEAU_MAX = 15       # Iteraciones maximas permitidas sin mejora absoluta (fitness plano)
-STAG_PATIENCE    = 3        # Alarmas consecutivas requeridas para confirmar el estancamiento (evita falsos positivos)
+STAG_PATIENCE    = 8        # Alarmas consecutivas requeridas para confirmar el estancamiento (evita falsos positivos)
 STAG_USE_DDTW    = False    # Usar derivadas (DDTW) en vez de valores absolutos (DTW)
 STAG_ADAPT       = True     # Si es True, adapta los umbrales dinamicamente usando el historial
 STAG_P_LOW       = 30.0     # Percentil bajo para umbral de linea plana (que tan estricto es D2)

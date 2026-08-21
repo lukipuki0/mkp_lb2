@@ -111,11 +111,11 @@ class StagnationConfig:
         Percentiles para los umbrales adaptativos.
     """
 
-    window:           int   = 30
+    window:           int   = 40
     band:             int   = 0        # 0 → auto
     min_slope:        float = 0.0
     plateau_max:      int   = 15
-    patience:         int   = 3
+    patience:         int   = 8
     use_ddtw:         bool  = False
     adapt_thresholds: bool  = True
     p_low:            float = 30.0

@@ -40,15 +40,19 @@ from plots import (
 N_RUNS       = 31     # Repeticiones independientes por instancia
 MAX_ITERS    = 1000   # Condición de parada por iteraciones
 RANDOM_SEED  = 42     # Semilla global fijada para reproducibilidad
-MAX_WORKERS  = 9      # Número de hilos paralelos (1 por cada archivo/instancia)
-OUTPUT_BASE  = os.path.join("resultados", "parallel_hpc_first_inst")
+
+# Detectar workers automáticamente desde Slurm o CPUs disponibles
+_slurm_cpus  = os.environ.get("SLURM_CPUS_PER_TASK")
+MAX_WORKERS  = min(9, int(_slurm_cpus)) if _slurm_cpus else min(9, os.cpu_count() or 4)
+
+OUTPUT_BASE  = os.environ.get("MKP_TMP_DIR", os.path.join("resultados", "parallel_hpc_first_inst"))
 
 # Parámetros DTW
-STAG_WINDOW      = 30
+STAG_WINDOW      = 40
 STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 3
+STAG_PATIENCE    = 8
 STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
