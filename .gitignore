@@ -2,3 +2,5 @@ resultados/
 cell_dump.txt
 variantes/
 .hpc
+__pycache__/
+*.pyc
