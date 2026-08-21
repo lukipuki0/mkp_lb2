@@ -52,11 +52,11 @@ OUTPUT_BASE            = os.path.join(os.path.dirname(__file__), "resultados")
 DIMENSION              = 10      # dimensionalidad de las funciones
 
 # DTW Stagnation params
-STAG_WINDOW      = 30
+STAG_WINDOW      = 40
 STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.0
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 3
+STAG_PATIENCE    = 8
 STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0

@@ -53,14 +53,14 @@ INSTANCIAS_POR_FAMILIA = 30  # Las 30 instancias de cada archivo (0 a 29)
 N_RUNS       = 31     # Repeticiones independientes por instancia
 MAX_ITERS    = 1000   # Condición de parada por iteraciones
 RANDOM_SEED  = 42     # Semilla global fijada para reproducibilidad (42)
-OUTPUT_BASE  = os.path.join("resultados", "batch_mkp")
+OUTPUT_BASE  = os.environ.get("MKP_TMP_DIR", os.path.join("resultados", "batch_mkp"))
 
 # Parámetros de Stagnation (DTW)
-STAG_WINDOW      = 30
+STAG_WINDOW      = 40
 STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 3
+STAG_PATIENCE    = 8
 STAG_USE_DDTW    = False
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0

@@ -39,23 +39,30 @@ def reparar_solucion(
     valor_total : float
         Ganancia acumulada de la solución reparada.
     """
-    sol = list(solucion)   # copia de trabajo
+    sol = np.array(solucion, dtype=np.int8)
+    uso = inst.r @ sol
+    indices_asc = inst.indices_ascendentes
+    b = inst.b
+    r = inst.r
+    p = inst.p
 
     # ── Fase 1: Expulsión ──────────────────────────────────────────────────
-    # Recorre ítems de menor a mayor densidad y los desactiva hasta lograr
-    # factibilidad.
-    for idx in inst.indices_ascendentes:
-        if np.all(np.dot(sol, inst.r.T) <= inst.b):
-            break                        # ya es factible
-        sol[int(idx)] = 0
+    # Recorre ítems de menor a mayor densidad y los desactiva hasta lograr factibilidad.
+    for idx in indices_asc:
+        if np.all(uso <= b):
+            break
+        if sol[idx] == 1:
+            sol[idx] = 0
+            uso -= r[:, idx]
 
     # ── Fase 2: Inserción ─────────────────────────────────────────────────
     # Recorre ítems de mayor a menor densidad y los activa si caben.
-    for idx in inst.indices_ascendentes[::-1]:
-        candidato = sol.copy()
-        candidato[int(idx)] = 1
-        if np.all(np.dot(candidato, inst.r.T) <= inst.b):
-            sol = candidato
+    for idx in indices_asc[::-1]:
+        if sol[idx] == 0:
+            w = r[:, idx]
+            if np.all(uso + w <= b):
+                sol[idx] = 1
+                uso += w
 
-    valor_total = inst.evaluar(sol)
-    return sol, valor_total
+    valor_total = float(sol @ p)
+    return sol.tolist(), valor_total

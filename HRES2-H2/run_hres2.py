@@ -81,11 +81,11 @@ RANDOM_SEED = 42     # Semilla global fijada para reproducibilidad (42)
 OUTPUT_BASE = os.path.join(os.path.dirname(__file__), "resultados")
 
 # Parámetros del Monitor DTW
-STAG_WINDOW      = 30
+STAG_WINDOW      = 40
 STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.0
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 3
+STAG_PATIENCE    = 8
 STAG_USE_DDTW    = False
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
