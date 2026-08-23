@@ -49,10 +49,17 @@ def grafico_convergencia(
         if n_seg == 0:
             continue
         seg = historial_global[offset: offset + n_seg]
-        xs  = range(offset, offset + len(seg))
         col = colores_mh.get(sw.mh_nombre, "gray")
 
-        ax.plot(xs, seg, color=col, linewidth=3.0, alpha=0.85)
+        # Conectar con el punto final de la MH anterior para trazar una línea continua de corrido
+        if offset > 0:
+            xs_plot = list(range(offset - 1, offset + len(seg)))
+            ys_plot = [historial_global[offset - 1]] + seg
+        else:
+            xs_plot = list(range(offset, offset + len(seg)))
+            ys_plot = seg
+
+        ax.plot(xs_plot, ys_plot, color=col, linewidth=3.0, alpha=0.85)
         if dibujar_lineas:
             ax.axvline(x=offset, color=col, linestyle="--", linewidth=1.5, alpha=0.5)
         offset += n_seg
@@ -72,7 +79,7 @@ def grafico_convergencia(
     ax.set_xlabel("Accumulated Iterations", fontsize=18)
     ax.set_ylabel("Best Fitness Value", fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
-    ax.legend(handles=legend_patches, loc="upper right", fontsize=15)
+    ax.legend(handles=legend_patches, loc="lower left", fontsize=15)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 

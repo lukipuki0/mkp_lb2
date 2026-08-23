@@ -13,6 +13,7 @@ Uso:
 
 import os
 import csv
+import time
 import random
 import datetime
 import concurrent.futures
@@ -53,7 +54,7 @@ STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
 STAG_PATIENCE    = 8
-STAG_USE_DDTW    = True
+STAG_USE_DDTW    = False
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
@@ -97,6 +98,19 @@ def grafico_boxplot_runs(
     plt.close(fig)
 
 
+ORLIB_BKS_INST00 = {
+    "mknapcb1": 24381.0,  # 5.100-00
+    "mknapcb2": 59312.0,  # 5.250-00
+    "mknapcb3": 120130.0, # 5.500-00
+    "mknapcb4": 23064.0,  # 10.100-00
+    "mknapcb5": 59187.0,  # 10.250-00
+    "mknapcb6": 117726.0, # 10.500-00
+    "mknapcb7": 21946.0,  # 30.100-00
+    "mknapcb8": 56693.0,  # 30.250-00
+    "mknapcb9": 115868.0, # 30.500-00
+}
+
+
 # ── Procesar una instancia completa (N_RUNS) ──────────────────────────────────
 
 def procesar_tarea_instancia(
@@ -116,6 +130,9 @@ def procesar_tarea_instancia(
     data = seleccionar_instancia(todas_inst, index)
     inst = MKPInstance.from_dict(data)
 
+    if (inst.valor_optimo <= 0) and index == 0 and familia in ORLIB_BKS_INST00:
+        inst.valor_optimo = ORLIB_BKS_INST00[familia]
+
     output_dir = os.path.join(batch_dir, familia, sub_nom)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -124,6 +141,7 @@ def procesar_tarea_instancia(
     valores_finales: list[float] = []
     n_switches_runs: list[int] = []
     gaps_runs: list[float] = []
+    tiempos_runs: list[float] = []
     resultados_runs: list = []
 
     for run_idx in range(1, n_runs + 1):
@@ -132,12 +150,17 @@ def procesar_tarea_instancia(
             random.seed(run_seed)
             np.random.seed(run_seed)
 
+        t_r_start = time.time()
         resultado = ejecutar_pipeline(
             inst      = inst,
             max_iters = max_iters,
             stag_cfg  = stag_cfg,
             verbose   = False,
         )
+        t_r_end = time.time()
+        dur_s = t_r_end - t_r_start
+        tiempos_runs.append(dur_s)
+
         valores_finales.append(resultado.mejor_valor_global)
         n_switches_runs.append(resultado.n_switches)
         resultados_runs.append(resultado)
@@ -255,10 +278,10 @@ def procesar_tarea_instancia(
     csv_runs_path = os.path.join(output_dir, "runs_resultados.csv")
     with open(csv_runs_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["run", "mejor_valor", "n_switches", "gap_pct"])
-        for i, (v, ns) in enumerate(zip(valores_finales, n_switches_runs), 1):
+        writer.writerow(["run", "mejor_valor", "n_switches", "gap_pct", "tiempo_s"])
+        for i, (v, ns, t_s) in enumerate(zip(valores_finales, n_switches_runs, tiempos_runs), 1):
             g = 100.0 * (inst.valor_optimo - v) / inst.valor_optimo if inst.valor_optimo > 0 else ""
-            writer.writerow([i, v, ns, g])
+            writer.writerow([i, v, ns, g, f"{t_s:.2f}"])
 
     # Standalone comparativo
     standalone_mhs = ["GA", "PSO", "GWO", "WOA", "EHO", "ACO", "SA"]
@@ -297,8 +320,11 @@ def procesar_tarea_instancia(
     gap_medio = float(np.mean(gaps_runs)) if gaps_runs else None
     gap_mejor = float(100.0 * (inst.valor_optimo - mejor) / inst.valor_optimo) if inst.valor_optimo > 0 else None
     switches_medio = float(np.mean(n_switches_runs))
+    tiempo_medio   = float(np.mean(tiempos_runs)) if tiempos_runs else 0.0
+    tiempo_total   = float(np.sum(tiempos_runs)) if tiempos_runs else 0.0
 
-    print(f"  [DONE] {nombre:<16} | Media: {media:9.1f} | Mejor: {mejor:9.1f} | Opt: {inst.valor_optimo:9.1f} | Gap: {gap_medio:.2f}%", flush=True)
+    gap_str = f"{gap_medio:.2f}%" if gap_medio is not None else "N/A"
+    print(f"  [DONE] {nombre:<16} | Media: {media:9.1f} | Mejor: {mejor:9.1f} | Opt: {inst.valor_optimo:9.1f} | Gap: {gap_str} | Tiempo: {tiempo_medio:.2f}s", flush=True)
 
     return {
         "nombre":         nombre,
@@ -313,6 +339,8 @@ def procesar_tarea_instancia(
         "gap_medio":      gap_medio,
         "gap_mejor":      gap_mejor,
         "switches_medio": switches_medio,
+        "tiempo_medio_s": tiempo_medio,
+        "tiempo_total_s": tiempo_total,
         "valores_runs":   valores_finales,
     }
 
@@ -387,18 +415,19 @@ def main() -> None:
     resumen_global.sort(key=lambda r: r["nombre"])
 
     # ── Reporte en Consola ────────────────────────────────────────────────────
-    banner_l = "=" * 90
+    banner_l = "=" * 102
     print(f"\n\n{banner_l}")
     print("  RESUMEN GLOBAL CONSOLIDADO (9 INSTANCIAS)")
     print(banner_l)
-    print(f"  {'#':<3} {'Instancia':<18} {'N':>5} {'M':>3} {'Media':>8} {'Std':>6} {'Mejor':>8} {'Optimo':>8} {'GapMed%':>8} {'GapMej%':>8} {'Sw(med)':>7}")
-    print("  " + "-" * 88)
+    print(f"  {'#':<3} {'Instancia':<18} {'N':>5} {'M':>3} {'Media':>8} {'Std':>6} {'Mejor':>8} {'Optimo':>8} {'GapMed%':>8} {'GapMej%':>8} {'Sw(med)':>7} {'Tiempo(s)':>9}")
+    print("  " + "-" * 100)
     for i, r in enumerate(resumen_global, 1):
         g_med_str = f"{r['gap_medio']:.2f}" if r["gap_medio"] is not None else "N/A"
         g_mej_str = f"{r['gap_mejor']:.2f}" if r["gap_mejor"] is not None else "N/A"
+        t_med_str = f"{r.get('tiempo_medio_s', 0.0):.2f}"
         print(f"  {i:<3} {r['nombre']:<18} {r['n']:>5} {r['m']:>3} {r['media']:>8.1f}"
               f" {r['std']:>6.1f} {r['mejor']:>8.1f} {r['valor_optimo']:>8.1f}"
-              f" {g_med_str:>8} {g_mej_str:>8} {r['switches_medio']:>7.1f}")
+              f" {g_med_str:>8} {g_mej_str:>8} {r['switches_medio']:>7.1f} {t_med_str:>9}")
     print(banner_l)
 
     # ── Guardar resumen TXT ───────────────────────────────────────────────────
@@ -409,21 +438,22 @@ def main() -> None:
         f.write(f"Instancias  : {len(resumen_global)}\n")
         f.write(f"Runs/inst   : {N_RUNS}\n")
         f.write(f"Iters/run   : {MAX_ITERS}\n\n")
-        f.write(f"{'#':<3} {'Instancia':<18} {'N':>5} {'M':>3} {'Media':>8} {'Std':>6} {'Mejor':>8} {'Optimo':>8} {'GapMed%':>8} {'GapMej%':>8} {'Sw(med)':>7}\n")
-        f.write("-" * 90 + "\n")
+        f.write(f"{'#':<3} {'Instancia':<18} {'N':>5} {'M':>3} {'Media':>8} {'Std':>6} {'Mejor':>8} {'Optimo':>8} {'GapMed%':>8} {'GapMej%':>8} {'Sw(med)':>7} {'Tiempo(s)':>9}\n")
+        f.write("-" * 100 + "\n")
         for i, r in enumerate(resumen_global, 1):
             g_med_str = f"{r['gap_medio']:.2f}" if r["gap_medio"] is not None else "N/A"
             g_mej_str = f"{r['gap_mejor']:.2f}" if r["gap_mejor"] is not None else "N/A"
+            t_med_str = f"{r.get('tiempo_medio_s', 0.0):.2f}"
             f.write(f"{i:<3} {r['nombre']:<18} {r['n']:>5} {r['m']:>3} {r['media']:>8.1f}"
                     f" {r['std']:>6.1f} {r['mejor']:>8.1f} {r['valor_optimo']:>8.1f}"
-                    f" {g_med_str:>8} {g_mej_str:>8} {r['switches_medio']:>7.1f}\n")
+                    f" {g_med_str:>8} {g_mej_str:>8} {r['switches_medio']:>7.1f} {t_med_str:>9}\n")
     print(f"\n  [txt] Resumen guardado en '{resumen_path}'")
 
     # ── Guardar resumen CSV ───────────────────────────────────────────────────
     csv_path = os.path.join(batch_dir, "resumen_batch.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["instancia", "n", "m", "media", "std", "mediana", "mejor", "peor", "valor_optimo", "gap_medio_pct", "gap_mejor_pct", "switches_medio"])
+        writer.writerow(["instancia", "n", "m", "media", "std", "mediana", "mejor", "peor", "valor_optimo", "gap_medio_pct", "gap_mejor_pct", "switches_medio", "tiempo_medio_s"])
         for r in resumen_global:
             writer.writerow([
                 r["nombre"],
@@ -438,6 +468,7 @@ def main() -> None:
                 r["gap_medio"] if r["gap_medio"] is not None else "",
                 r["gap_mejor"] if r["gap_mejor"] is not None else "",
                 r["switches_medio"],
+                f"{r.get('tiempo_medio_s', 0.0):.2f}",
             ])
     print(f"  [csv] Resumen guardado en '{csv_path}'")
 
@@ -449,12 +480,13 @@ def main() -> None:
         f.write(f"- **Runs por Instancia:** {N_RUNS}\n")
         f.write(f"- **Max Iteraciones por Run:** {MAX_ITERS}\n\n")
         f.write("## Características de las Instancias y Resultados\n\n")
-        f.write("| # | Instancia | N | M | Media | Std | Mejor | Peor | Óptimo | Gap Medio % | Gap Mejor % | Switches (med) |\n")
-        f.write("|---|-----------|---|---|-------|-----|-------|------|--------|-------------|-------------|----------------|\n")
+        f.write("| # | Instancia | N | M | Media | Std | Mejor | Peor | Óptimo | Gap Medio % | Gap Mejor % | Switches (med) | Tiempo Medio (s) |\n")
+        f.write("|---|-----------|---|---|-------|-----|-------|------|--------|-------------|-------------|----------------|------------------|\n")
         for i, r in enumerate(resumen_global, 1):
             g_med_str = f"{r['gap_medio']:.2f}%" if r["gap_medio"] is not None else "N/A"
             g_mej_str = f"{r['gap_mejor']:.2f}%" if r["gap_mejor"] is not None else "N/A"
-            f.write(f"| {i} | `{r['nombre']}` | {r['n']} | {r['m']} | {r['media']:.1f} | {r['std']:.2f} | {r['mejor']:.1f} | {r['peor']:.1f} | {r['valor_optimo']:.1f} | {g_med_str} | {g_mej_str} | {r['switches_medio']:.1f} |\n")
+            t_med_str = f"{r.get('tiempo_medio_s', 0.0):.2f}s"
+            f.write(f"| {i} | `{r['nombre']}` | {r['n']} | {r['m']} | {r['media']:.1f} | {r['std']:.2f} | {r['mejor']:.1f} | {r['peor']:.1f} | {r['valor_optimo']:.1f} | {g_med_str} | {g_mej_str} | {r['switches_medio']:.1f} | {t_med_str} |\n")
     print(f"  [md] Resumen guardado en '{md_path}'")
 
     # ── Análisis Estadístico Global ───────────────────────────────────────────
