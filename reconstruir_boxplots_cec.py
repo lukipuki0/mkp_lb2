@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from analisis_estadistico import realizar_analisis_estadistico
+from continuous_benchmark.analisis_estadistico import realizar_analisis_estadistico
 
 
 def get_cec_index_from_name(name: str) -> int:

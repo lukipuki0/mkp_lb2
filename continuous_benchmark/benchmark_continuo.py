@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from dtw_stagnation import StagnationConfig
 from continuous_benchmark.funciones_cec2022 import get_test_functions, ContinuousFunction
 from continuous_benchmark.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
-from analisis_estadistico import realizar_analisis_estadistico
+from continuous_benchmark.analisis_estadistico import realizar_analisis_estadistico
 from continuous_benchmark.plots import (
     grafico_convergencia,
     grafico_dtw_delta,

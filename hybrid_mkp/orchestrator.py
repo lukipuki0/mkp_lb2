@@ -20,20 +20,20 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Optional
 
-from mkp_core.problem import MKPInstance
-from mkp_core.repair  import reparar_solucion
+from hybrid_mkp.mkp_core.problem import MKPInstance
+from hybrid_mkp.mkp_core.repair  import reparar_solucion
 from dtw_stagnation   import StagnationConfig
 
-from mh.sa  import SAParams,  ejecutar_epoch as _sa_epoch
-from mh.ts  import TSParams,  ejecutar_epoch as _ts_epoch
-from mh.ga  import GAParams,  ejecutar_epoch as _ga_epoch
-from mh.pso import PSOParams, ejecutar_epoch as _pso_epoch
-from mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
-from mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
-from mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
-from mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
-from mh.vns import VNSParams, ejecutar_epoch as _vns_epoch
-from mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
+from hybrid_mkp.mh.sa  import SAParams,  ejecutar_epoch as _sa_epoch
+from hybrid_mkp.mh.ts  import TSParams,  ejecutar_epoch as _ts_epoch
+from hybrid_mkp.mh.ga  import GAParams,  ejecutar_epoch as _ga_epoch
+from hybrid_mkp.mh.pso import PSOParams, ejecutar_epoch as _pso_epoch
+from hybrid_mkp.mh.gwo import GWOParams, ejecutar_epoch as _gwo_epoch
+from hybrid_mkp.mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
+from hybrid_mkp.mh.ils import ILSParams, ejecutar_epoch as _ils_epoch
+from hybrid_mkp.mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
+from hybrid_mkp.mh.vns import VNSParams, ejecutar_epoch as _vns_epoch
+from hybrid_mkp.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
 
 
 # ── Estructuras de datos ──────────────────────────────────────────────────────

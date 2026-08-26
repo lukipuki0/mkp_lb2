@@ -26,15 +26,18 @@ import time
 import random
 import datetime
 
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-from mkp_core.data_loader import cargar_instancias, seleccionar_instancia
-from mkp_core.problem     import MKPInstance
 from dtw_stagnation       import StagnationConfig
+from hybrid_mkp.mkp_core.data_loader import cargar_instancias, seleccionar_instancia
+from hybrid_mkp.mkp_core.problem     import MKPInstance
 from hybrid_mkp.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
-from analisis_estadistico import realizar_analisis_estadistico
-from plots import (
+from hybrid_mkp.analisis_estadistico import realizar_analisis_estadistico
+from hybrid_mkp.plots import (
     grafico_convergencia,
     grafico_dtw_delta,
     grafico_switches,

@@ -20,13 +20,16 @@ import csv
 import random
 import datetime
 
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import numpy as np
 
-from mkp_core.data_loader import cargar_instancias, seleccionar_instancia
-from mkp_core.problem     import MKPInstance
 from dtw_stagnation       import StagnationConfig
+from hybrid_mkp.mkp_core.data_loader import cargar_instancias, seleccionar_instancia
+from hybrid_mkp.mkp_core.problem     import MKPInstance
 from hybrid_mkp.orchestrator import ejecutar_pipeline, COLORES_MH
-from plots import (
+from hybrid_mkp.plots import (
     grafico_convergencia,
     grafico_dtw_delta,
     grafico_switches,

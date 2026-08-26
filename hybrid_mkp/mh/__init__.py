@@ -1,0 +1,30 @@
+"""
+mh – Paquete unificado de metaheurísticas para el MKP.
+
+Contiene los algoritmos listos para el pipeline híbrido:
+  - SA  (Simulated Annealing)
+  - TS  (Tabu Search)
+  - GA  (Genetic Algorithm)
+  - PSO (Particle Swarm Optimization + LB2)
+  - GWO (Grey Wolf Optimizer + LB2)
+  - EHO (Elk Herd Optimizer + LB2)
+  - ILS (Iterated Local Search)
+  - WOA (Whale Optimization Algorithm)
+  - VNS (Variable Neighborhood Search)
+
+Cada algoritmo expone: Params, EpochResult, Result, ejecutar_epoch().
+"""
+
+from hybrid_mkp.mh.sa  import SAParams,  SAEpochResult,  SAResult,  ejecutar_epoch as sa_epoch   # noqa: F401
+from hybrid_mkp.mh.ts  import TSParams,  TSEpochResult,  TSResult,  ejecutar_epoch as ts_epoch   # noqa: F401
+from hybrid_mkp.mh.ga  import GAParams,  GAEpochResult,  GAResult,  ejecutar_epoch as ga_epoch   # noqa: F401
+from hybrid_mkp.mh.pso import PSOParams, PSOEpochResult, PSOResult, ejecutar_epoch as pso_epoch  # noqa: F401
+from hybrid_mkp.mh.gwo import GWOParams, GWOEpochResult, GWOResult, ejecutar_epoch as gwo_epoch  # noqa: F401
+from hybrid_mkp.mh.eho import EHOParams, EHOEpochResult, EHOResult, ejecutar_epoch as eho_epoch  # noqa: F401
+from hybrid_mkp.mh.ils import ILSParams, ILSEpochResult, ILSResult, ejecutar_epoch as ils_epoch  # noqa: F401
+from hybrid_mkp.mh.woa import WOAParams, WOAEpochResult, WOAResult, ejecutar_epoch as woa_epoch  # noqa: F401
+from hybrid_mkp.mh.vns import VNSParams, VNSEpochResult, VNSResult, ejecutar_epoch as vns_epoch  # noqa: F401
+from hybrid_mkp.mh.aco import ACOParams, ACOEpochResult, ACOResult, ejecutar_epoch as aco_epoch  # noqa: F401
+from hybrid_mkp.mh.abc import ABCParams, ABCEpochResult, ABCResult, ejecutar_epoch as abc_epoch  # noqa: F401
+
+

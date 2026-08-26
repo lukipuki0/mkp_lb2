@@ -35,5 +35,5 @@ echo "CPUs asignadas por Slurm: ${SLURM_CPUS_PER_TASK:-1}"
 echo "Directorio de salida     : ./resultados/parallel_hpc_first_inst"
 
 # Ejecutar el benchmark en paralelo
-python3 parallel_mkp_first_inst.py
+python3 -m hybrid_mkp.parallel_mkp_first_inst
 

@@ -23,4 +23,4 @@ conda activate base
 cd /work/lucas.erazo/mkp_lb2
 
 # Ejecutar el benchmark
-python3 batch_benchmark.py
+python3 -m hybrid_mkp.batch_benchmark
