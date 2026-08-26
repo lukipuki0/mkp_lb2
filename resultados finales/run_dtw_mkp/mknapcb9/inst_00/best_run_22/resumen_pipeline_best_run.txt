@@ -1,0 +1,14 @@
+Instancia          : mknapcb9_inst00 (Mejor Run #22)
+Items / Restricc.  : 500 / 30
+Mejor valor global : 113547.0
+Optimo conocido    : 115868.0
+Gap relativo       : 2.00%
+Total switches     : 7
+
+1. WOA (poblacional) | mejor=108041.0 | 0.0s-22.1s | iters=129
+2. SA (trayectoria) | mejor=113378.0 | 22.1s-54.8s | iters=280
+3. GA (poblacional) | mejor=113378.0 | 54.8s-62.0s | iters=99
+4. VNS (trayectoria) | mejor=113378.0 | 62.0s-221.5s | iters=99
+5. WOA (poblacional) | mejor=113378.0 | 221.5s-238.1s | iters=99
+6. VNS (trayectoria) | mejor=113547.0 | 238.1s-561.4s | iters=212
+7. WOA (poblacional) | mejor=113547.0 | 561.4s-578.2s | iters=99

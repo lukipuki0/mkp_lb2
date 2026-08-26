@@ -1,0 +1,15 @@
+Instancia          : mknapcb8_inst00 (Mejor Run #28)
+Items / Restricc.  : 250 / 30
+Mejor valor global : 55988.0
+Optimo conocido    : 56693.0
+Gap relativo       : 1.24%
+Total switches     : 8
+
+1. GA (poblacional) | mejor=55122.0 | 0.0s-6.6s | iters=147
+2. ILS (trayectoria) | mejor=55988.0 | 6.6s-153.3s | iters=277
+3. EHO (poblacional) | mejor=55988.0 | 153.3s-164.2s | iters=99
+4. ILS (trayectoria) | mejor=55988.0 | 164.2s-221.3s | iters=99
+5. GWO (poblacional) | mejor=55988.0 | 221.3s-232.2s | iters=99
+6. TS (trayectoria) | mejor=55988.0 | 232.2s-235.9s | iters=99
+7. EHO (poblacional) | mejor=55988.0 | 235.9s-246.7s | iters=99
+8. TS (trayectoria) | mejor=55988.0 | 246.7s-250.4s | iters=99

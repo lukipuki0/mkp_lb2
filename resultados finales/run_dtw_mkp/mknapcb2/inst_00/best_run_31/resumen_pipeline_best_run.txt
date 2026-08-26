@@ -1,0 +1,16 @@
+Instancia          : mknapcb2_inst00 (Mejor Run #31)
+Items / Restricc.  : 250 / 5
+Mejor valor global : 58828.0
+Optimo conocido    : 59312.0
+Gap relativo       : 0.82%
+Total switches     : 9
+
+1. GWO (poblacional) | mejor=54600.0 | 0.0s-13.1s | iters=123
+2. SA (trayectoria) | mejor=58685.0 | 13.1s-31.6s | iters=280
+3. GA (poblacional) | mejor=58690.0 | 31.6s-35.5s | iters=99
+4. SA (trayectoria) | mejor=58690.0 | 35.5s-42.3s | iters=99
+5. ACO (poblacional) | mejor=58690.0 | 42.3s-55.5s | iters=99
+6. TS (trayectoria) | mejor=58828.0 | 55.5s-58.8s | iters=99
+7. PSO (poblacional) | mejor=58828.0 | 58.8s-69.3s | iters=99
+8. TS (trayectoria) | mejor=58828.0 | 69.3s-72.6s | iters=99
+9. WOA (poblacional) | mejor=58828.0 | 72.6s-82.6s | iters=99

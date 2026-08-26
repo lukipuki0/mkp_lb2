@@ -1,0 +1,16 @@
+Instancia          : mknapcb4_inst00 (Mejor Run #15)
+Items / Restricc.  : 100 / 10
+Mejor valor global : 23025.0
+Optimo conocido    : 23064.0
+Gap relativo       : 0.17%
+Total switches     : 9
+
+1. GA (poblacional) | mejor=22721.0 | 0.0s-2.5s | iters=139
+2. ILS (trayectoria) | mejor=23025.0 | 2.5s-15.9s | iters=181
+3. GA (poblacional) | mejor=23025.0 | 15.9s-17.6s | iters=99
+4. TS (trayectoria) | mejor=23025.0 | 17.6s-19.1s | iters=99
+5. GA (poblacional) | mejor=23025.0 | 19.1s-20.9s | iters=99
+6. ILS (trayectoria) | mejor=23025.0 | 20.9s-28.3s | iters=99
+7. PSO (poblacional) | mejor=23025.0 | 28.3s-32.9s | iters=99
+8. TS (trayectoria) | mejor=23025.0 | 32.9s-34.4s | iters=99
+9. GWO (poblacional) | mejor=23025.0 | 34.4s-39.1s | iters=99

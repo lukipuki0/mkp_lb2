@@ -129,6 +129,7 @@ def procesar_instancia(
     valores_finales: list[float] = []
     n_switches_runs: list[int] = []
     gaps_runs: list[float] = []
+    tiempos_runs: list[float] = []
     resultados_runs: list = []
 
     for run_idx in range(1, n_runs + 1):
@@ -141,12 +142,17 @@ def procesar_instancia(
         if verbose:
             print(f"\n  --- Run {run_idx:2d}/{n_runs} | {nombre} ---", flush=True)
 
+        t_r_start = time.time()
         resultado = ejecutar_pipeline(
             inst      = inst,
             max_iters = max_iters,
             stag_cfg  = stag_cfg,
             verbose   = verbose,
         )
+        t_r_end = time.time()
+        dur_s = t_r_end - t_r_start
+        tiempos_runs.append(dur_s)
+
         valores_finales.append(resultado.mejor_valor_global)
         n_switches_runs.append(resultado.n_switches)
         resultados_runs.append(resultado)
