@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=mkp_par9
+#SBATCH --job-name=ddtw_2k
 #SBATCH --partition=CPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

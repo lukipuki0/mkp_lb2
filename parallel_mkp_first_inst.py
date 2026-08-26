@@ -39,7 +39,7 @@ from plots import (
 # ── Configuración para HPC ───────────────────────────────────────────────────
 
 N_RUNS       = 31     # Repeticiones independientes por instancia
-MAX_ITERS    = 1000   # Condición de parada por iteraciones
+MAX_ITERS    = 3000   # Condición de parada por iteraciones
 RANDOM_SEED  = 42     # Semilla global fijada para reproducibilidad
 
 # Detectar workers automáticamente desde Slurm o CPUs disponibles
@@ -49,11 +49,11 @@ MAX_WORKERS  = min(9, int(_slurm_cpus)) if _slurm_cpus else min(9, os.cpu_count(
 OUTPUT_BASE  = os.environ.get("MKP_TMP_DIR", os.path.join("resultados", "parallel_hpc_first_inst"))
 
 # Parámetros DTW
-STAG_WINDOW      = 40
+STAG_WINDOW      = 75
 STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 8
+STAG_PATIENCE    = 25
 STAG_USE_DDTW    = False
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
@@ -373,7 +373,7 @@ def main() -> None:
 
     dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    batch_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
+    batch_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_3k_{timestamp}")
     os.makedirs(batch_dir, exist_ok=True)
 
     banner = "=" * 70

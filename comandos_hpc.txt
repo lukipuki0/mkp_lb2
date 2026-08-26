@@ -1,0 +1,135 @@
+================================================================================
+                    GUÍA DE COMANDOS SLURM / HPC - CLÚSTER
+================================================================================
+
+--------------------------------------------------------------------------------
+1. MONITOREO DE COLA Y TRABAJOS (squeue)
+--------------------------------------------------------------------------------
+# Ver todos los trabajos en cola/ejecución
+squeue
+
+# Ver solo tus trabajos en ejecución o pendientes
+squeue -u $USER
+
+# Monitorear tus trabajos en tiempo real (se actualiza cada 2 segundos)
+watch -n 2 squeue -u $USER
+
+# Formato personalizado con más detalle (ID, partición, nombre, usuario, estado, tiempo transcurrido, CPUs, nodos, razón de espera)
+squeue -u $USER -o "%.8i %.9P %.15j %.8u %.2t %.10M %.4C %.5D %R"
+
+# Ver cola de una partición específica (ej. CPU o GPU)
+squeue -p CPU
+squeue -p GPU
+
+
+--------------------------------------------------------------------------------
+2. ENVIAR, CONTROLAR Y CANCELAR TRABAJOS
+--------------------------------------------------------------------------------
+# Enviar un script de trabajo (Batch) a la cola
+sbatch run_parallel_hpc.sh
+
+# Cancelar un trabajo específico mediante su JOBID
+scancel <JOBID>
+
+# Cancelar TODOS tus trabajos activos/pendientes
+scancel -u $USER
+
+# Cancelar todos tus trabajos que estén solo en estado 'PENDING'
+scancel -u $USER --state=PENDING
+
+# Pausar / Reanudar un trabajo
+scontrol hold <JOBID>     # Pausar
+scontrol release <JOBID>  # Reanudar
+
+
+--------------------------------------------------------------------------------
+3. INSPECCIÓN Y DETALLES DE TRABAJOS EN EJECUCIÓN
+--------------------------------------------------------------------------------
+# Ver información detallada de configuración de un trabajo activo
+scontrol show job <JOBID>
+
+# Monitorear el uso de CPU y memoria de un trabajo en ejecución
+sstat -j <JOBID> --format=JobID,MaxRSS,AveCPU,AveDiskRead,AveDiskWrite
+
+
+--------------------------------------------------------------------------------
+4. HISTORIAL Y EFICIENCIA DE TRABAJOS (sacct, seff)
+--------------------------------------------------------------------------------
+# Ver eficiencia de CPU y memoria de un trabajo completado o cancelado
+seff <JOBID>
+
+# Historial de tus trabajos ejecutados hoy
+sacct -u $USER
+
+# Historial detallado con fecha de inicio, fin, estado, memoria y CPUs utilizadas
+sacct -u $USER --format=JobID,JobName,Partition,AllocCPUS,Elapsed,State,ExitCode,MaxRSS -S today
+
+# Historial desde una fecha específica (Formato: YYYY-MM-DD)
+sacct -u $USER --starttime 2026-08-01 --format=JobID,JobName,State,Elapsed,MaxRSS
+
+
+--------------------------------------------------------------------------------
+5. ESTADO DE LOS NODOS Y PARTICIONES (sinfo)
+--------------------------------------------------------------------------------
+# Ver estado general de las particiones y nodos
+sinfo
+
+# Ver estado detallado de cada nodo (idle, alloc, down, mix)
+sinfo -N -l
+
+# Ver características específicas de los nodos (CPUs, Memoria, GPUs)
+sinfo -o "%20N %10c %10m %25f %10G %t"
+
+
+--------------------------------------------------------------------------------
+6. SESIONES INTERACTIVAS (srun)
+--------------------------------------------------------------------------------
+# Solicitar una sesión interactiva en CPU (ej. 4 cores, 16GB RAM por 2 horas)
+srun --partition=CPU --nodes=1 --ntasks=1 --cpus-per-task=4 --mem=16G --time=02:00:00 --pty bash
+
+# Solicitar una sesión interactiva con GPU
+srun --partition=GPU --nodes=1 --ntasks=1 --cpus-per-task=4 --mem=16G --gres=gpu:1 --time=01:00:00 --pty bash
+
+
+--------------------------------------------------------------------------------
+7. LOGS Y SEGUIMIENTO EN VIVO (MKP_LB2)
+--------------------------------------------------------------------------------
+# Ver el log de salida estándar en tiempo real mientras corre el trabajo
+tail -f ./.hpc/logs/mkp_par9_<JOBID>.log
+
+# Ver el log de errores en tiempo real
+tail -f ./.hpc/errors/mkp_par9_<JOBID>.error
+
+# Ver las últimas 50 líneas del log más reciente
+ls -t ./.hpc/logs/*.log | head -n 1 | xargs tail -n 50
+
+
+--------------------------------------------------------------------------------
+8. GESTIÓN DE DISCO Y ESPACIO EN EL CLÚSTER
+--------------------------------------------------------------------------------
+# Ver espacio disponible en las particiones de almacenamiento (/work, /home, etc.)
+df -h /work/lucas.erazo
+
+# Ver cuánto pesa la carpeta actual
+du -sh .
+
+# Ver las 10 carpetas o archivos más pesados en el directorio actual
+du -h --max-depth=1 . | sort -hr | head -n 10
+
+
+--------------------------------------------------------------------------------
+9. GESTIÓN DE MÓDULOS Y CONDA (Entorno)
+--------------------------------------------------------------------------------
+# Ver módulos de software disponibles en el clúster
+module avail
+
+# Cargar un módulo (ej. GCC, CUDA, Python)
+module load <nombre_modulo>
+
+# Listar módulos cargados actualmente
+module list
+
+# Activar el entorno conda del proyecto
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate mkp_env
+================================================================================

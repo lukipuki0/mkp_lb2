@@ -64,9 +64,9 @@ Este documento contiene la lista completa de referencias bibliográficas citadas
 
 4. **Keogh, E. J., & Pazzani, M. J.** (2001).  
    Derivative Dynamic Time Warping.  
-   In *Proceedings of the 2001 ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '01)*, 1–11.  
-   - **DOI:** [10.1145/502512.502515](https://doi.org/10.1145/502512.502515)  
-   - **Enlace:** [ACM Digital Library](https://dl.acm.org/doi/10.1145/502512.502515)
+   In *Proceedings of the 2001 SIAM International Conference on Data Mining (SDM)*, 1–11.  
+   - **DOI:** [10.1137/1.9781611972719.1](https://doi.org/10.1137/1.9781611972719.1)  
+   - **Enlace:** [SIAM Digital Library](https://epubs.siam.org/doi/book/10.1137/1.9781611972719)
 
 ---
 
@@ -200,10 +200,10 @@ vol.~398, pp. 359--370, 1994.
 
 \bibitem{keogh2001derivative}
 E.~J.~Keogh and M.~J.~Pazzani,
-``Derivative dynamic time warping,''
-in \emph{Proceedings of the 2001 ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '01)},
+``Derivative Dynamic Time Warping,''
+in \emph{Proceedings of the 2001 SIAM International Conference on Data Mining (SDM)},
 pp. 1--11, 2001,
-doi: \url{https://doi.org/10.1145/502512.502515}.
+doi: \url{https://doi.org/10.1137/1.9781611972719.1}.
 
 \bibitem{chu1998genetic}
 P.~C.~Chu and J.~E.~Beasley,
