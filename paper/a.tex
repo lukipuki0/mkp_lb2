@@ -1,0 +1,100 @@
+\subsection{Formulación Matemática del Motor de Detección de Estancamiento DTW/DDTW}
+\label{sec:dtw_formulation}
+
+El motor de detección de estancamiento opera sobre la secuencia temporal deslizante de los mejores valores de aptitud (\textit{fitness}) registrados por el algoritmo activo durante las $W$ iteraciones más recientes:
+\begin{equation}
+\mathbf{X} = \left[ x_{t-W+1}, x_{t-W+2}, \dots, x_t \right] \in \mathbb{R}^W, \quad t \ge W
+\label{eq:sliding_window}
+\end{equation}
+
+\subsubsection{Construcción Dinámica de las Secuencias de Referencia Base}
+
+Para evaluar cuantitativamente si $\mathbf{X}$ refleja una convergencia productiva o una meseta inactiva, el motor construye dos secuencias sintéticas de referencia de longitud $W$, ambas ancladas en el valor inicial de la ventana $x_1 = x_{t-W+1}$:
+
+\begin{enumerate}
+    \item \textbf{Rampa de Progreso Ideal ($\mathbf{R} = [r_1, r_2, \dots, r_W]$):} Representa una tasa de mejora lineal y sostenida con pendiente mínima $s_{min}$:
+    \begin{equation}
+    r_k = x_1 + s_{min} \cdot (k - 1), \quad \forall k \in \{1, 2, \dots, W\}
+    \label{eq:ramp_baseline}
+    \end{equation}
+    donde $s_{min}$ se calcula de forma adaptativa a partir del rango dinámico instantáneo de la ventana:
+    \begin{equation}
+    s_{min} = 0.01 \cdot \frac{|x_W - x_1|}{W}
+    \label{eq:adaptive_slope}
+    \end{equation}
+
+    \item \textbf{Meseta de Estancamiento Constante ($\mathbf{C} = [c_1, c_2, \dots, c_W]$):} Representa la detención absoluta del progreso en la optimización:
+    \begin{equation}
+    c_k = x_1, \quad \forall k \in \{1, 2, \dots, W\}
+    \label{eq:constant_baseline}
+    \end{equation}
+\end{enumerate}
+
+\subsubsection{Alineamiento Temporal Dinámico (DTW) con Restricción de Banda de Sakoe--Chiba}
+
+La distancia elástica entre la trayectoria observada $\mathbf{X}$ y una secuencia de referencia objetivo $\mathbf{Y} \in \{\mathbf{R}, \mathbf{C}\}$ se calcula mediante programación dinámica sobre la matriz de costo acumulado $\mathbf{D} \in \mathbb{R}^{(W+1) \times (W+1)}$. La distancia local entre celdas se rige por la relación de recurrencia:
+\begin{equation}
+D(i, j) = |x_i - y_j| + \min \left\{ D(i-1, j),\, D(i, j-1),\, D(i-1, j-1) \right\}
+\label{eq:dtw_recurrence}
+\end{equation}
+con las condiciones de frontera $D(0, 0) = 0$ y $D(i, 0) = D(0, j) = +\infty$ para $i, j \ge 1$.
+
+Para evitar alineamientos patológicos y garantizar una complejidad computacional acotada en tiempo lineal $\mathcal{O}(W \cdot w)$, el espacio de búsqueda del camino de alineamiento se restringe mediante la banda de Sakoe--Chiba de ancho $w$:
+\begin{equation}
+|i - j| \le w, \quad w = \max(1, \lfloor \gamma \cdot W \rfloor), \quad \gamma = 0.10
+\label{eq:sakoe_chiba}
+\end{equation}
+La métrica final de alineamiento corresponde a la celda terminal: $\text{DTW}(\mathbf{X}, \mathbf{Y}) = D(W, W)$.
+
+\subsubsection{Formulación del Alineamiento Temporal Dinámico Derivativo (DDTW)}
+
+Cuando las escalas de las funciones objetivo varían significativamente o presentan desplazamientos verticales entre distintos conjuntos de prueba (\textit{benchmarks}), el DTW estándar puede verse afectado por diferencias de magnitud. Para asegurar una estricta invariancia respecto a la forma morfológica, el marco de trabajo implementa el Alineamiento Temporal Dinámico Derivativo (DDTW) \cite{keogh2001derivative}. Las series observada y de referencia se transforman a sus diferencias finitas de primer orden:
+\begin{equation}
+\nabla x_k = x_k - x_{k-1}, \quad \text{con } \nabla x_1 = 0
+\label{eq:derivative_transform}
+\end{equation}
+La distancia DDTW se calcula posteriormente aplicando el procedimiento de alineamiento DTW directamente sobre las secuencias de derivadas:
+\begin{equation}
+\text{DDTW}(\mathbf{X}, \mathbf{Y}) = \text{DTW}(\nabla \mathbf{X}, \nabla \mathbf{Y})
+\label{eq:ddtw_metric}
+\end{equation}
+
+\subsubsection{Métricas de Diagnóstico de Distancia}
+
+En cada iteración $t \ge W$, el monitor extrae tres características diagnósticas fundamentales:
+\begin{align}
+D_1 &= \text{DTW/DDTW}(\mathbf{X}, \mathbf{R}) \label{eq:d1_dist} \\
+D_2 &= \text{DTW/DDTW}(\mathbf{X}, \mathbf{C}) \label{eq:d2_dist} \\
+\Delta &= D_1 - D_2 \label{eq:delta_metric}
+\end{align}
+Bajo una convergencia activa, $\mathbf{X}$ se alinea estrechamente con $\mathbf{R}$, generando un valor bajo de $D_1$, un valor elevado de $D_2$ y un $\Delta < 0$ negativo. Por el contrario, el estancamiento provoca que $\mathbf{X}$ colapse sobre $\mathbf{C}$, lo que resulta en $D_2 \to 0$, un $D_1$ elevado y $\Delta \gg 0$.
+
+\subsection{Umbralización Adaptativa mediante Percentiles Históricos Móviles}
+\label{sec:adaptive_thresholding}
+
+El uso de umbrales estáticos resulta inherentemente frágil ante problemas de optimización multidominio con paisajes de aptitud dispares (por ejemplo, MKP con valores en el orden de $10^4$, CEC2022 en el orden de $10^2$ y HRES2-H2 en rangos sub-unitarios). Para garantizar una portabilidad invariante a la escala, el marco de trabajo mantiene tres búferes de memoria acumulativa: $\mathcal{H}_{D_1}$, $\mathcal{H}_{D_2}$ y $\mathcal{H}_{\Delta}$, los cuales almacenan los valores históricos de $D_1$, $D_2$ y $\Delta$ registrados a lo largo de la ejecución en curso.
+
+Una vez alcanzado un tamaño mínimo de calentamiento del búfer ($|\mathcal{H}| \ge 10$), los umbrales dinámicos de clasificación se actualizan en cada iteración utilizando funciones de percentiles empíricos:
+\begin{align}
+\theta_c &= \text{Percentil}\left(\mathcal{H}_{D_2}, P_{low}\right) \label{eq:theta_c} \\
+\theta_r &= \text{Percentil}\left(\mathcal{H}_{D_1}, P_{high}\right) \label{eq:theta_r} \\
+\theta_\Delta &= \text{Percentil}\left(\mathcal{H}_{\Delta}, P_{high}\right) \label{eq:theta_delta}
+\end{align}
+donde $P_{low} = 30.0$ y $P_{high} = 70.0$.
+
+La condición instantánea de triple estancamiento $\text{Estancado}(t) \in \{\text{Verdadero}, \text{Falso}\}$ se define formalmente como:
+\begin{equation}
+\text{Estancado}(t) \iff \left( N_{no\_improve} \ge K_{max} \right) \land \left( D_2 \le \theta_c \right) \land \left( (D_1 \ge \theta_r) \lor (\Delta \ge \theta_\Delta) \right)
+\label{eq:stagnant_condition}
+\end{equation}
+donde $N_{no\_improve}$ representa el conteo de iteraciones consecutivas sin una mejora estricta en el fitness élite local.
+
+Para eliminar activaciones espurias causadas por la varianza estocástica a corto plazo, un filtro de paciencia de confirmación rastrea el contador de racha consecutiva $S_t$:
+\begin{equation}
+S_t = \begin{cases}
+S_{t-1} + 1, & \text{si } \text{Estancado}(t) = \text{Verdadero} \\
+0, & \text{si } \text{Estancado}(t) = \text{Falso}
+\end{cases}
+\label{eq:streak_counter}
+\end{equation}
+El orquestador activa un evento de rotación algorítmica si y solo si $S_t \ge P = 3$.
