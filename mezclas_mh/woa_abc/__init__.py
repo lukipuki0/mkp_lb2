@@ -1,14 +1,30 @@
 """
 mezclas_mh/woa_abc
 ------------------
-Módulo de hibridaciones de WOA y ABC (Variantes A, B, C y MDG-WABC).
+Módulo principal de hibridaciones de WOA y ABC.
 
-Exporta los hiperparámetros y funciones de ejecución tanto para MKP como para el benchmark continuo.
+Re-exporta los hiperparámetros y funciones de ejecución desde el subpaquete `algoritmos`.
 """
 
-from mezclas_mh.woa_abc.variante_a import VariantAParams, VariantAEpochResult, ejecutar_epoch as variant_a_epoch, ejecutar_epoch_continuo as variant_a_epoch_continuo  # noqa: F401
-from mezclas_mh.woa_abc.variante_b import VariantBParams, VariantBEpochResult, ejecutar_epoch as variant_b_epoch, ejecutar_epoch_continuo as variant_b_epoch_continuo  # noqa: F401
-from mezclas_mh.woa_abc.variante_c import VariantCParams, VariantCEpochResult, ejecutar_epoch as variant_c_epoch, ejecutar_epoch_continuo as variant_c_epoch_continuo  # noqa: F401
-from mezclas_mh.woa_abc.mdg_wabc import MDGWABCParams, MDGWABCEpochResult, ejecutar_epoch as mdg_wabc_epoch, ejecutar_epoch_continuo as mdg_wabc_epoch_continuo  # noqa: F401
-from mezclas_mh.woa_abc.variante_d_dtw import DTWWOAABCParams, DTWWOAABCEpochResult, ejecutar_epoch as variant_d_epoch, ejecutar_epoch_continuo as variant_d_epoch_continuo  # noqa: F401
-
+from mezclas_mh.woa_abc.algoritmos import (  # noqa: F401
+    VariantAParams,
+    VariantAEpochResult,
+    variant_a_epoch,
+    variant_a_epoch_continuo,
+    VariantBParams,
+    VariantBEpochResult,
+    variant_b_epoch,
+    variant_b_epoch_continuo,
+    VariantCParams,
+    VariantCEpochResult,
+    variant_c_epoch,
+    variant_c_epoch_continuo,
+    MDGWABCParams,
+    MDGWABCEpochResult,
+    mdg_wabc_epoch,
+    mdg_wabc_epoch_continuo,
+    DTWWOAABCParams,
+    DTWWOAABCEpochResult,
+    variant_d_epoch,
+    variant_d_epoch_continuo,
+)
