@@ -10,6 +10,17 @@ Example:
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+# Permite ejecutar el archivo directamente con una ruta absoluta en Windows.
+# En modo módulo, Python ya tiene la raíz del repositorio en sys.path.
+if __package__ in {None, ""}:
+    _repo_root = Path(__file__).resolve().parents[2]
+    if str(_repo_root) not in sys.path:
+        sys.path.insert(0, str(_repo_root))
+else:
+    _repo_root = Path(__file__).resolve().parents[2]
 
 from dtw_stagnation import StagnationConfig
 from mcdp_core.data import load_mcdp_instances
@@ -21,7 +32,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--file",
-        default="mcdp_core/instances/instancias.txt",
+        default=str(_repo_root / "mcdp_core" / "instances" / "instancias.txt"),
         help="Archivo con matrices MCDP",
     )
     parser.add_argument("--instance", type=int, default=1, help="Índice humano de la matriz")

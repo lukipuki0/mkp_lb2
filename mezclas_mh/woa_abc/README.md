@@ -189,6 +189,16 @@ Desde la raíz del repositorio:
 python -m mezclas_mh.woa_abc.run_cooperative_mcdp --iterations 300
 ```
 
+También se puede ejecutar el archivo directamente, incluso usando una ruta
+absoluta en Windows:
+
+```powershell
+python .\mezclas_mh\woa_abc\run_cooperative_mcdp.py --iterations 300
+```
+
+El ejecutor localiza automáticamente la raíz del repositorio para encontrar
+`dtw_stagnation.py` y `mcdp_core/instances/instancias.txt`.
+
 Ejemplo con la configuración DTW indicada para el proyecto:
 
 ```bash

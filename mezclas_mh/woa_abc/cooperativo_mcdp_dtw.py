@@ -16,10 +16,20 @@ from __future__ import annotations
 
 import math
 import random
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
+
+# Permite ejecutar este archivo directamente desde Windows o desde una
+# terminal ubicada fuera de la raíz del repositorio. Al importarlo como
+# paquete no se modifica el path.
+if __package__ in {None, ""}:
+    _repo_root = Path(__file__).resolve().parents[2]
+    if str(_repo_root) not in sys.path:
+        sys.path.insert(0, str(_repo_root))
 
 from dtw_stagnation import StagnationConfig, StagnationMonitor
 from mcdp_core.environment import MCDPEvaluation, MCDP_Instance
@@ -721,8 +731,9 @@ cooperative_mcdp_epoch = ejecutar_epoch
 if __name__ == "__main__":
     from mcdp_core.data import load_mcdp_instances
 
+    _repo_root = Path(__file__).resolve().parents[2]
     instance = load_mcdp_instances(
-        "mcdp_core/instances/instancias.txt",
+        str(_repo_root / "mcdp_core" / "instances" / "instancias.txt"),
         max_cells=3,
         max_machines_per_cell=6,
     )[0]
