@@ -48,6 +48,12 @@ neighbors.  `MCDP_Instance.evaluate()` returns cost, feasibility, derived part
 assignments, and the machine assignment.  `MCDPResult` and the save helpers
 persist complete per-run records in CSV or JSON.
 
+The cooperative WOA--ABC + DTW solver is available in
+`mezclas_mh/woa_abc/cooperativo_mcdp_dtw.py`. It uses one shared population:
+WOA performs exploration, ABC performs employed/onlooker/scout refinement on
+that same population, and the solver monitors `-cost` with the shared DTW
+stagnation detector.
+
 The input loader accepts blocks headed by `matriz 1`, `matriz 2`, etc., with
 comma- or whitespace-separated binary rows.  The ten source matrices are
 available in `mcdp_core/instances/instancias.txt`; the original copy remains
