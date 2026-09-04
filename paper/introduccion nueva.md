@@ -1,0 +1,75 @@
+# Nueva Introducción / New Introduction (Paper Q1 — ESWA)
+
+Versiones corregidas para **Expert Systems with Applications (ESWA)**.
+
+---
+
+## 🇬🇧 English Version (LaTeX — ESWA Ready)
+
+```latex
+\section{Introduction}
+\label{sec:introduction}
+
+Population-based and trajectory-based metaheuristics provide flexible, derivative-free search mechanisms for complex optimization problems by iteratively combining diversification of the search space with intensification around promising solutions \cite{blum2003metaheuristics,talbi2009metaheuristics}. Achieving a productive balance between these complementary behaviors is critical: excessive exploration slows convergence, whereas excessive exploitation leads to premature convergence and loss of search diversity \cite{dhiman2026decade,vcrepinvsek2013exploration,zhang2019balancing}. Crucially, the desirable balance is not constant during an optimization run; different stages of the search process benefit from fundamentally different algorithmic behaviors \cite{vega2021learning,zhang2019balancing}. According to the No Free Lunch (NFL) theorem \cite{wolpert1997no}, no single algorithm can universally outperform all alternatives across all problem topologies, which further motivates the design of collaborative architectures that integrate complementary search operators. This dynamic, non-stationary nature of the optimization process has driven the development of adaptive and hybrid mechanisms capable of exploiting information generated during the search to modify algorithmic behavior online \cite{aleti2016systematic,talbi2002taxonomy}.
+
+Adaptive mechanisms have progressively incorporated richer sources of search information, including successful parameter histories \cite{zhang2009jade}, explicit evolutionary-state estimation \cite{zhan2009adaptive}, stagnation-related indicators \cite{liu2024adaptive}, and learning-based feedback \cite{tatsis2023reinforcement,karimimamaghan2022machine}. In the domain of hybrid metaheuristics, collaborative frameworks that alternate between population-based solvers and trajectory-based solvers have emerged as a natural strategy to synergize global exploration with local intensification \cite{raidl2006unified,crainic2010parallel,alba2005parallel}. However, a persistent challenge in these architectures is the communication and scheduling dilemma: determining precisely \textit{when} an active solver should hand over control to its complement \cite{talbi2021machine_tax,song2019review}. Most existing schemes rely on static switching policies---fixed iteration counts, predetermined stagnation counters, or rigid diversity thresholds---that disregard the non-stationary dynamics of the fitness landscape and lack scale-invariance across heterogeneous problem domains \cite{elhashash2025hybrid,pei2024learning}. While the temporal trajectory of incumbent fitness values directly encapsulates search velocity, active progress, and genuine stagnation episodes, explicit pattern-based analysis of this trajectory remains largely unexploited as a cross-algorithm feedback signal for coordinating multi-solver collaboration \cite{berndt1994using,keogh2001derivative}.
+
+Accordingly, this work proposes an \textbf{Adaptive Collaborative Metaheuristic Framework} in which Dynamic Time Warping (DTW) \cite{berndt1994using} and Derivative Dynamic Time Warping (DDTW) \cite{keogh2001derivative} are employed to analyze morphological patterns in the recent best-so-far fitness trajectory. Rather than relying on fixed switching schedules, the framework continuously evaluates a sliding window of recent fitness history against two dynamically constructed synthetic reference sequences---an ideal progress ramp and a constant stagnation plateau---using scale-invariant percentile-based thresholds and a confirmation patience filter. Upon detecting confirmed stagnation, the orchestrator autonomously triggers a rotational solver handoff between an exploration-oriented Population Pool ($\mathcal{P}_{pop}$) and an exploitation-oriented Trajectory Pool ($\mathcal{P}_{traj}$), transferring accumulated search knowledge through an elitist Seed Memory Injection Protocol ($\mathbf{x}_{best}^*$). In this way, DTW/DDTW acts as a domain-agnostic search-monitoring mechanism within a broader adaptive collaborative controller, allowing solver transitions to respond to patterns observed in the evolving fitness trajectory.
+
+The proposed framework is comprehensively evaluated across three optimization domains of increasing complexity:
+\begin{enumerate}
+    \item \textbf{Discrete Combinatorial Optimization:} The Multidimensional Knapsack Problem (MKP) \cite{chu1998genetic}, on nine Chu~\& Beasley benchmark instances with up to $n = 500$ items and $m = 30$ constraints.
+    \item \textbf{Continuous Global Optimization:} The IEEE CEC2022 benchmark suite \cite{kumar2022problem} ($D = 10$), covering 12 unimodal, multimodal, hybrid, and composition functions.
+    \item \textbf{Real-World Engineering Optimization:} Techno-economic sizing of a Wind--PV--Electrolyzer--Battery green hydrogen microgrid (HRES2-H2) \cite{li2024capacity,modu2023systematic}, minimizing LCOE and LCOH under grid supply constraints ($\text{AGSR} \le 20\%$).
+\end{enumerate}
+For each domain, the framework is benchmarked against standalone constituent metaheuristics across $N = 31$ runs, with corresponding executions treated as paired under a non-parametric statistical protocol.
+
+The main contributions of this work are summarized as follows:
+\begin{itemize}
+    \item A trajectory-driven adaptive collaborative framework that analyzes morphological patterns in the fitness trajectory via DTW/DDTW and uses the resulting information as online feedback to autonomously govern solver rotation and elitist memory transfer between complementary metaheuristic pools.
+    
+    \item A scale-invariant stagnation monitoring engine comprising dynamic synthetic baselines, historical moving percentile thresholds, and a patience confirmation filter, enabling robust detection across problem domains with disparate objective magnitudes.
+    
+    \item A cross-domain experimental assessment demonstrating that the same trajectory-driven coordination policy operates effectively across discrete combinatorial (MKP), continuous multimodal (CEC2022), and mixed-variable engineering (HRES2-H2) landscapes without requiring domain-specific recalibration.
+    
+    \item A controlled statistical comparison against standalone population-based and trajectory-based metaheuristics to quantify the effect of adaptive trajectory-driven collaboration and to evaluate the comparative behavior of DTW and DDTW alignment modalities.
+\end{itemize}
+
+The remainder of this article is organized as follows. Section~\ref{sec:materials_and_methods} presents the DTW/DDTW stagnation detection engine, the collaborative orchestration protocol, and the problem formulations. Section~\ref{sec:results_and_discussion} describes the experimental setup, numerical results, and statistical analysis. Section~\ref{sec:discussion} discusses switching dynamics, budget sensitivity, and threats to validity. Section~\ref{sec:conclusion} concludes the paper and outlines future research directions.
+```
+
+---
+
+## 🇪🇸 Versión en Español (Referencia y Revisión)
+
+```latex
+\section{Introducción}
+\label{sec:introduccion}
+
+Las metaheurísticas poblacionales y de trayectoria proporcionan mecanismos de búsqueda flexibles y libres de derivadas para problemas de optimización complejos, combinando iterativamente la diversificación del espacio de búsqueda con la intensificación en torno a soluciones prometedoras \cite{blum2003metaheuristics,talbi2009metaheuristics}. Lograr un equilibrio productivo entre estos comportamientos complementarios es crítico: la exploración excesiva ralentiza la convergencia, mientras que la explotación excesiva conduce a convergencia prematura y pérdida de diversidad de búsqueda \cite{dhiman2026decade,vcrepinvsek2013exploration,zhang2019balancing}. De manera fundamental, el equilibrio deseable no es constante durante una ejecución de optimización; diferentes etapas del proceso de búsqueda se benefician de comportamientos algorítmicos fundamentalmente distintos \cite{vega2021learning,zhang2019balancing}. Según el Teorema del No Free Lunch (NFL) \cite{wolpert1997no}, ningún algoritmo puede superar universalmente a todas las alternativas en todas las topologías de problemas, lo cual motiva adicionalmente el diseño de arquitecturas colaborativas que integren operadores de búsqueda complementarios. Esta naturaleza dinámica y no estacionaria del proceso de optimización ha impulsado el desarrollo de mecanismos adaptativos e híbridos capaces de explotar la información generada durante la búsqueda para modificar el comportamiento algorítmico en línea \cite{aleti2016systematic,talbi2002taxonomy}.
+
+Los mecanismos adaptativos han incorporado progresivamente fuentes de información de búsqueda más ricas, incluyendo historiales de parámetros exitosos \cite{zhang2009jade}, estimación explícita del estado evolutivo \cite{zhan2009adaptive}, indicadores de estancamiento \cite{liu2024adaptive} y retroalimentación basada en aprendizaje \cite{tatsis2023reinforcement,karimimamaghan2022machine}. En el ámbito de las metaheurísticas híbridas, los marcos colaborativos que alternan entre solvers poblacionales y de trayectoria han emergido como una estrategia natural para sinergizar la exploración global con la intensificación local \cite{raidl2006unified,crainic2010parallel,alba2005parallel}. No obstante, un desafío persistente en estas arquitecturas es el dilema de comunicación y planificación: determinar con precisión \textit{cuándo} un solver activo debe ceder el control a su complemento \cite{talbi2021machine_tax,song2019review}. La mayoría de los esquemas existentes se basan en políticas de conmutación estáticas ---conteos fijos de iteraciones, contadores de estancamiento predeterminados o umbrales rígidos de diversidad--- que desestiman la dinámica no estacionaria del paisaje de aptitud y carecen de invariancia de escala entre dominios heterogéneos \cite{elhashash2025hybrid,pei2024learning}. Aunque la trayectoria temporal de los valores de aptitud incumbentes encapsula directamente la velocidad de búsqueda, el progreso activo y los episodios genuinos de estancamiento, el análisis explícito de patrones sobre esta trayectoria permanece ampliamente inexplorado como señal de retroalimentación cruzada para coordinar la colaboración multi-solver \cite{berndt1994using,keogh2001derivative}.
+
+En consecuencia, este trabajo propone un \textbf{Marco Colaborativo Adaptativo de Metaheurísticas} en el cual el Alineamiento Temporal Dinámico (DTW) \cite{berndt1994using} y el Alineamiento Temporal Dinámico Derivativo (DDTW) \cite{keogh2001derivative} se emplean para analizar patrones morfológicos en la trayectoria reciente de la mejor aptitud encontrada. En lugar de depender de calendarios de conmutación fijos, el marco evalúa continuamente una ventana deslizante del historial reciente de aptitud contra dos secuencias sintéticas de referencia construidas dinámicamente ---una rampa de progreso ideal y una meseta constante de estancamiento--- utilizando umbrales basados en percentiles invariantes a la escala y un filtro de paciencia confirmatoria. Al detectar estancamiento confirmado, el orquestador activa de forma autónoma una conmutación rotacional de solvers entre un Pool Poblacional orientado a exploración ($\mathcal{P}_{pop}$) y un Pool de Trayectoria orientado a explotación ($\mathcal{P}_{traj}$), transfiriendo el conocimiento de búsqueda acumulado mediante un Protocolo de Inyección de Memoria Semilla Elitista ($\mathbf{x}_{best}^*$). De este modo, DTW/DDTW actúa como un mecanismo de monitoreo de búsqueda agnóstico al dominio dentro de un controlador colaborativo adaptativo más amplio, permitiendo que las transiciones de solver respondan a patrones observados en la trayectoria de aptitud en evolución.
+
+El marco propuesto se evalúa de manera exhaustiva en tres dominios de optimización de complejidad creciente:
+\begin{enumerate}
+    \item \textbf{Optimización Discreta Combinatoria:} El Problema de la Mochila Multidimensional (MKP) \cite{chu1998genetic}, en nueve instancias de referencia de Chu~\& Beasley con hasta $n = 500$ ítems y $m = 30$ restricciones.
+    \item \textbf{Optimización Continua Global:} La suite de referencia IEEE CEC2022 \cite{kumar2022problem} ($D = 10$), abarcando 12 funciones unimodales, multimodales, híbridas y de composición.
+    \item \textbf{Optimización de Ingeniería Real:} Dimensionamiento tecno-económico de una microred de hidrógeno verde Eólica--FV--Electrolizador--Batería (HRES2-H2) \cite{li2024capacity,modu2023systematic}, minimizando LCOE y LCOH bajo restricciones de suministro a red ($\text{AGSR} \le 20\%$).
+\end{enumerate}
+En cada dominio, el marco se compara contra las metaheurísticas constituyentes aisladas a lo largo de $N = 31$ corridas, tratando las ejecuciones correspondientes como pareadas bajo un protocolo estadístico no paramétrico.
+
+Las principales contribuciones de este trabajo se resumen a continuación:
+\begin{itemize}
+    \item Un marco colaborativo adaptativo guiado por trayectoria que analiza patrones morfológicos en la trayectoria de aptitud mediante DTW/DDTW y utiliza la información resultante como retroalimentación en línea para gobernar de forma autónoma la rotación de solvers y la transferencia de memoria elitista entre pools de metaheurísticas complementarios.
+    
+    \item Un motor de monitoreo de estancamiento invariante a la escala que comprende referencias sintéticas dinámicas, umbrales de percentiles históricos móviles y un filtro de paciencia confirmatoria, permitiendo detección robusta entre dominios con magnitudes objetivo dispares.
+    
+    \item Una evaluación experimental multidominio que demuestra que la misma política de coordinación guiada por trayectoria opera eficazmente en paisajes combinatorios discretos (MKP), continuos multimodales (CEC2022) y de ingeniería con variables mixtas (HRES2-H2) sin requerir recalibración específica del dominio.
+    
+    \item Una comparación estadística controlada contra metaheurísticas aisladas poblacionales y de trayectoria para cuantificar el efecto de la colaboración adaptativa guiada por trayectoria y evaluar el comportamiento comparativo de las modalidades de alineamiento DTW y DDTW.
+\end{itemize}
+
+El resto del artículo se organiza como sigue. La Sección~\ref{sec:materials_and_methods} presenta el motor de detección de estancamiento DTW/DDTW, el protocolo de orquestación colaborativa y las formulaciones de los problemas. La Sección~\ref{sec:results_and_discussion} describe el diseño experimental, los resultados numéricos y el análisis estadístico. La Sección~\ref{sec:discussion} discute la dinámica de conmutación, la sensibilidad al presupuesto y las amenazas a la validez. La Sección~\ref{sec:conclusion} concluye el artículo y delinea líneas de investigación futura.
+```

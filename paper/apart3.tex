@@ -1,0 +1,58 @@
+% Seleccion reducida de graficos MKP.
+% Para cada instancia se conserva solamente la configuracion con el mejor
+% fitness medio (menor gap medio) entre DTW-1K, DDTW-1K, DTW-3K y DDTW-3K.
+%
+% Requiere en el preambulo:
+%   \usepackage{graphicx}
+%   \usepackage{subcaption}
+%
+% Este archivo puede incorporarse desde un documento ubicado en paper/ con:
+%   \input{apart3}
+
+\subsection{Selecci\'on de las mejores configuraciones por instancia MKP}
+\label{sec:mkp-mejores-configuraciones}
+
+Para evitar redundancia, se presenta una sola configuraci\'on por instancia
+MKP. La selecci\'on se realiz\'o utilizando como criterio el mayor fitness
+medio de las 31 corridas, equivalente al menor gap medio respecto del valor
+\'optimo conocido. DTW con 3,000 iteraciones fue seleccionado en siete
+instancias, mientras que DDTW con 3,000 iteraciones obtuvo el mejor promedio
+en \texttt{mknapcb2} y \texttt{mknapcb9}.
+
+\newcommand{\mkpMejorSuite}[5]{%
+\begin{figure}[p]
+    \centering
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_convergencia.png}
+        \caption{Convergencia}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_delta.png}
+        \caption{#4-$\Delta$}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_comparativo_mh.png}
+        \caption{Comparativo MH}
+    \end{subfigure}
+    \caption{Mejor configuraci\'on para la instancia \texttt{mknapcb#3}:
+    framework \textbf{#4} con un presupuesto de #5 iteraciones. Se muestran
+    la convergencia de la mejor corrida, la evoluci\'on del indicador
+    #4-$\Delta$ y la comparaci\'on de las metaheur\'isticas en 31 corridas.}
+    \label{fig:mkp-mejor-mknapcb#3}
+\end{figure}%
+}
+
+% DTW-3K: mejor fitness medio en mknapcb1, 3, 4, 5, 6, 7 y 8.
+\mkpMejorSuite{dtw}{3k}{1}{DTW}{3\,000}
+\mkpMejorSuite{ddtw}{3k}{2}{DDTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{3}{DTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{4}{DTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{5}{DTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{6}{DTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{7}{DTW}{3\,000}
+\mkpMejorSuite{dtw}{3k}{8}{DTW}{3\,000}
+\mkpMejorSuite{ddtw}{3k}{9}{DDTW}{3\,000}
+

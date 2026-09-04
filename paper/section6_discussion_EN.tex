@@ -1,62 +1,48 @@
 \section{Discussion}
 \label{sec:discussion}
 
-This section provides a deeper analytical discussion of the empirical findings, focusing on the underlying mechanisms driving the performance of the proposed \textbf{DTW/DDTW-Driven Adaptive Rotational Hybrid Metaheuristic Framework}. Specifically, we examine the adaptive collaboration dynamics, the role of elitist memory injection, conduct a comprehensive parameter sensitivity analysis, and analyze computational complexity and threats to validity.
+The experiments provide evidence that the proposed rotational framework is a robust portfolio strategy across discrete, continuous, and engineering optimization settings. The central result is not that the hybrid dominates every constituent solver on every problem. Rather, it reduces dependence on selecting a single algorithm in advance and produces consistently competitive solutions across heterogeneous landscapes. This distinction is supported by the corrected statistical analysis: the framework accumulated substantially more wins than losses against the standalone methods, while GA and several continuous optimizers remained superior on selected instances and functions.
 
-\subsection{Insights into Adaptive Collaboration Dynamics}
-\label{sec:discussion_collaboration}
+\subsection{Effect of Computational Budget and Alignment Modality}
+\label{sec:discussion_budget_alignment}
 
-Traditional collaborative and relay hybrid metaheuristics rely on fixed communication intervals (e.g., executing solver switches every $K$ iterations). Such static approaches suffer from two fundamental flaws:
-\begin{enumerate}
-    \item \textbf{Premature Handoffs:} Switching solvers while the active metaheuristic is still making significant progress wastes its exploratory trajectory momentum.
-    \item \textbf{Prolonged Stagnation Entrapment:} Maintaining an algorithm long after its search trajectory has stagnated in a local basin wastes computational budget ($NFE$).
-\end{enumerate}
+The MKP experiments show a clear quality--budget relationship. Increasing the search horizon from 1,000 to 3,000 iterations reduced the average optimality gap by 19.3\% for DTW and 21.5\% for DDTW. The rank analysis also placed both 3K configurations ahead of their 1K counterparts. This improvement indicates that the additional rotations observed under the extended budget were associated with continued solution refinement rather than complete search saturation. Nevertheless, this conclusion concerns solution quality under a larger computational budget; it does not imply a free efficiency gain, because the 3K campaigns necessarily require more objective evaluations and longer execution times.
 
-The proposed framework mitigates these limitations through elastic trajectory monitoring via Dynamic Time Warping (DTW) and Derivative DTW (DDTW). By computing non-linear time alignments between the recent fitness trajectory window ($Q$) and a monotonic reference vector ($R$), the monitor quantifies dynamic slope indices $D_1$ and $D_2$. The adaptive historical percentile thresholds ($P_{low}$ and $P_{high}$) dynamically scale with the search history, ensuring that solver rotation is triggered only when true numerical stagnation occurs.
+DTW achieved the best aggregate MKP rank at both budgets, whereas DDTW obtained a marginally better win/tie/loss profile on the continuous suite. However, the direct DTW--DDTW comparisons were not significant on any of the 12 continuous functions after multiplicity correction, and their HRES2-H2 LCOE difference was also non-significant. These results do not support declaring either alignment modality universally superior. Raw-value DTW appears well suited to MKP trajectories, where fitness amplitudes are directly informative, while DDTW can reduce sensitivity to level offsets by emphasizing changes in trajectory shape. The choice between them should therefore be treated as problem-dependent unless a larger cross-problem evaluation demonstrates a stable advantage.
 
-As observed in the timeline Gantt profiling across the continuous CEC2022 functions and the HRES2-H2 microgrid system, early search phases ($t < 200$) naturally allow population-based swarm algorithms ($\mathcal{P}_{pop}$) to execute longer epochs ($\Delta t \approx 60 - 120$ iterations) for global landscape coverage. In contrast, during mature exploitation ($t > 500$), the elastic monitor detects slope attenuation rapidly, triggering responsive handoffs to trajectory solvers ($\mathcal{P}_{traj}$) with shorter epochs ($\Delta t \approx 20 - 45$ iterations) to perform localized descent.
+\subsection{Interpretation of the MKP Results}
+\label{sec:discussion_mkp}
 
-\subsection{Role of Elitist Memory Injection}
-\label{sec:discussion_memory_injection}
+Across the four MKP campaigns, the framework recorded between 40 and 41 significant wins in each set of 63 corrected comparisons. Its strongest advantages occurred against PSO and EHO, while the comparisons with SA and GWO were more frequently ties. GA was the most important counterexample to universal superiority: it significantly outperformed the hybrid on several instances at both budgets. This pattern suggests that the hybrid's primary benefit is robustness across instance characteristics rather than peak performance on every individual case. A specialized solver can still exploit a particular landscape more effectively than a general portfolio.
 
-When a stagnation event triggers a rotation from solver $\mathcal{M}_A$ to solver $\mathcal{M}_B$, transferring knowledge effectively is critical. In the proposed framework, the elitist memory operator injects the best-so-far global solution vector $\mathbf{x}_{best}$ into the initial state of $\mathcal{M}_B$:
+The instance results also show that increasing the number of constraints or decision variables did not change the qualitative ordering of the four framework configurations: the extended-budget variants generally retained the smaller gaps. Even so, none of the configurations reached every Best Known Solution. The residual gaps on the larger 500-item instances indicate that adaptive rotation does not eliminate the combinatorial difficulty of MKP and that further improvement may require stronger repair, intensification, or problem-specific neighborhood operators.
+
+\subsection{Interpretation of the Continuous Benchmark Results}
+\label{sec:discussion_continuous}
+
+On the current continuous benchmark implementation, DTW and DDTW obtained 31 and 32 significant wins, respectively, across 60 corrected baseline comparisons. Both variants were especially reliable relative to WOA, but their losses against PSO, GWO, EHO, and ACO on selected functions demonstrate sensitivity to landscape structure. The hybrid therefore broadens competitive coverage without erasing the strengths of specialized optimizers. The similar mean ranks of DTW (2.64) and DDTW (2.61), together with the absence of significant pairwise differences between them, reinforce this interpretation.
+
+The best-run convergence and $\Delta$ profiles illustrate temporal correspondence between trajectory flattening and solver handoffs. They are useful diagnostic evidence that the monitor reacts during stagnant phases. However, these plots alone cannot establish causality: the final performance also depends on the algorithm portfolio, state-transfer operator, repair procedure, and solver-selection policy. A controlled ablation against fixed-period rotation, random rotation, a no-rotation portfolio, and variants without elitist state transfer is required to isolate the contribution of the DTW/DDTW monitor.
+
+\subsection{Engineering Significance of the HRES2-H2 Results}
+\label{sec:discussion_hres2}
+
+The most practically relevant HRES2-H2 outcome is the stability of the proposed framework. Both variants achieved feasible solutions in all 31 runs and converged to the same reported component sizing, while their LCOE dispersion was markedly smaller than that of the standalone algorithms. The Friedman and corrected Wilcoxon results confirm that this consistency is not explained solely by a small number of favorable runs. For an infrastructure-sizing problem, such repeatability is important because an optimizer that occasionally produces a low cost but frequently violates feasibility or returns widely dispersed designs is less useful for planning.
+
+The statistical equivalence of DTW and DDTW in this case is also practically informative. Their mean LCOE difference is below the reporting resolution and does not imply a meaningful economic distinction. Thus, claims of engineering benefit should focus on feasibility, low dispersion, and reproducible sizing rather than on ranking the two alignment modalities. Moreover, the result applies to the meteorological, demand, and techno-economic scenario used in this study; robustness to alternative years, price assumptions, degradation models, and reliability constraints remains to be evaluated.
+
+\subsection{Threats to Validity and Required Follow-up Experiments}
+\label{sec:discussion_validity}
+
+Several limitations constrain the conclusions that can be drawn from the present experiments:
+
 \begin{itemize}
-    \item For population-based algorithms ($\mathcal{P}_{pop}$), $\mathbf{x}_{best}$ replaces the weakest individual in the population, preserving population diversity while anchoring search around the promising basin.
-    \item For trajectory-based methods ($\mathcal{P}_{traj}$), $\mathbf{x}_{best}$ serves as the immediate starting solution vector, preventing random restarts and enabling instant local intensification.
-\end{itemize}
-Empirical observation confirms that memory injection eliminates the "re-exploration penalty" typically associated with solver handoffs, allowing the incoming metaheuristic to immediately refine the candidate solution.
-
-\subsection{Parameter Sensitivity Analysis}
-\label{sec:discussion_sensitivity}
-
-The performance of the DTW/DDTW stagnation monitoring engine depends on three main control parameters: the sliding window size $W$, the Sakoe--Chiba band width $w$, and the historical percentile thresholds ($P_{low}, P_{high}$).
-
-\subsubsection{Impact of Window Size $W$}
-Experiments evaluated window sizes $W \in \{15, 30, 50\}$ across unimodal, hybrid, and composite CEC2022 functions:
-\begin{itemize}
-    \item Small windows ($W = 15$) exhibit high sensitivity to transient stochastic fluctuations, occasionally triggering false-positive handoffs before a solver has fully exploited a basin.
-    \item Large windows ($W = 50$) introduce detection lag, delaying necessary solver switches by 15--20 iterations and reducing budget efficiency.
-    \item The default setting of $W = 30$ provides an optimal balance between responsiveness and noise filter stability across both continuous and physical engineering landscapes.
+    \item \textbf{Continuous-suite implementation:} the current local implementation uses deterministic fallback shift and rotation data when the official benchmark data files are unavailable, and some hybrid/composition definitions differ from the official CEC2022 reference implementation. The present results must therefore be described as obtained on the current CEC2022-inspired implementation. A claim of compliance with the official suite requires replacing the fallback definitions and rerunning all continuous experiments.
+    \item \textbf{Absence of an ablation study:} the experiments compare the complete framework with standalone algorithms but do not separately quantify the effects of adaptive monitoring, portfolio composition, solver selection, and elitist state transfer.
+    \item \textbf{Limited benchmark scope:} MKP is represented by nine selected Chu--Beasley instances, the continuous study uses only $D=10$, and the engineering evaluation uses one HRES2-H2 scenario. Additional instances, dimensions, and operating scenarios are required before claiming broad generalization.
+    \item \textbf{Multiplicity and effect magnitude:} Holm correction controls the family-wise error rate in the reported pairwise comparisons, but future reporting should also include standardized effect sizes and confidence intervals for median paired differences. Statistical significance alone does not measure practical importance.
+    \item \textbf{Best-run diagnostics:} the convergence and $\Delta$ figures correspond to the best run of each configuration. They explain possible operating behavior but should not be interpreted as the typical trajectory without complementary across-run summaries.
+    \item \textbf{Computational overhead:} the asymptotic cost of band-constrained DTW/DDTW is small for the selected window sizes, but the actual monitoring overhead was not instrumented independently. Consequently, no numerical overhead percentage can yet be claimed.
 \end{itemize}
 
-\subsubsection{Impact of Sakoe--Chiba Band Width $w$}
-The Sakoe--Chiba band constrains the warping path $|i - j| \le w$:
-\begin{itemize}
-    \item Unconstrained warping ($w = \infty$) allows excessive temporal distortion, causing stagnant trajectories to align artificially with steep reference curves.
-    \item Setting $w = 3$ restricts temporal shifts to small local delays, accurately preserving local gradient trends while maintaining computational speed.
-\end{itemize}
-
-\subsubsection{Percentile Thresholds ($P_{low}, P_{high}$)}
-Configuring $P_{low} = 30.0\%$ and $P_{high} = 70.0\%$ creates a self-adjusting sensitivity envelope. As the optimization progresses and overall fitness improves, the absolute threshold value adapts automatically, eliminating the need for problem-specific manual tuning.
-
-\subsection{Computational Overhead and Threats to Validity}
-\label{sec:discussion_threats}
-
-\subsubsection{Algorithmic Complexity}
-The computational complexity of calculating DTW/DDTW alignment between a window $Q$ of length $W$ and reference $R$ under a Sakoe--Chiba band $w$ is $\mathcal{O}(W \cdot w)$. Because $W = 30$ and $w = 3$ are small constants independent of problem dimension $D$ or maximum iterations $T_{max}$, the CPU time required for monitoring is under $0.5\%$ of total execution time. The computational bottleneck remains the objective function evaluations (particularly the 8,760-hour simulation loop in the HRES2-H2 microgrid).
-
-\subsubsection{Threats to Validity}
-\begin{itemize}
-    \item \textbf{Internal Validity:} Mitigated by evaluating $N = 31$ independent Monte Carlo runs per algorithm using fixed pseudo-random seeds derived from master seed 42, ensuring exact reproducibility.
-    \item \textbf{External Validity:} Mitigated by testing across diverse mathematical topologies (CEC2022 F1--F12) and complex physical engineering dispatch constraints (HRES2-H2).
-\end{itemize}
+Within these limits, the evidence supports the framework as a competitive and stable adaptive portfolio. The next decisive validation step is not the addition of more best-run plots, but a controlled ablation study and a rerun of the continuous experiments using the official benchmark definitions and data files.

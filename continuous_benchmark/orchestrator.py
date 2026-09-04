@@ -31,34 +31,25 @@ from continuous_benchmark.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
 from continuous_benchmark.mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
 
 
-POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC"]
-POOL_TRAYECTORIA = ["ILS", "SA"]
+POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO"]
 
 COLORES_MH = {
     "PSO": "#2196F3",
-    "GA" : "#4CAF50",
     "GWO": "#9C27B0",
+    "WOA": "#E040FB",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
-    "WOA": "#E040FB",
-    "GA" : "#4CAF50",
-    "ABC": "#FFC107",
-    # Trayectoria (usados en HRES2-H2)
-    "ILS": "#E91E63",
-    "VNS": "#00E676",
-    "TS" : "#795548",
-    "SA" : "#FF5722",
 }
 
 
 @dataclass
 class SwitchLog:
     mh_nombre   : str
-    tipo        : str
-    mejor_valor : float
-    t_inicio    : float
-    t_fin       : float
-    n_iters     : int
+    tipo        : str = "poblacional"
+    mejor_valor : float = float("inf")
+    t_inicio    : float = 0.0
+    t_fin       : float = 0.0
+    n_iters     : int = 0
     dtw_deltas  : list = None
 
 
@@ -95,7 +86,6 @@ def ejecutar_pipeline(
     verbose            : bool = True,
     on_epoch_callback  = None,
     pool_poblacional   : list[str] | None = None,
-    pool_trayectoria   : list[str] | None = None,
     ejecutar_mh_fn     = None,   # funcion personalizada: (mh_nombre, func, sol_global, stag_cfg, mode, epoch, verbose) -> resultado
 ) -> PipelineResult:
 
@@ -119,8 +109,8 @@ def ejecutar_pipeline(
     log_switches      : list[SwitchLog] = []
 
     epoch_ctr   = 0
-    fase_actual = "poblacional"
     t_inicio    = time.time()
+    mh_anterior : str | None = None
 
     if verbose:
         print("\n" + "=" * 62)
@@ -129,7 +119,6 @@ def ejecutar_pipeline(
         lim_str = f"Max Iters: {max_iters}" if max_iters is not None else f"Tiempo max: {tiempo_max}s"
         print(f"  Condicion  : {lim_str}")
         print(f"  Pool Poblacional : {pool_poblacional}")
-        print(f"  Pool Trayectoria : {pool_trayectoria if pool_trayectoria else 'Ninguno'}")
         print("=" * 62)
 
     while True:
@@ -140,14 +129,11 @@ def ejecutar_pipeline(
 
         t_mh_inicio = time.time() - t_inicio
 
-        if fase_actual == "poblacional":
-            mh = random.choice(POOL_POBLACIONAL)
-            tipo = "poblacional"
-            fase_actual = "trayectoria"
-        else:
-            mh = random.choice(POOL_TRAYECTORIA)
-            tipo = "trayectoria"
-            fase_actual = "poblacional"
+        # Rotar entre las MHs poblacionales evitando repetir consecutivamente la misma
+        candidatos = [m for m in pool_poblacional if m != mh_anterior] or pool_poblacional
+        mh = random.choice(candidatos)
+        mh_anterior = mh
+        tipo = "poblacional"
 
 
         if verbose:
@@ -277,8 +263,8 @@ def _ejecutar_mh(
         return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     else:
-        raise ValueError(f"MH desconocida o de trayectoria: '{mh_nombre}'. "
-                         f"Las MHs de trayectoria solo estan disponibles en HRES2-H2/orchestrator.py")
+        raise ValueError(f"MH poblacional no soportada: '{mh_nombre}'. "
+                         f"Opciones válidas: {POOL_POBLACIONAL}")
 
 
 def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
@@ -299,4 +285,4 @@ def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
         return _abc_epoch(func, ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     else:
         raise ValueError(f"MH poblacional no soportada: '{mh_nombre}'. "
-                         f"Para trayectoria usar HRES2-H2/orchestrator.py")
+                         f"Opciones válidas: {POOL_POBLACIONAL}")

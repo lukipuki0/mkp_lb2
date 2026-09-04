@@ -1,0 +1,83 @@
+% Bloque de figuras MKP. Solo referencia copias renombradas de PNG existentes.
+% Requiere en el preámbulo: \usepackage{graphicx} y \usepackage{subcaption}.
+
+\newcommand{\mkpTresGraficos}[5]{%
+\begin{figure}[p]
+    \centering
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_convergencia.png}
+        \caption{Convergencia}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_delta.png}
+        \caption{DTW-$\Delta$}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{imagenes_paper/mkp_#1_#2_mknapcb#3_comparativo_mh.png}
+        \caption{Comparativo MH}
+    \end{subfigure}
+    \caption{Dinámica del framework \textbf{#4} con presupuesto de #5
+    iteraciones en la instancia \texttt{mknapcb#3}. Se muestran la curva de
+    convergencia, el indicador DTW-$\Delta$ y la comparación de las
+    metaheurísticas en las 31 corridas.}
+    \label{fig:mkp-#1-#2-cb#3}
+\end{figure}%
+}
+
+\subsection{MKP: DTW con 1K iteraciones}
+\label{sec:mkp-dtw-1k-graficos}
+
+\mkpTresGraficos{dtw}{1k}{1}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{2}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{3}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{4}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{5}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{6}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{7}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{8}{DTW}{1\,000}
+\mkpTresGraficos{dtw}{1k}{9}{DTW}{1\,000}
+
+\clearpage
+\subsection{MKP: DTW con 3K iteraciones}
+\label{sec:mkp-dtw-3k-graficos}
+
+\mkpTresGraficos{dtw}{3k}{1}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{2}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{3}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{4}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{5}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{6}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{7}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{8}{DTW}{3\,000}
+\mkpTresGraficos{dtw}{3k}{9}{DTW}{3\,000}
+
+\clearpage
+\subsection{MKP: DDTW con 1K iteraciones}
+\label{sec:mkp-ddtw-1k-graficos}
+
+\mkpTresGraficos{ddtw}{1k}{1}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{2}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{3}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{4}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{5}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{6}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{7}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{8}{DDTW}{1\,000}
+\mkpTresGraficos{ddtw}{1k}{9}{DDTW}{1\,000}
+
+\clearpage
+\subsection{MKP: DDTW con 3K iteraciones}
+\label{sec:mkp-ddtw-3k-graficos}
+
+\mkpTresGraficos{ddtw}{3k}{1}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{2}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{3}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{4}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{5}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{6}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{7}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{8}{DDTW}{3\,000}
+\mkpTresGraficos{ddtw}{3k}{9}{DDTW}{3\,000}

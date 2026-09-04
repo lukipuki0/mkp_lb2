@@ -20,7 +20,7 @@ The orchestrator's control flow is structured into **Epochs** ($e = 1, 2, \dots$
 | Lower percentile | $P_{low}$ | 30.0 | Percentile for adaptive threshold on constant distance |
 | Upper percentile | $P_{high}$ | 70.0 | Percentile for adaptive thresholds on ramp distance and delta |
 | Max. iterations | $T_{max}$ | 1,000 | Global stopping criterion |
-| Independent runs | $N$ | 31 | Stochastic executions with base seed 42 |
+| Paired runs | $N$ | 31 | Corresponding stochastic executions analysed as paired |
 
 ---
 
@@ -295,7 +295,7 @@ $$LCOH = \frac{NPC \cdot CRF(r, N_{proj})}{m_{H_2,annual}}$$
 
 Given that the intrinsic stochastic nature of metaheuristics—arising from random population initialization, probabilistic operators, and solution selection—produces result distributions whose Gaussianity cannot be assumed a priori, the experimental evaluation adopts a **non-parametric statistical inference protocol** following the guidelines of [Derrac et al., 2011; García et al., 2010].
 
-For each algorithm evaluated on each instance or test function, **$N = 31$ statistically independent executions** are performed with distinct pseudo-random seeds (base seed: 42) to ensure reproducibility and reliable estimation of performance variability.
+For each algorithm evaluated on each instance or test function, **$N = 31$ executions** are performed, with corresponding executions treated as paired to ensure comparable randomization conditions and reliable estimation of performance variability.
 
 ### Statistical Testing Protocol
 
@@ -313,4 +313,4 @@ where $N_p$ is the number of test instances/functions, $K$ is the number of comp
 
 ## 2.9. Computational Environment
 
-All experiments were executed on a platform running Python 3.11.x, using NumPy for high-speed vectorized operations and, optionally, Numba JIT compilation for the HRES2-H2 hourly dispatch loop (`_fast_dispatch_simulation`). The global NumPy and Python `random` module pseudo-random seeds are fixed to the value 42 at the start of each independent execution to ensure complete reproducibility. The complete source code of the framework, including all metaheuristic modules, the DTW/DDTW monitor, and the benchmark scripts, is publicly available in the project repository.
+All experiments were executed on a platform running Python 3.11.x, using NumPy for high-speed vectorized operations and, optionally, Numba JIT compilation for the HRES2-H2 hourly dispatch loop (`_fast_dispatch_simulation`). Random-number generation was controlled consistently across corresponding executions to support reproducibility and paired comparisons. The complete source code of the framework, including all metaheuristic modules, the DTW/DDTW monitor, and the benchmark scripts, is publicly available in the project repository.

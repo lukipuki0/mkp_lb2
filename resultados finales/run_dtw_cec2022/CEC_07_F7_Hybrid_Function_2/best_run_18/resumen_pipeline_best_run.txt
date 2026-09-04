@@ -1,0 +1,14 @@
+Funcion            : CEC 7 (F7_Hybrid_Function_2) (Mejor Run #18)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 2000.000000
+Mejor valor global : 2000.626550
+Total switches     : 7
+
+1. WOA (poblacional) | mejor=2188.422442 | 0.0s-1.8s | iters=161
+2. GWO (poblacional) | mejor=2178.735864 | 1.8s-2.3s | iters=56
+3. PSO (poblacional) | mejor=2021.610459 | 2.3s-5.7s | iters=300
+4. GWO (poblacional) | mejor=2021.519113 | 5.7s-6.2s | iters=56
+5. EHO (poblacional) | mejor=2015.830181 | 6.2s-7.5s | iters=110
+6. PSO (poblacional) | mejor=2000.626551 | 7.5s-10.9s | iters=300
+7. WOA (poblacional) | mejor=2000.626550 | 10.9s-12.2s | iters=117

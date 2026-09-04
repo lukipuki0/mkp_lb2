@@ -90,7 +90,7 @@ Esta sección debe ser matemáticamente rigurosa para revisión Q1:
 ---
 
 ### 6. SECTION 5: EXPERIMENTAL RESULTS & STATISTICAL ANALYSIS
-- **5.1. Experimental Protocol & Settings:** 31 ejecuciones independientes, semillas fijas, hardware/software specifications.
+- **5.1. Experimental Protocol & Settings:** 31 ejecuciones pareadas bajo las mismas condiciones, hardware/software specifications.
 - **5.2. Performance on MKP Benchmarks:** Tablas comparativas (Mejor, Media, Std) vs solvers aislados y baseline.
 - **5.3. Performance on CEC2022 Continuous Benchmark:** 
   - Tablas de métricas descriptivas para F1-F12.

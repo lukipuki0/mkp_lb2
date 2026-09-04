@@ -51,12 +51,12 @@ RANDOM_SEED            = 42      # Semilla global fijada para reproducibilidad (
 OUTPUT_BASE            = os.path.join(os.path.dirname(__file__), "resultados")
 DIMENSION              = 10      # dimensionalidad de las funciones
 
-# DTW Stagnation params
-STAG_WINDOW      = 40
+# Parámetros DTW
+STAG_WINDOW      = 75
 STAG_BAND        = 0
-STAG_MIN_SLOPE   = 0.0
+STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 8
+STAG_PATIENCE    = 25
 STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0

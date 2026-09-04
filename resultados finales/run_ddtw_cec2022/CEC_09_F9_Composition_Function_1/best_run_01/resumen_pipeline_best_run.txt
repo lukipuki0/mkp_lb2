@@ -1,0 +1,23 @@
+Funcion            : CEC 9 (F9_Composition_Function_1) (Mejor Run #01)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 2300.000000
+Mejor valor global : 2529.284383
+Total switches     : 16
+
+1. PSO (poblacional) | mejor=2529.284383 | 0.0s-0.9s | iters=213
+2. EHO (poblacional) | mejor=2529.284383 | 0.9s-1.1s | iters=56
+3. WOA (poblacional) | mejor=2529.284383 | 1.1s-1.3s | iters=56
+4. PSO (poblacional) | mejor=2529.284383 | 1.3s-1.5s | iters=56
+5. EHO (poblacional) | mejor=2529.284383 | 1.5s-1.8s | iters=56
+6. GWO (poblacional) | mejor=2529.284383 | 1.8s-2.0s | iters=56
+7. WOA (poblacional) | mejor=2529.284383 | 2.0s-2.2s | iters=56
+8. ACO (poblacional) | mejor=2529.284383 | 2.2s-2.3s | iters=56
+9. PSO (poblacional) | mejor=2529.284383 | 2.3s-2.5s | iters=56
+10. EHO (poblacional) | mejor=2529.284383 | 2.5s-2.8s | iters=56
+11. PSO (poblacional) | mejor=2529.284383 | 2.8s-3.0s | iters=56
+12. GWO (poblacional) | mejor=2529.284383 | 3.0s-3.2s | iters=56
+13. WOA (poblacional) | mejor=2529.284383 | 3.2s-3.4s | iters=56
+14. PSO (poblacional) | mejor=2529.284383 | 3.4s-3.6s | iters=56
+15. EHO (poblacional) | mejor=2529.284383 | 3.6s-3.8s | iters=56
+16. WOA (poblacional) | mejor=2529.284383 | 3.8s-4.0s | iters=56

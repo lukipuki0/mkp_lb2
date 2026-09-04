@@ -1,0 +1,13 @@
+Funcion            : CEC 8 (F8_Hybrid_Function_3) (Mejor Run #19)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 2200.000000
+Mejor valor global : 2202.674801
+Total switches     : 6
+
+1. EHO (poblacional) | mejor=2216.021367 | 0.0s-2.4s | iters=203
+2. GWO (poblacional) | mejor=2210.693930 | 2.4s-3.0s | iters=56
+3. EHO (poblacional) | mejor=2203.344804 | 3.0s-4.2s | iters=111
+4. WOA (poblacional) | mejor=2203.265531 | 4.2s-7.5s | iters=300
+5. EHO (poblacional) | mejor=2203.264537 | 7.5s-8.6s | iters=94
+6. PSO (poblacional) | mejor=2202.674801 | 8.6s-12.0s | iters=300

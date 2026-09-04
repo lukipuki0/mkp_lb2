@@ -1,0 +1,128 @@
+% Seccion independiente de analisis estadistico para CEC2022, MKP y HRES2-H2.
+% Puede incorporarse desde un documento ubicado en paper/ mediante:
+%   \input{analisis_estadistico_ES}
+% Requiere en el preambulo: booktabs, amsmath y, si se usan referencias,
+% las entradas bibliograficas correspondientes a derrac2011practical y
+% garcia2010study.
+
+\section{An\'alisis estad\'istico inferencial}
+\label{sec:analisis-estadistico-global}
+
+La naturaleza estoc\'astica de las metaheur\'isticas impide asumir normalidad de los resultados sin una verificaci\'on previa. Por ello, los tres dominios experimentales se analizaron mediante un protocolo no param\'etrico basado en 31 ejecuciones por m\'etodo, instancia o funci\'on, tratando las ejecuciones correspondientes como pareadas bajo las mismas condiciones de aleatoriedad.
+
+La normalidad se evalu\'o mediante Shapiro--Wilk con $\alpha=0.05$. Para las
+comparaciones pareadas entre el framework h\'ibrido y cada metaheur\'istica
+base se emple\'o la prueba de rangos con signo de Wilcoxon. Cuando se realizaron
+varias comparaciones simult\'aneas, los valores $p$ se ajustaron mediante el
+procedimiento paso a paso de Holm. Finalmente, la prueba de Friedman se utiliz\'o
+para el contraste global y el c\'alculo de rangos medios; en todos los casos se
+adopt\'o $\alpha=0.05$. Un resultado se considera significativo si
+$p_{\mathrm{Holm}}<0.05$.
+
+\begin{table}[htbp]
+\centering
+\caption{Resumen del protocolo y de los contrastes estad\'isticos por dominio.}
+\label{tab:resumen-contrastes-estadisticos}
+\small
+\begin{tabular}{p{0.20\linewidth}p{0.24\linewidth}p{0.22\linewidth}p{0.24\linewidth}}
+\toprule
+Dominio & M\'etrica y dise\~no & Contraste global & Resultado principal \\
+\midrule
+MKP & Gap porcentual normalizado; 9 instancias y 4 configuraciones & Friedman entre DTW/DDTW y 1K/3K; Wilcoxon pareado con Holm & Diferencia global significativa; DTW--3K alcanza el mejor rango medio \\
+CEC2022 & Error objetivo; 12 funciones & Friedman y Wilcoxon por funci\'on frente a cinco bases & El framework es competitivo; no se demuestra superioridad universal de una modalidad \\
+HRES2--H2 & LCOE (CNY/kWh); un caso de ingenier\'ia & Friedman frente a diez bases; Wilcoxon pareado DTW--DDTW & Ambos frameworks superan significativamente a las bases; DTW y DDTW son equivalentes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Problema de la mochila multidimensional (MKP)}
+\label{sec:estadistico-mkp-es}
+
+El test de Shapiro--Wilk rechaz\'o la normalidad en 14 de las 36 distribuciones
+correspondientes a las combinaciones instancia--configuraci\'on. Por tanto, la
+comparaci\'on se realiz\'o sobre el gap porcentual medio de cada instancia. El
+contraste de Friedman detect\'o diferencias entre las cuatro configuraciones,
+$\chi_F^2=24.067$ y $p=2.42\times10^{-5}$. Los rangos medios fueron 1.22 para
+DTW--3K, 1.78 para DDTW--3K, 3.11 para DTW--1K y 3.89 para DDTW--1K, donde un
+rango menor indica un gap menor.
+
+Las seis comparaciones pareadas entre configuraciones resultaron significativas
+despu\'es del ajuste de Holm ($p_{\mathrm{Holm}}\leq0.0391$). El aumento del
+presupuesto redujo el gap promedio de 2.237\% a 1.805\% para DTW, una reducci\'on
+relativa del 19.3\%, y de 2.391\% a 1.876\% para DDTW, una reducci\'on relativa
+del 21.5\%.
+
+En el contraste entre el framework y las siete metaheur\'isticas independientes,
+las pruebas de Friedman fueron significativas en las 36 combinaciones evaluadas
+($36/36$, $p<0.05$). Los registros globales de victoria/empate/derrota del
+framework fueron $41/19/3$ para DTW--1K, $40/16/7$ para DDTW--1K, $41/15/7$
+para DTW--3K y $40/15/8$ para DDTW--3K, considerando las comparaciones ajustadas
+por Holm. Estos resultados respaldan robustez de portafolio, pero no una
+superioridad universal: GA obtuvo una ventaja significativa en tres instancias
+DTW--1K, tres DTW--3K, tres DDTW--1K y cuatro DDTW--3K.
+
+En consecuencia, para la selecci\'on gr\'afica por instancia se conserva la
+configuraci\'on con mejor fitness medio: DTW--3K en
+\texttt{mknapcb1}, \texttt{mknapcb3}--\texttt{mknapcb8}, y DDTW--3K en
+\texttt{mknapcb2} y \texttt{mknapcb9}. Esta selecci\'on descriptiva se basa en
+el gap medio; no debe interpretarse como una prueba adicional de significancia
+entre cada par de configuraciones.
+
+\subsection{Benchmark continuo IEEE CEC2022}
+\label{sec:estadistico-cec-es}
+
+La normalidad fue rechazada para el framework en 9 de las 12 funciones para
+cada modalidad de alineamiento. Tras ajustar mediante Holm las cinco
+comparaciones pareadas dentro de cada funci\'on, DTW obtuvo un registro de
+$31/22/7$ (victorias/empates/derrotas) en 60 comparaciones y un rango medio
+por funci\'on de 2.64. DDTW obtuvo $32/23/5$ y un rango medio de 2.61.
+
+La ventaja m\'as consistente de ambas modalidades apareci\'o frente a WOA, con
+diez victorias significativas, dos empates y ninguna derrota para cada framework.
+PSO, GWO, EHO y ACO conservaron ventajas en funciones concretas, por lo que el
+resultado agregado debe interpretarse como evidencia de competitividad y
+robustez, no como dominancia incondicional.
+
+Aunque DDTW obtuvo un objetivo medio menor que DTW en 10 de las 12 funciones,
+la comparaci\'on pareada entre ambas variantes no fue significativa despu\'es de
+Holm ($0/12$ contrastes significativos). Por ello, no se puede afirmar que una
+modalidad de alineamiento sea estad\'isticamente superior a la otra en la suite
+CEC2022.
+
+Como referencia documental, los informes globales reportan para DTW
+$\chi_F^2=327.5161$, $p=1.373589\times10^{-63}$, y para DDTW
+$\chi_F^2=329.6948$, $p=4.760406\times10^{-64}$. Estos contrastes globales
+comparan funciones con escalas y sesgos distintos; la evidencia inferencial
+principal debe tomarse de las comparaciones normalizadas dentro de cada funci\'on.
+
+\subsection{Caso de ingenier\'ia HRES2--H2}
+\label{sec:estadistico-hres2-es}
+
+El test de Shapiro--Wilk rechaz\'o la normalidad en las dos distribuciones de
+LCOE del framework ($p<10^{-11}$). Los contrastes omnibus de Friedman detectaron
+diferencias entre m\'etodos tanto para DTW ($\chi_F^2=129.166$,
+$p=6.91\times10^{-23}$) como para DDTW ($\chi_F^2=123.474$,
+$p=9.97\times10^{-22}$).
+
+En las comparaciones pareadas sin ajuste de Holm, cada framework super\'o significativamente a las diez metaheur\'isticas incluidas en la comparaci\'on, con un registro $10/0/0$ de victorias, empates y derrotas. Los rangos medios fueron 1.71 para DTW y 1.95 para DDTW.
+
+La comparaci\'on pareada directa entre DTW y DDTW no detect\'o una diferencia
+significativa en LCOE (Wilcoxon $p=0.593$). La diferencia observada entre medias
+fue de apenas $7.42\times10^{-7}$ CNY/kWh, inferior a la precisi\'on de seis
+decimales utilizada en el reporte. En consecuencia, el resultado de ingenier\'ia
+m\'as relevante es la factibilidad, la reproducibilidad y la baja dispersi\'on
+del dimensionamiento com\'un, no una ventaja econ\'omica concluyente de DTW sobre
+DDTW o viceversa.
+
+\subsection{S\'intesis inferencial}
+\label{sec:sintesis-estadistica-es}
+
+Los tres dominios muestran diferencias globales estad\'isticamente detectables,
+pero la interpretaci\'on depende de la escala y del objetivo de cada problema.
+En MKP, el presupuesto de 3,000 iteraciones mejora significativamente el gap y
+DTW--3K presenta el mejor rango global. En CEC2022, DTW y DDTW son variantes
+competitivas sin una diferencia significativa entre ellas. En HRES2--H2, ambas
+variantes superan a las metaheur\'isticas individuales y son estad\'isticamente
+equivalentes entre s\'i. Por tanto, las conclusiones se formulan como evidencia
+de robustez y estabilidad del framework, evitando afirmar dominancia universal
+en todos los problemas o funciones.

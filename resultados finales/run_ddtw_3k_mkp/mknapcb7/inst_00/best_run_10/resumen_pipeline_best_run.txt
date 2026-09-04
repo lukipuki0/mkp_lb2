@@ -1,0 +1,35 @@
+Instancia          : mknapcb7_inst00 (Mejor Run #10)
+Items / Restricc.  : 100 / 30
+Mejor valor global : 21772.0
+Optimo conocido    : 21946.0
+Gap relativo       : 0.79%
+Total switches     : 28
+
+1. GWO (poblacional) | mejor=21120.0 | 0.0s-4.7s | iters=121
+2. SA (trayectoria) | mejor=21250.0 | 4.7s-7.4s | iters=108
+3. GWO (poblacional) | mejor=21250.0 | 7.4s-11.6s | iters=108
+4. ILS (trayectoria) | mejor=21250.0 | 11.6s-17.3s | iters=108
+5. GWO (poblacional) | mejor=21250.0 | 17.3s-21.5s | iters=108
+6. VNS (trayectoria) | mejor=21250.0 | 21.5s-26.7s | iters=108
+7. PSO (poblacional) | mejor=21250.0 | 26.7s-30.8s | iters=108
+8. VNS (trayectoria) | mejor=21250.0 | 30.8s-36.0s | iters=108
+9. ACO (poblacional) | mejor=21616.0 | 36.0s-40.0s | iters=108
+10. SA (trayectoria) | mejor=21616.0 | 40.0s-42.7s | iters=108
+11. GA (poblacional) | mejor=21772.0 | 42.7s-44.3s | iters=108
+12. TS (trayectoria) | mejor=21772.0 | 44.3s-45.8s | iters=108
+13. GWO (poblacional) | mejor=21772.0 | 45.8s-50.0s | iters=108
+14. TS (trayectoria) | mejor=21772.0 | 50.0s-51.4s | iters=108
+15. PSO (poblacional) | mejor=21772.0 | 51.4s-55.6s | iters=108
+16. TS (trayectoria) | mejor=21772.0 | 55.6s-57.0s | iters=108
+17. EHO (poblacional) | mejor=21772.0 | 57.0s-61.2s | iters=108
+18. SA (trayectoria) | mejor=21772.0 | 61.2s-63.9s | iters=108
+19. ACO (poblacional) | mejor=21772.0 | 63.9s-67.9s | iters=108
+20. VNS (trayectoria) | mejor=21772.0 | 67.9s-74.3s | iters=108
+21. GA (poblacional) | mejor=21772.0 | 74.3s-75.9s | iters=108
+22. TS (trayectoria) | mejor=21772.0 | 75.9s-77.4s | iters=108
+23. EHO (poblacional) | mejor=21772.0 | 77.4s-81.6s | iters=108
+24. TS (trayectoria) | mejor=21772.0 | 81.6s-83.0s | iters=108
+25. ACO (poblacional) | mejor=21772.0 | 83.0s-87.0s | iters=108
+26. VNS (trayectoria) | mejor=21772.0 | 87.0s-93.1s | iters=108
+27. PSO (poblacional) | mejor=21772.0 | 93.1s-97.2s | iters=108
+28. ILS (trayectoria) | mejor=21772.0 | 97.2s-104.9s | iters=108

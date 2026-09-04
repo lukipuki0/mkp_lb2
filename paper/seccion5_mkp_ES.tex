@@ -1,0 +1,198 @@
+% Sección MKP para insertar en el manuscrito en español.
+% Requiere: \usepackage{amsmath}, \usepackage{booktabs},
+%           \usepackage{graphicx}, \usepackage{subcaption} y
+%           \usepackage{array}.
+
+\subsection{Resultados MKP}
+\label{sec:resultados-mkp}
+
+La evaluación del problema de la mochila multidimensional (MKP) se realizó
+sobre la primera instancia de cada una de las nueve familias Chu--Beasley
+(``mknapcb1''--``mknapcb9''). Cada configuración se ejecutó en 31 corridas, tratando las ejecuciones correspondientes como pareadas. Se compararon dos presupuestos del framework híbrido DTW: 1,000 iteraciones (1K) y 3,000 iteraciones (3K). Como
+el MKP es un problema de maximización, el gap relativo se calculó como
+\begin{equation}
+  \operatorname{gap}(\%) = 100\,\frac{f_{BKS}-f_{\mathrm{best}}}{f_{BKS}},
+  \label{eq:mkp-gap}
+\end{equation}
+donde $f_{BKS}$ es el mejor valor conocido de la instancia. Por tanto, un
+gap menor indica una solución de mayor calidad.
+
+\begin{table}[htbp]
+\centering
+\caption{Resumen de resultados del framework híbrido DTW con 3,000 iteraciones
+en las nueve instancias MKP.}
+\label{tab:mkp-resumen-3k}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+Instancia & $n$ & $m$ & Media & $\sigma$ & Mejor & BKS & Gap medio & Mejor gap & Tiempo (s) \\
+\midrule
+\texttt{mknapcb1} & 100 & 5  & 24142.84 & 100.87 & 24276 & 24381  & 0.98\% & 0.43\% & 107.48 \\
+\texttt{mknapcb2} & 250 & 5  & 58168.42 & 247.12 & 58849 & 59312  & 1.93\% & 0.78\% & 470.79 \\
+\texttt{mknapcb3} & 500 & 5  & 117369.97 & 382.63 & 118015 & 120130 & 2.30\% & 1.76\% & 1742.91 \\
+\texttt{mknapcb4} & 100 & 10 & 22821.97 & 130.31 & 23030 & 23064  & 1.05\% & 0.15\% & 112.86 \\
+\texttt{mknapcb5} & 250 & 10 & 58150.29 & 186.40 & 58425 & 59187  & 1.75\% & 1.29\% & 487.25 \\
+\texttt{mknapcb6} & 500 & 10 & 114760.61 & 427.68 & 115701 & 117726 & 2.52\% & 1.72\% & 1637.69 \\
+\texttt{mknapcb7} & 100 & 30 & 21691.94 & 71.33 & 21772 & 21946  & 1.16\% & 0.79\% & 119.39 \\
+\texttt{mknapcb8} & 250 & 30 & 55451.13 & 240.76 & 55988 & 56693  & 2.19\% & 1.24\% & 470.81 \\
+\texttt{mknapcb9} & 500 & 30 & 113115.10 & 426.33 & 113974 & 115868 & 2.38\% & 1.63\% & 1655.78 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+La Tabla~\ref{tab:mkp-resumen-3k} muestra que el mejor gap obtenido con
+3K iteraciones fue 0.15\% en \texttt{mknapcb4}, seguido de 0.43\% en
+\texttt{mknapcb1}. Las instancias de mayor tamaño ($n=500$) siguen siendo
+las más exigentes: sus gaps medios se mantienen entre 2.30\% y 2.52\%.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{imagenes_paper/mkp_gap_medio_1k_vs_3k.png}
+\caption{Gap medio por instancia MKP para los presupuestos de 1K y 3K
+iteraciones. El valor menor es mejor.}
+\label{fig:mkp-gap-medio}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{imagenes_paper/mkp_gap_mejor_1k_vs_3k.png}
+\caption{Mejor gap alcanzado por instancia MKP con 1K y 3K iteraciones.}
+\label{fig:mkp-gap-mejor}
+\end{figure}
+
+Al aumentar el presupuesto de 1K a 3K iteraciones, el gap medio disminuyó en
+las nueve instancias (Figura~\ref{fig:mkp-gap-medio}). Considerando las nueve
+instancias por igual, la media de los gaps medios pasó de 2.24\% a 1.81\%,
+una reducción relativa aproximada de 20.9\%. El mejor gap también disminuyó
+en términos agregados, de 1.24\% a 1.09\%; en \texttt{mknapcb7} y
+\texttt{mknapcb8} se mantuvo prácticamente sin cambio (Figura~\ref{fig:mkp-gap-mejor}).
+
+\begin{table}[htbp]
+\centering
+\caption{Ablación del presupuesto de iteraciones en MKP. $\Delta$ gap se
+define como gap(3K)$-$gap(1K), en puntos porcentuales.}
+\label{tab:mkp-ablation}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Instancia & Gap medio 1K & Gap medio 3K & $\Delta$ gap & Mejor gap 1K & Mejor gap 3K & Tiempo 1K (s) & Tiempo 3K (s) & Factor \\
+\midrule
+\texttt{mknapcb1} & 1.40\% & 0.98\% & $-0.42$ & 0.47\% & 0.43\% & 45.81 & 107.48 & 2.35$\times$ \\
+\texttt{mknapcb2} & 2.28\% & 1.93\% & $-0.35$ & 0.82\% & 0.78\% & 210.22 & 470.79 & 2.24$\times$ \\
+\texttt{mknapcb3} & 2.94\% & 2.30\% & $-0.64$ & 2.05\% & 1.76\% & 682.37 & 1742.91 & 2.55$\times$ \\
+\texttt{mknapcb4} & 1.58\% & 1.05\% & $-0.53$ & 0.17\% & 0.15\% & 47.07 & 112.86 & 2.40$\times$ \\
+\texttt{mknapcb5} & 2.17\% & 1.75\% & $-0.42$ & 1.40\% & 1.29\% & 210.45 & 487.25 & 2.32$\times$ \\
+\texttt{mknapcb6} & 2.88\% & 2.52\% & $-0.36$ & 2.23\% & 1.72\% & 678.31 & 1637.69 & 2.41$\times$ \\
+\texttt{mknapcb7} & 1.66\% & 1.16\% & $-0.50$ & 0.79\% & 0.79\% & 53.12 & 119.39 & 2.25$\times$ \\
+\texttt{mknapcb8} & 2.55\% & 2.19\% & $-0.36$ & 1.24\% & 1.24\% & 186.76 & 470.81 & 2.52$\times$ \\
+\texttt{mknapcb9} & 2.67\% & 2.38\% & $-0.30$ & 2.00\% & 1.63\% & 648.34 & 1655.78 & 2.55$\times$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+La mejora de calidad tiene un costo computacional claro. El tiempo medio por
+instancia aumentó de 306.94~s con 1K a 756.11~s con 3K; el factor medio de
+incremento fue $2.40\times$ (Figura~\ref{fig:mkp-tiempo}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{imagenes_paper/mkp_tiempo_1k_vs_3k.png}
+\caption{Tiempo medio de ejecución por instancia MKP para 1K y 3K
+iteraciones. Se emplea escala logarítmica para visualizar conjuntamente las
+instancias pequeñas y grandes.}
+\label{fig:mkp-tiempo}
+\end{figure}
+
+Para examinar la competencia entre solvers, la Figura~\ref{fig:mkp-boxplots}
+presenta los boxplots comparativos de tres instancias representativas:
+\texttt{mknapcb1} (pequeña), \texttt{mknapcb5} (intermedia) y
+\texttt{mknapcb9} (grande). Estos gráficos corresponden al presupuesto de
+3K iteraciones y muestran la distribución de las 31 corridas de cada
+metaheurística incluida en el benchmark.
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[t]{0.32\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{imagenes_paper/mkp_boxplot_mknapcb1_3k.png}
+  \caption{\texttt{mknapcb1}}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.32\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{imagenes_paper/mkp_boxplot_mknapcb5_3k.png}
+  \caption{\texttt{mknapcb5}}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.32\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{imagenes_paper/mkp_boxplot_mknapcb9_3k.png}
+  \caption{\texttt{mknapcb9}}
+\end{subfigure}
+\caption{Comparación estadística de las metaheurísticas en instancias MKP
+pequeña, intermedia y grande (31 corridas; mayor fitness es mejor).}
+\label{fig:mkp-boxplots}
+\end{figure}
+
+La dinámica temporal del mejor valor y del monitor DTW se ilustra para la
+instancia grande \texttt{mknapcb9}. La Figura~\ref{fig:mkp-convergencia}
+permite observar el incremento escalonado del mejor fitness a través de los
+epochs, mientras que la Figura~\ref{fig:mkp-dtw-delta} muestra el indicador
+$\Delta$ utilizado para distinguir estancamiento (valores positivos) de
+mejora activa (valores negativos).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{imagenes_paper/mkp_convergencia_mknapcb9_3k.png}
+\caption{Convergencia del mejor fitness y cambios de solver durante la mejor
+corrida de \texttt{mknapcb9} con 3K iteraciones. La línea discontinua roja
+indica el BKS.}
+\label{fig:mkp-convergencia}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{imagenes_paper/mkp_dtw_delta_mknapcb9_3k.png}
+\caption{Evolución del indicador $\Delta$ del monitor DTW en la mejor corrida
+de \texttt{mknapcb9}; $\Delta>0$ identifica estancamiento y $\Delta<0$
+mejora activa.}
+\label{fig:mkp-dtw-delta}
+\end{figure}
+
+Finalmente, se aplicó una prueba de Friedman dentro de cada instancia y una
+prueba de rangos con signo de Wilcoxon frente al control Hybrid DTW. La
+Tabla~\ref{tab:mkp-inferencia} resume el resultado. Todas las pruebas de
+Friedman detectaron diferencias globales ($p<0.05$); sin embargo, esto no
+implica que el framework sea el mejor en todas las instancias. En particular,
+SA o GA obtuvieron rangos superiores en varias familias. Por ello, la
+interpretación correcta es que el framework ofrece un comportamiento
+competitivo y estadísticamente diferenciable, con ventajas que dependen de la
+estructura de la instancia.
+
+\begin{table}[htbp]
+\centering
+\caption{Inferencia estadística por instancia MKP con 3K iteraciones. El
+valor $p_W$ corresponde al comparador de mejor rango frente a Hybrid DTW; no
+se aplicó corrección por comparaciones múltiples en los archivos de origen.}
+\label{tab:mkp-inferencia}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrll}
+\toprule
+Instancia & $\chi^2_F$ & $p_F$ & Rango Hybrid & Mejor rango & $p_W$ & Resultado vs. Hybrid \\
+\midrule
+\texttt{mknapcb1} & 144.2549 & $6.52\times10^{-28}$ & 3.76 & GA  & $3.34\times10^{-4}$ & GA mejor \\
+\texttt{mknapcb2} & 192.3441 & $4.79\times10^{-38}$ & 2.00 & SA  & $2.08\times10^{-2}$ & SA mejor \\
+\texttt{mknapcb3} & 202.7312 & $3.03\times10^{-40}$ & 1.81 & SA  & $4.53\times10^{-4}$ & SA mejor \\
+\texttt{mknapcb4} & 142.4763 & $1.54\times10^{-27}$ & 3.71 & GA  & $3.12\times10^{-3}$ & GA mejor \\
+\texttt{mknapcb5} & 191.7699 & $6.34\times10^{-38}$ & 1.94 & SA  & $8.85\times10^{-1}$ & Similar (ns) \\
+\texttt{mknapcb6} & 204.9892 & $1.01\times10^{-40}$ & 1.61 & SA  & $6.10\times10^{-1}$ & Similar (ns) \\
+\texttt{mknapcb7} & 123.8332 & $1.22\times10^{-23}$ & 3.71 & WOA & $6.48\times10^{-4}$ & WOA mejor \\
+\texttt{mknapcb8} & 165.9320 & $1.81\times10^{-32}$ & 3.00 & GA  & $1.21\times10^{-2}$ & GA mejor \\
+\texttt{mknapcb9} & 204.0860 & $1.56\times10^{-40}$ & 1.74 & SA  & $1.46\times10^{-1}$ & Similar (ns) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

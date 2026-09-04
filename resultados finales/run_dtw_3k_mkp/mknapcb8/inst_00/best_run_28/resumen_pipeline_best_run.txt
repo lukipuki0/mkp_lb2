@@ -1,0 +1,36 @@
+Instancia          : mknapcb8_inst00 (Mejor Run #28)
+Items / Restricc.  : 250 / 30
+Mejor valor global : 55988.0
+Optimo conocido    : 56693.0
+Gap relativo       : 1.24%
+Total switches     : 29
+
+1. GA (poblacional) | mejor=55122.0 | 0.0s-5.5s | iters=147
+2. ILS (trayectoria) | mejor=55988.0 | 5.5s-128.6s | iters=277
+3. EHO (poblacional) | mejor=55988.0 | 128.6s-137.6s | iters=99
+4. ILS (trayectoria) | mejor=55988.0 | 137.6s-185.6s | iters=99
+5. GWO (poblacional) | mejor=55988.0 | 185.6s-194.9s | iters=99
+6. TS (trayectoria) | mejor=55988.0 | 194.9s-197.9s | iters=99
+7. EHO (poblacional) | mejor=55988.0 | 197.9s-207.0s | iters=99
+8. TS (trayectoria) | mejor=55988.0 | 207.0s-210.1s | iters=99
+9. GA (poblacional) | mejor=55988.0 | 210.1s-213.7s | iters=99
+10. TS (trayectoria) | mejor=55988.0 | 213.7s-216.7s | iters=99
+11. GA (poblacional) | mejor=55988.0 | 216.7s-220.4s | iters=99
+12. SA (trayectoria) | mejor=55988.0 | 220.4s-226.3s | iters=99
+13. ACO (poblacional) | mejor=55988.0 | 226.3s-238.0s | iters=99
+14. TS (trayectoria) | mejor=55988.0 | 238.0s-241.1s | iters=99
+15. GA (poblacional) | mejor=55988.0 | 241.1s-244.7s | iters=99
+16. SA (trayectoria) | mejor=55988.0 | 244.7s-250.6s | iters=99
+17. WOA (poblacional) | mejor=55988.0 | 250.6s-259.4s | iters=99
+18. ILS (trayectoria) | mejor=55988.0 | 259.4s-306.2s | iters=99
+19. GWO (poblacional) | mejor=55988.0 | 306.2s-315.3s | iters=99
+20. ILS (trayectoria) | mejor=55988.0 | 315.3s-366.7s | iters=99
+21. ACO (poblacional) | mejor=55988.0 | 366.7s-378.4s | iters=99
+22. SA (trayectoria) | mejor=55988.0 | 378.4s-384.4s | iters=99
+23. EHO (poblacional) | mejor=55988.0 | 384.4s-393.4s | iters=99
+24. ILS (trayectoria) | mejor=55988.0 | 393.4s-440.5s | iters=99
+25. ACO (poblacional) | mejor=55988.0 | 440.5s-452.3s | iters=99
+26. ILS (trayectoria) | mejor=55988.0 | 452.3s-504.2s | iters=99
+27. GA (poblacional) | mejor=55988.0 | 504.2s-507.8s | iters=99
+28. ILS (trayectoria) | mejor=55988.0 | 507.8s-554.9s | iters=99
+29. ACO (poblacional) | mejor=55988.0 | 554.9s-566.7s | iters=99

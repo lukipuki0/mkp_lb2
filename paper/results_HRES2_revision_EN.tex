@@ -1,0 +1,124 @@
+% Replacement fragment for the HRES2--H2 part of paper/results.tex.
+% This file is separate and does not modify the original manuscript.
+
+\subsection{Results in the HRES2--H2 WPEB Engineering Case}
+\label{sec:results_hres2_revision}
+
+The engineering experiment evaluates the sizing and rule-based dispatch of a
+grid-connected wind--photovoltaic--electrolyzer--battery (WPEB) system over
+8,760 hourly steps. The 31 repetitions are stochastic optimization runs on a
+common fixed synthetic weather profile; they should not be described as a
+multi-year meteorological Monte Carlo experiment. The comparison comprises
+the ten standalone methods PSO, GWO, WOA, EHO, ACO, ABC, ILS, SA, TS, and VNS.
+The 31 corresponding executions were treated as paired runs for the inferential comparison.
+
+The current implementation computes annual hydrogen production from the
+electrolyzer load. It does not include a minimum hydrogen-demand constraint, a
+hydrogen storage tank, or a fuel-cell subsystem. Accordingly, this result is a
+WPEB capacity-sizing and dispatch case with hydrogen production, not a complete
+hydrogen-storage microgrid.
+
+\begin{table}[htbp]
+\centering
+\caption{Techno-economic performance metrics for the HRES2-H2 microgrid
+($N=31$ stochastic optimization runs with corresponding executions treated as paired; 8,760-hour annual
+simulation budget). Bold font indicates the best performance for each metric.}
+\label{tab:hres2_metrics_revision}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Algorithm} & \textbf{Mean LCOE} & \textbf{Best LCOE} & \textbf{Std. Dev. ($\sigma$)} & \textbf{LCOH} & \textbf{AGSR} & \textbf{Feasibility} \\
+ & \textbf{(CNY/kWh)} & \textbf{(CNY/kWh)} & \textbf{(CNY/kWh)} & \textbf{(CNY/kg)} & \textbf{(\%)} & \textbf{Rate (\%)} \\
+\midrule
+\textbf{Proposed (DTW)} & \textbf{0.267160} & \textbf{0.267159} & \textbf{0.000001} & 17.6314 & \textbf{20.00\%} & \textbf{100.0\%} \\
+\textbf{Proposed (DDTW)} & \textbf{0.267160} & \textbf{0.267159} & 0.000005 & \textbf{17.6313} & \textbf{20.00\%} & \textbf{100.0\%} \\
+GWO & 0.268066 & 0.267160 & 0.002815 & 17.6800 & 19.42\% & 90.3\% \\
+VNS & 0.267806 & 0.267159 & 0.002465 & 17.6700 & 19.95\% & 93.5\% \\
+TS & 0.267188 & 0.267159 & 0.000038 & 17.6334 & 19.99\% & 96.8\% \\
+ACO & 0.273288 & 0.267159 & 0.007584 & 18.0400 & 18.95\% & 93.5\% \\
+ILS & 0.267184 & 0.267171 & 0.000023 & 17.6331 & 19.98\% & 96.8\% \\
+PSO & 0.277289 & 0.274579 & 0.010939 & 18.2900 & 19.85\% & 83.8\% \\
+WOA & 0.277227 & 0.276524 & 0.009567 & 18.3100 & 19.70\% & 87.1\% \\
+EHO & 0.277728 & 0.276524 & 0.007382 & 18.3400 & 19.92\% & 80.6\% \\
+SA & 0.286431 & 0.281339 & 0.013206 & 18.9100 & 19.35\% & 87.1\% \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Optimal physical system component sizing and annual green hydrogen
+production for the HRES2-H2 microgrid. Bold font indicates the most
+cost-effective component configuration.}
+\label{tab:hres2_components_revision}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Algorithm} & \textbf{Wind Power} & \textbf{Solar PV} & \textbf{Electrolyzer} & \textbf{Battery Storage} & \textbf{Annual $\text{H}_2$ Production} \\
+ & \textbf{(MW)} & \textbf{(MW)} & \textbf{(MW)} & \textbf{(MW / 4h)} & \textbf{(kg/year)} \\
+\midrule
+\textbf{Proposed (DTW)} & \textbf{174.47} & \textbf{25.53} & \textbf{70.0} & \textbf{50.0} & \textbf{8,862,879.4} \\
+\textbf{Proposed (DDTW)} & \textbf{174.47} & \textbf{25.53} & \textbf{70.0} & \textbf{50.0} & \textbf{8,862,879.4} \\
+GWO & 176.50 & 28.00 & 75.0 & 55.0 & 8,820,410.0 \\
+VNS & 175.20 & 25.80 & 70.0 & 50.0 & 8,845,120.0 \\
+TS & 174.50 & 25.60 & 70.0 & 50.0 & 8,860,250.0 \\
+ACO & 178.00 & 27.50 & 75.0 & 55.0 & 8,790,500.0 \\
+ILS & 175.00 & 26.00 & 70.0 & 50.0 & 8,855,100.0 \\
+PSO & 185.00 & 35.00 & 85.0 & 65.0 & 8,650,200.0 \\
+WOA & 182.00 & 32.00 & 80.0 & 60.0 & 8,690,400.0 \\
+EHO & 190.00 & 40.00 & 90.0 & 70.0 & 8,610,000.0 \\
+SA & 195.00 & 42.00 & 95.0 & 75.0 & 8,510,300.0 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+Both variants produced a stable low-LCOE solution on the archived scenario.
+The best recorded configuration in both variants was
+$P_{WT}=174.473154$ MW, $P_{PV}=25.526846$ MW, a $70$ MW electrolyzer, and a
+$50$ MW battery with four hours of duration. This configuration produced
+approximately $8.862879\times10^{6}$ kg of hydrogen per year, with LCOE
+$0.267159$ CNY/kWh and LCOH $17.631389$ CNY/kg. The AGSR value was at or very
+close to its $20\%$ upper bound, so the result should not be interpreted as
+having a large constraint margin.
+
+The archived LCOE statistics show significant differences among the eleven
+methods according to the Friedman test for both variants. The proposed DTW and
+DDTW variants obtained mean ranks of 1.71 and 1.95, respectively. All ten
+standalone methods had higher mean LCOE ranks and unadjusted Wilcoxon
+$p<0.001$ against the corresponding proposed control. The full inferential
+comparison is reported in the companion statistical-analysis subsection; the
+reported $p$-values are unadjusted because no Holm correction is applied.
+
+The direct DTW--DDTW comparison yielded no significant difference in LCOE
+(Wilcoxon $p=0.593$). The mean difference was only
+$7.42\times10^{-7}$ CNY/kWh. Therefore, the engineering result supports
+comparable performance of the two alignment modalities on the fixed scenario,
+rather than a statistically established advantage of one modality.
+
+The component table is retained as a descriptive summary of the reported
+best configurations. However, the current standalone output does not preserve
+per-run LCOH, AGSR, feasibility, hydrogen-production, or component-sizing
+records. Therefore, the baseline engineering values in that table should be
+interpreted as reported summary values rather than independently auditable
+per-run comparisons until the complete records are archived.
+
+\subsubsection{Stagnation-monitor dynamics}
+\label{sec:results_hres2_dynamics_revision}
+
+The convergence and DTW/DDTW profiles illustrate the switching behaviour of
+the adaptive monitor over the 1,000-iteration budget. They should be described
+as trajectories on the fixed synthetic engineering scenario. The final value
+should be called the best observed solution rather than the global optimum,
+because the metaheuristic search does not provide a proof of global
+optimality.
+
+The figure captions should also state ``ten standalone baseline
+metaheuristics'' rather than ``nine standalone baseline metaheuristics'' and
+should identify the experiment as 31 stochastic optimization runs over one
+fixed synthetic weather profile.
+
+% Implementation-aligned correction for the companion methods section:
+% the photovoltaic temperature coefficient used by the code is
+% gamma_T=-0.50 percent per degree Celsius, not -0.45 percent per degree.

@@ -1,0 +1,36 @@
+Instancia          : mknapcb7_inst00 (Mejor Run #02)
+Items / Restricc.  : 100 / 30
+Mejor valor global : 21772.0
+Optimo conocido    : 21946.0
+Gap relativo       : 0.79%
+Total switches     : 29
+
+1. WOA (poblacional) | mejor=21215.0 | 0.0s-6.5s | iters=170
+2. SA (trayectoria) | mejor=21468.0 | 6.5s-9.1s | iters=102
+3. ACO (poblacional) | mejor=21468.0 | 9.1s-12.8s | iters=99
+4. ILS (trayectoria) | mejor=21468.0 | 12.8s-20.4s | iters=99
+5. PSO (poblacional) | mejor=21468.0 | 20.4s-24.3s | iters=99
+6. SA (trayectoria) | mejor=21468.0 | 24.3s-26.8s | iters=99
+7. GWO (poblacional) | mejor=21468.0 | 26.8s-30.7s | iters=99
+8. ILS (trayectoria) | mejor=21772.0 | 30.7s-44.5s | iters=194
+9. PSO (poblacional) | mejor=21772.0 | 44.5s-48.3s | iters=99
+10. TS (trayectoria) | mejor=21772.0 | 48.3s-49.7s | iters=99
+11. EHO (poblacional) | mejor=21772.0 | 49.7s-53.6s | iters=99
+12. ILS (trayectoria) | mejor=21772.0 | 53.6s-60.7s | iters=99
+13. GWO (poblacional) | mejor=21772.0 | 60.7s-64.6s | iters=99
+14. VNS (trayectoria) | mejor=21772.0 | 64.6s-70.4s | iters=99
+15. WOA (poblacional) | mejor=21772.0 | 70.4s-74.1s | iters=99
+16. VNS (trayectoria) | mejor=21772.0 | 74.1s-79.9s | iters=99
+17. WOA (poblacional) | mejor=21772.0 | 79.9s-83.6s | iters=99
+18. VNS (trayectoria) | mejor=21772.0 | 83.6s-89.7s | iters=99
+19. PSO (poblacional) | mejor=21772.0 | 89.7s-93.5s | iters=99
+20. SA (trayectoria) | mejor=21772.0 | 93.5s-96.1s | iters=99
+21. EHO (poblacional) | mejor=21772.0 | 96.1s-100.0s | iters=99
+22. TS (trayectoria) | mejor=21772.0 | 100.0s-101.3s | iters=99
+23. GA (poblacional) | mejor=21772.0 | 101.3s-102.8s | iters=99
+24. ILS (trayectoria) | mejor=21772.0 | 102.8s-109.7s | iters=99
+25. PSO (poblacional) | mejor=21772.0 | 109.7s-113.6s | iters=99
+26. TS (trayectoria) | mejor=21772.0 | 113.6s-114.9s | iters=99
+27. PSO (poblacional) | mejor=21772.0 | 114.9s-118.8s | iters=99
+28. SA (trayectoria) | mejor=21772.0 | 118.8s-121.3s | iters=99
+29. WOA (poblacional) | mejor=21772.0 | 121.3s-125.1s | iters=99

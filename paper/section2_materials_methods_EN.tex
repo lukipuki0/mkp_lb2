@@ -4,7 +4,14 @@
 \subsection{Overall Architecture of the DTW-Driven Adaptive Rotational Hybrid Framework}
 \label{sec:overall_architecture}
 
-To systematically resolve the critical challenges of premature convergence, progressive diversity loss, and limited cross-domain adaptability commonly encountered in standalone metaheuristic algorithms, this work proposes an Adaptive Rotational Hybrid Metaheuristic Framework governed by a Dynamic Time Warping (DTW) and Derivative Dynamic Time Warping (DDTW) Stagnation Monitor. Conventional hybrid schemes frequently switch between exploration and exploitation phases using rigid, heuristic criteria—such as fixed iteration intervals or static stagnation counters—which inevitably lead to either premature switching (interrupting productive search trajectories) or delayed switching (wasting computational evaluations on stalled regions). In contrast, the proposed framework employs temporal elastic alignment over the recent objective-function trajectory as a mathematically rigorous and dynamic indicator of search productivity.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/framework_flowchart.png}
+\caption{Comprehensive workflow architecture of the proposed DTW/DDTW-driven adaptive rotational hybrid metaheuristic framework across heterogeneous problem domains, illustrating the closed-loop interaction between the multi-domain benchmark layer, the elastic stagnation monitoring engine, and the rotational solver alternation with elitist memory injection.}
+\label{fig:framework_flowchart}
+\end{figure}
+
+The overall architecture and closed-loop operational workflow of the proposed collaborative optimization framework are presented in Figure~\ref{fig:framework_flowchart}. The framework integrates three interconnected functional layers: (i) a multi-domain problem layer covering discrete combinatorial optimization (MKP), continuous global benchmarks (IEEE CEC2022), and real-world engineering simulations (HRES2-H2 microgrid); (ii) an elastic DTW/DDTW stagnation monitoring engine that tracks sliding fitness trajectories ($\mathbf{X} \in \mathbb{R}^W$) against synthetic progress ($\mathbf{R}$) and stagnation ($\mathbf{C}$) baselines to compute distance metrics ($D_1, D_2, \Delta$) and confirm search stagnation via adaptive percentile thresholds and a patience streak filter ($S_t \ge 3$); and (iii) a collaborative metaheuristic execution layer that dynamically alternates active solvers between exploration ($\mathcal{P}_{pop}$) and exploitation ($\mathcal{P}_{traj}$) pools, seamlessly transferring search memory through an elitist solution injection protocol upon each validated solver switch.
 
 The theoretical foundation of the framework is rooted in the principle of algorithmic complementarity dictated by the No Free Lunch (NFL) theorem \cite{wolpert1997no}. Because no single search operator uniformly dominates across diverse landscape topologies, the proposed architecture organizes eight metaheuristic algorithms into two disjoint and specialized operational pools:
 \begin{enumerate}
@@ -31,7 +38,7 @@ Plateau Tolerance & $K_{max}$ & $15$ & Iterations without local improvement to i
 Lower Percentile Threshold & $P_{low}$ & $30.0$ & Historical percentile for constant-baseline distance ($\theta_c$) \\
 Upper Percentile Threshold & $P_{high}$ & $70.0$ & Historical percentile for ramp distance ($\theta_r$) and delta ($\theta_\Delta$) \\
 Maximum Evaluations & $T_{max}$ & $1,000$ & Maximum iterations / generations per complete execution \\
-Independent Runs & $N$ & $31$ & Statistical sample size with distinct pseudo-random seeds \\
+Paired Runs & $N$ & $31$ & Statistical sample size; corresponding executions are analysed as paired \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -380,7 +387,7 @@ f_{penalized}(\mathbf{x}) = 100.0 + 10.0 \cdot AGSR
 
 To ensure rigorous validation of algorithmic superiority given the inherently stochastic nature of metaheuristics, all experiments are structured following standardized statistical inference guidelines \cite{derrac2011practical,garcia2010study}:
 \begin{enumerate}
-    \item \textbf{Shapiro--Wilk Normality Test:} Evaluates the null hypothesis $H_0$ that the sample of $N=31$ independent runs is normally distributed. Rejection ($p < 0.05$) establishes the necessity of non-parametric ranking tests.
+    \item \textbf{Shapiro--Wilk Normality Test:} Evaluates the null hypothesis $H_0$ that the sample of $N=31$ runs is normally distributed. Rejection ($p < 0.05$) establishes the necessity of non-parametric ranking tests.
     \item \textbf{Wilcoxon Signed-Rank Test:} Conducts paired non-parametric comparisons between the proposed DTW framework and each baseline metaheuristic at a significance level $\alpha = 0.05$. Reported metrics include positive ranks ($W^+$), negative ranks ($W^-$), and asymptotic $p$-values.
     \item \textbf{Friedman Global Ranking Test:} Evaluates omnibus statistical significance across multi-problem datasets and establishes global mean ranks $\bar{R}_j$:
     \begin{equation}
@@ -393,4 +400,4 @@ To ensure rigorous validation of algorithmic superiority given the inherently st
 \subsection{Computational Implementation and Reproducibility}
 \label{sec:computational_implementation}
 
-All algorithms and simulation models were implemented in Python 3.11 using vectorized NumPy routines. The 8,760-hour dispatch simulation loop (`_fast_dispatch_simulation`) was compiled with Numba JIT acceleration to ensure high evaluation throughput. Pseudo-random number generators were initialized with seed 42 to guarantee full experimental reproducibility.
+All algorithms and simulation models were implemented in Python 3.11 using vectorized NumPy routines. The 8,760-hour dispatch simulation loop (`_fast_dispatch_simulation`) was compiled with Numba JIT acceleration to ensure high evaluation throughput. Random-number generation was controlled consistently across corresponding executions to support reproducibility and paired comparisons.

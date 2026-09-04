@@ -1,570 +1,511 @@
-"""
-================================================================================
-Funciones Benchmark CEC 2022 (Congress on Evolutionary Computation 2022)
-================================================================================
-Implementación completa de las 12 funciones de benchmark CEC 2022 en Python,
-siguiendo las especificaciones oficiales y los papers de referencia:
-  - Wang, R., Pan, J., Chu, S., Lin, B., & Zhong, N. (2026). A Multi-Strategy
-    Population-Free Particle Swarm Optimization Algorithm... Applied Soft Computing.
-  - Akbulut, H. (2026). Artificial Bee Colony with Momentum-Guided Search and
-    Starfish Exploration... Applied Soft Computing.
+"""IEEE CEC 2022 real-parameter benchmark suite.
 
-Las 12 funciones son:
-  F1 : Zakharov desplazada y rotada (unimodal)                  - Bias: 300
-  F2 : Rosenbrock desplazada y rotada (multimodal básica)         - Bias: 400
-  F3 : Schaffer's F6 expandida, desplazada y rotada            - Bias: 600
-  F4 : Rastrigin no continua, desplazada y rotada              - Bias: 800
-  F5 : Levy desplazada y rotada                                 - Bias: 900
-  F6 : Función Híbrida 1 (N=3 subfunciones)                     - Bias: 1800
-  F7 : Función Híbrida 2 (N=6 subfunciones)                     - Bias: 2000
-  F8 : Función Híbrida 3 (N=5 subfunciones)                     - Bias: 2200
-  F9 : Función de Composición 1 (N=5 subfunciones)              - Bias: 2300
-  F10: Función de Composición 2 (N=4 subfunciones)              - Bias: 2400
-  F11: Función de Composición 3 (N=5 subfunciones)              - Bias: 2600
-  F12: Función de Composición 4 (N=6 subfunciones)              - Bias: 2700
-
-Rango de búsqueda: [-100, 100]^nD para todas las funciones.
-Dimensiones soportadas: nD = 10, nD = 20 (y arbitrario > 1).
-================================================================================
+The implementation follows the official Python reference distributed in
+``2022-SO-BO`` and uses its shift, rotation and shuffle files from
+``continuous_benchmark/input_data``.  The files are deliberately required:
+silently generating replacement matrices would make results incomparable
+with CEC2022 publications.
 """
+
+from __future__ import annotations
 
 import os
-import numpy as np
-from typing import Callable, List, Tuple, Dict, Optional
 from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "input_data")
+SUPPORTED_DIMENSIONS = (2, 10, 20)
+CEC_BIASES = {
+    1: 300.0, 2: 400.0, 3: 600.0, 4: 800.0, 5: 900.0,
+    6: 1800.0, 7: 2000.0, 8: 2200.0, 9: 2300.0,
+    10: 2400.0, 11: 2600.0, 12: 2700.0,
+}
+# Backwards-compatible public name used by the existing verification script.
+OFFICIAL_BIASES = CEC_BIASES
+
 
 @dataclass
 class ContinuousFunction:
-    """Descriptor de una función de benchmark continua."""
-    name    : str
-    func    : Callable[[np.ndarray], float]
-    lb      : float          # Límite inferior
-    ub      : float          # Límite superior
-    optimum : float          # Bias/Valor óptimo conocido
-    n_dim   : int            # Dimensionalidad
+    """Descriptor consumed by the continuous metaheuristics."""
+
+    name: str
+    func: Callable[[np.ndarray], float]
+    lb: float
+    ub: float
+    optimum: float
+    n_dim: int
 
 
-# ============================================================================
-# 1. FUNCIONES BASE AUXILIARES
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Mathematical functions used by the official CEC implementation
+# ---------------------------------------------------------------------------
 
+def _zakharov(z: np.ndarray) -> float:
+    i = np.arange(1, z.size + 1, dtype=float)
+    s2 = np.sum(0.5 * i * z)
+    return float(np.sum(z * z) + s2**2 + s2**4)
+
+
+def _ellips(z: np.ndarray) -> float:
+    if z.size <= 1:
+        return float(np.sum(z * z))
+    exponents = 6.0 * np.arange(z.size) / (z.size - 1)
+    return float(np.sum(10.0**exponents * z * z))
+
+
+def _bent_cigar(z: np.ndarray) -> float:
+    return float(z[0] ** 2 + 1.0e6 * np.sum(z[1:] ** 2))
+
+
+def _discus(z: np.ndarray) -> float:
+    return float(1.0e6 * z[0] ** 2 + np.sum(z[1:] ** 2))
+
+
+def _rosenbrock(z: np.ndarray) -> float:
+    y = z + 1.0
+    if y.size <= 1:
+        return 0.0
+    return float(np.sum(100.0 * (y[:-1] ** 2 - y[1:]) ** 2 + (y[:-1] - 1.0) ** 2))
+
+
+def _ackley(z: np.ndarray) -> float:
+    n = z.size
+    return float(
+        np.e - 20.0 * np.exp(-0.2 * np.sqrt(np.sum(z * z) / n))
+        - np.exp(np.sum(np.cos(2.0 * np.pi * z)) / n) + 20.0
+    )
+
+
+def _griewank(z: np.ndarray) -> float:
+    i = np.arange(1, z.size + 1, dtype=float)
+    return float(1.0 + np.sum(z * z) / 4000.0 - np.prod(np.cos(z / np.sqrt(i))))
+
+
+def _rastrigin(z: np.ndarray) -> float:
+    return float(np.sum(z * z - 10.0 * np.cos(2.0 * np.pi * z) + 10.0))
+
+
+def _step_rastrigin(z: np.ndarray) -> float:
+    # Official reference rule: floor rather than np.round at half-integers.
+    stepped = np.where(np.abs(z) > 0.5, np.floor(2.0 * z + 0.5) / 2.0, z)
+    return _rastrigin(stepped)
+
+
+def _schwefel(z: np.ndarray) -> float:
+    f = 0.0
+    for value in z + 4.209687462275036e2:
+        if value > 500.0:
+            remainder = np.fmod(value, 500.0)
+            f -= (500.0 - remainder) * np.sin(np.sqrt(500.0 - remainder))
+            f += ((value - 500.0) / 100.0) ** 2 / z.size
+        elif value < -500.0:
+            remainder = np.fmod(abs(value), 500.0)
+            f -= (-500.0 + remainder) * np.sin(np.sqrt(500.0 - remainder))
+            f += ((value + 500.0) / 100.0) ** 2 / z.size
+        else:
+            f -= value * np.sin(np.sqrt(abs(value)))
+    return float(f + 4.189828872724338e2 * z.size)
+
+
+def _grie_rosen(z: np.ndarray) -> float:
+    y = z + 1.0
+    if y.size <= 1:
+        return 0.0
+    total = 0.0
+    for i in range(y.size - 1):
+        temp = 100.0 * (y[i] ** 2 - y[i + 1]) ** 2 + (y[i] - 1.0) ** 2
+        total += temp * temp / 4000.0 - np.cos(temp) + 1.0
+    temp = 100.0 * (y[-1] ** 2 - y[0]) ** 2 + (y[-1] - 1.0) ** 2
+    total += temp * temp / 4000.0 - np.cos(temp) + 1.0
+    return float(total)
+
+
+def _expanded_schaffer_f6(z: np.ndarray) -> float:
+    if z.size <= 1:
+        return 0.0
+    pair_sq = np.concatenate((z[:-1] ** 2 + z[1:] ** 2, [z[-1] ** 2 + z[0] ** 2]))
+    return float(np.sum(0.5 + (np.sin(np.sqrt(pair_sq)) ** 2 - 0.5) / (1.0 + 0.001 * pair_sq) ** 2))
+
+
+def _schaffer_f7(z: np.ndarray) -> float:
+    if z.size <= 1:
+        return 0.0
+    radius = np.sqrt(z[:-1] ** 2 + z[1:] ** 2)
+    terms = np.sqrt(radius) * (1.0 + np.sin(50.0 * radius**0.2) ** 2)
+    return float(np.sum(terms) ** 2 / (z.size - 1) ** 2)
+
+
+def _happycat(z: np.ndarray) -> float:
+    y = z - 1.0
+    r2 = np.sum(y * y)
+    return float(abs(r2 - z.size) ** 0.25 + (0.5 * r2 + np.sum(y)) / z.size + 0.5)
+
+
+def _hgbat(z: np.ndarray) -> float:
+    y = z - 1.0
+    r2 = np.sum(y * y)
+    sum_y = np.sum(y)
+    return float(abs(r2**2 - sum_y**2) ** 0.5 + (0.5 * r2 + sum_y) / z.size + 0.5)
+
+
+def _katsuura(z: np.ndarray) -> float:
+    product = 1.0
+    for i, value in enumerate(z, start=1):
+        term = 0.0
+        for j in range(1, 33):
+            power = 2.0**j
+            term += abs(power * value - np.floor(power * value + 0.5)) / power
+        product *= (1.0 + i * term) ** (10.0 / (z.size**1.2))
+    scale = 10.0 / (z.size * z.size)
+    return float(product * scale - scale)
+
+
+# Public standalone helpers retained for compatibility with earlier code.
 def bent_cigar(x: np.ndarray) -> float:
-    """Bent Cigar function."""
-    x = np.asarray(x, dtype=float)
-    return float(x[0]**2 + 1e6 * np.sum(x[1:]**2))
+    return _bent_cigar(np.asarray(x, dtype=float))
 
 
 def discus(x: np.ndarray) -> float:
-    """Discus function."""
-    x = np.asarray(x, dtype=float)
-    return float(1e6 * x[0]**2 + np.sum(x[1:]**2))
+    return _discus(np.asarray(x, dtype=float))
 
 
 def zakharov(x: np.ndarray) -> float:
-    """Zakharov function."""
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    i = np.arange(1, n + 1)
-    s1 = np.sum(x**2)
-    s2 = np.sum(0.5 * i * x)
-    return float(s1 + s2**2 + s2**4)
+    return _zakharov(np.asarray(x, dtype=float))
 
 
 def rosenbrock(x: np.ndarray) -> float:
-    """Rosenbrock function con transformación CEC (mínimo 0 en x=0)."""
-    x = np.asarray(x, dtype=float) * (2.048 / 100.0) + 1.0
-    if len(x) <= 1:
-        return 0.0
-    return float(np.sum(100.0 * (x[1:] - x[:-1]**2)**2 + (x[:-1] - 1.0)**2))
+    return _rosenbrock(np.asarray(x, dtype=float) * (2.048 / 100.0))
 
 
 def schaffer_f6(x_i: float, x_j: float) -> float:
-    """Schaffer's F6 function para dos variables."""
-    num = np.sin(np.sqrt(x_i**2 + x_j**2))**2 - 0.5
-    den = (1.0 + 0.001 * (x_i**2 + x_j**2))**2
-    return 0.5 + num / den
+    q = x_i * x_i + x_j * x_j
+    return float(0.5 + (np.sin(np.sqrt(q)) ** 2 - 0.5) / (1.0 + 0.001 * q) ** 2)
 
 
 def expanded_schaffer_f6(x: np.ndarray) -> float:
-    """Expanded Schaffer's F6 function."""
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    if n <= 1:
-        return 0.0
-    total = 0.0
-    for i in range(n - 1):
-        total += schaffer_f6(x[i], x[i + 1])
-    total += schaffer_f6(x[-1], x[0])
-    return float(total)
+    return _expanded_schaffer_f6(np.asarray(x, dtype=float))
 
 
 def rastrigin(x: np.ndarray) -> float:
-    """Rastrigin function con escalado CEC."""
-    x = np.asarray(x, dtype=float) * (5.12 / 100.0)
-    return float(np.sum(x**2 - 10.0 * np.cos(2.0 * np.pi * x) + 10.0))
+    return _rastrigin(np.asarray(x, dtype=float) * (5.12 / 100.0))
 
 
 def non_continuous_rastrigin(x: np.ndarray) -> float:
-    """Non-continuous Rastrigin function con escalado CEC."""
-    x = np.asarray(x, dtype=float) * (5.12 / 100.0)
-    y = np.where(np.abs(x) < 0.5, x, np.round(2.0 * x) / 2.0)
-    return float(np.sum(y**2 - 10.0 * np.cos(2.0 * np.pi * y) + 10.0))
+    return _step_rastrigin(np.asarray(x, dtype=float) * (5.12 / 100.0))
 
 
 def levy(x: np.ndarray) -> float:
-    """Levy function con transformación CEC (mínimo 0 en x=0)."""
-    x = np.asarray(x, dtype=float) + 1.0
-    w = 1.0 + (x - 1.0) / 4.0
-    t1 = np.sin(np.pi * w[0])**2
-    t3 = (w[-1] - 1.0)**2 * (1.0 + np.sin(2.0 * np.pi * w[-1])**2)
-    t2 = np.sum((w[:-1] - 1.0)**2 * (1.0 + 10.0 * np.sin(np.pi * w[:-1] + 1.0)**2))
-    return float(t1 + t2 + t3)
+    z = np.asarray(x, dtype=float)
+    w = 1.0 + z / 4.0
+    return float(
+        np.sin(np.pi * w[0]) ** 2
+        + np.sum((w[:-1] - 1.0) ** 2 * (1.0 + 10.0 * np.sin(np.pi * w[:-1] + 1.0) ** 2))
+        + (w[-1] - 1.0) ** 2 * (1.0 + np.sin(2.0 * np.pi * w[-1]) ** 2)
+    )
 
 
 def ackley(x: np.ndarray) -> float:
-    """Ackley function."""
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    a, b, c = 20.0, 0.2, 2.0 * np.pi
-    t1 = -a * np.exp(-b * np.sqrt(np.sum(x**2) / n))
-    t2 = -np.exp(np.sum(np.cos(c * x)) / n)
-    return float(t1 + t2 + a + np.e)
-
-
-def weierstrass(x: np.ndarray, a: float = 0.5, b: float = 3.0, kmax: int = 20) -> float:
-    """Weierstrass function con escalado CEC."""
-    x = np.asarray(x, dtype=float) * (0.5 / 100.0)
-    n = len(x)
-    k = np.arange(0, kmax + 1)
-    ak = a**k
-    bk = b**k
-
-    term1 = 0.0
-    for i in range(n):
-        term1 += np.sum(ak * np.cos(2.0 * np.pi * bk * (x[i] + 0.5)))
-
-    term2 = n * np.sum(ak * np.cos(2.0 * np.pi * bk * 0.5))
-    return float(term1 - term2)
+    return _ackley(np.asarray(x, dtype=float))
 
 
 def griewank(x: np.ndarray) -> float:
-    """Griewank function con escalado CEC."""
-    x = np.asarray(x, dtype=float) * (600.0 / 100.0)
-    n = len(x)
-    s = np.sum(x**2) / 4000.0
-    p = np.prod(np.cos(x / np.sqrt(np.arange(1, n + 1))))
-    return float(s - p + 1.0)
+    return _griewank(np.asarray(x, dtype=float) * (600.0 / 100.0))
 
 
 def schwefel(x: np.ndarray) -> float:
-    """Schwefel function con límite y escalado oficial CEC (mínimo 0 en x=0)."""
-    x = np.asarray(x, dtype=float) * (1000.0 / 100.0)
-    n = len(x)
-    z = x + 420.9687462272847
-    
-    g = np.zeros(n)
-    for i in range(n):
-        zi = z[i]
-        if zi > 500.0:
-            rem = zi % 500.0
-            g[i] = (500.0 - rem) * np.sin(np.sqrt(np.abs(500.0 - rem))) - ((zi - 500.0)**2) / (10000.0 * n)
-        elif zi < -500.0:
-            rem = (-zi) % 500.0
-            g[i] = (rem - 500.0) * np.sin(np.sqrt(np.abs(rem - 500.0))) - ((zi + 500.0)**2) / (10000.0 * n)
-        else:
-            g[i] = zi * np.sin(np.sqrt(np.abs(zi)))
-            
-    return float(418.98288727243379 * n - np.sum(g))
+    return _schwefel(np.asarray(x, dtype=float) * (1000.0 / 100.0))
 
 
 def katsuura(x: np.ndarray) -> float:
-    """Katsuura function con escalado CEC."""
-    x = np.asarray(x, dtype=float) * (5.0 / 100.0)
-    n = len(x)
-    prod = 1.0
-    j_arr = 2.0**np.arange(1, 33) # 1 a 32
-    for i in range(n):
-        sum_j = np.sum(np.abs(np.round(j_arr * x[i]) - j_arr * x[i]) / j_arr)
-        prod *= (1.0 + (i + 1) * sum_j)**(10.0 / n**1.2)
-    return float((10.0 / n**2) * prod - (10.0 / n**2))
+    return _katsuura(np.asarray(x, dtype=float) * (5.0 / 100.0))
 
 
 def happycat(x: np.ndarray) -> float:
-    """HappyCat function con transformación CEC (mínimo 0 en x=0)."""
-    x = np.asarray(x, dtype=float) * (5.0 / 100.0) - 1.0
-    n = len(x)
-    sum_sq = np.sum(x**2)
-    sum_x = np.sum(x)
-    t1 = np.abs(sum_sq - n)**0.25
-    t2 = (0.5 * sum_sq + sum_x) / n
-    return float(t1 + t2 + 0.5)
+    return _happycat(np.asarray(x, dtype=float) * (5.0 / 100.0))
 
 
 def hgbat(x: np.ndarray) -> float:
-    """HGBat function con transformación CEC (mínimo 0 en x=0)."""
-    x = np.asarray(x, dtype=float) * (5.0 / 100.0) - 1.0
-    n = len(x)
-    sum_sq = np.sum(x**2)
-    sum_x = np.sum(x)
-    t1 = np.abs(sum_sq**2 - sum_x**2)**0.5
-    t2 = (0.5 * sum_sq + sum_x) / n
-    return float(t1 + t2 + 0.5)
+    return _hgbat(np.asarray(x, dtype=float) * (5.0 / 100.0))
 
 
 def grie_rosen(x: np.ndarray) -> float:
-    """Expanded Griewank plus Rosenbrock (Grie-Rosen)."""
-    x = np.asarray(x, dtype=float) * (5.0 / 100.0)
-    n = len(x)
-    if n <= 1:
-        return 0.0
-    z = x + 1.0
-    total = 0.0
-    for i in range(n - 1):
-        # rosenbrock directo sobre par z sin re-escalar
-        r = 100.0 * (z[i+1] - z[i]**2)**2 + (z[i] - 1.0)**2
-        # griewank directo sobre r
-        g = r**2 / 4000.0 - np.cos(r) + 1.0
-        total += g
-    r_last = 100.0 * (z[0] - z[-1]**2)**2 + (z[-1] - 1.0)**2
-    g_last = r_last**2 / 4000.0 - np.cos(r_last) + 1.0
-    total += g_last
-    return float(total)
+    return _grie_rosen(np.asarray(x, dtype=float) * (5.0 / 100.0))
 
 
-# ============================================================================
-# 2. OPERADORES TRANSFORMACIÓN (SHIFT, ROTATE, HYBRID & COMPOSITION)
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Official data loading and transformations
+# ---------------------------------------------------------------------------
 
 def shift(x: np.ndarray, o: np.ndarray) -> np.ndarray:
-    """Aplica vector de desplazamiento (shift): z = x - o."""
     return np.asarray(x, dtype=float) - np.asarray(o, dtype=float)
 
 
-def rotate(x: np.ndarray, M: np.ndarray) -> np.ndarray:
-    """Aplica matriz de rotación: z = M * x."""
-    return np.dot(np.asarray(M, dtype=float), np.asarray(x, dtype=float))
+def rotate(x: np.ndarray, matrix: np.ndarray) -> np.ndarray:
+    return np.asarray(matrix, dtype=float) @ np.asarray(x, dtype=float)
 
 
-def sr_func(x: np.ndarray, o: np.ndarray, M: np.ndarray, sh_flag: bool = True, rot_flag: bool = True) -> np.ndarray:
-    """Aplica shift y rotación según banderas."""
+def _transform(
+    x: np.ndarray,
+    o: Optional[np.ndarray],
+    matrix: Optional[np.ndarray],
+    rate: float,
+    rotate_flag: bool = True,
+) -> np.ndarray:
     z = np.asarray(x, dtype=float)
-    if sh_flag:
-        z = shift(z, o)
-    if rot_flag:
-        z = rotate(z, M)
+    if o is not None:
+        z = z - np.asarray(o, dtype=float)
+    z = z * rate
+    if rotate_flag and matrix is not None:
+        z = np.asarray(matrix, dtype=float) @ z
     return z
 
 
-def hybrid_func(x: np.ndarray, sub_funcs: List[Callable[[np.ndarray], float]],
-                proportions: List[float], o: np.ndarray, M: np.ndarray) -> float:
-    """
-    Evalúa una función híbrida dividiendo la solución en sub-vectores según proporciones.
-    """
-    z = sr_func(x, o, M)
-    n = len(z)
-    num_funcs = len(sub_funcs)
-    
-    # Calcular tamaños de sub-vectores
-    sizes = [int(p * n) for p in proportions]
-    sizes[-1] = n - sum(sizes[:-1]) # asegurar suma igual a n
-    
+def _read_required(path: str) -> np.ndarray:
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"Falta el archivo oficial de CEC2022: {path}. "
+            "Instala los archivos de input_data antes de ejecutar el benchmark."
+        )
+    return np.loadtxt(path)
+
+
+def get_shift_matrix_data(
+    func_num: int, n_dim: int, num_subfuncs: int = 1
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    """Load the official shifts and rotation matrices for a function."""
+    raw_shift = np.asarray(_read_required(os.path.join(DATA_DIR, f"shift_data_{func_num}.txt")), dtype=float)
+    raw_matrix = np.asarray(_read_required(os.path.join(DATA_DIR, f"M_{func_num}_D{n_dim}.txt")), dtype=float)
+    if num_subfuncs == 1:
+        return [raw_shift.reshape(-1)[:n_dim]], [raw_matrix.reshape(-1, n_dim)[:n_dim, :n_dim]]
+    shift_rows = raw_shift.reshape(-1, 100)[:num_subfuncs, :n_dim]
+    matrix_rows = raw_matrix.reshape(-1, n_dim)
+    shifts = [row.copy() for row in shift_rows]
+    matrices = [matrix_rows[i * n_dim : (i + 1) * n_dim, :n_dim].copy() for i in range(num_subfuncs)]
+    return shifts, matrices
+
+
+def _get_shuffle_data(func_num: int, n_dim: int) -> np.ndarray:
+    path = os.path.join(DATA_DIR, f"shuffle_data_{func_num}_D{n_dim}.txt")
+    return np.asarray(_read_required(path), dtype=int).reshape(-1)
+
+
+def _validate_dimension(func_num: int, n_dim: int) -> None:
+    if n_dim not in SUPPORTED_DIMENSIONS:
+        raise ValueError(f"CEC2022 solo define D={SUPPORTED_DIMENSIONS}; se recibió D={n_dim}.")
+    if func_num in (6, 7, 8) and n_dim == 2:
+        raise ValueError(f"CEC2022 F{func_num} no está definida para D=2.")
+
+
+# ---------------------------------------------------------------------------
+# CEC2022 functions
+# ---------------------------------------------------------------------------
+
+_RATES = {
+    "zakharov": 1.0, "rosenbrock": 2.048 / 100.0, "schaffer_f7": 1.0,
+    "step_rastrigin": 5.12 / 100.0, "levy": 1.0, "bent_cigar": 1.0,
+    "hgbat": 5.0 / 100.0, "rastrigin": 5.12 / 100.0, "katsuura": 5.0 / 100.0,
+    "ackley": 1.0, "schwefel": 1000.0 / 100.0, "happycat": 5.0 / 100.0,
+    "grie_rosen": 5.0 / 100.0, "escaffer6": 1.0, "griewank": 600.0 / 100.0,
+    "ellips": 1.0, "discus": 1.0,
+}
+
+_RAW_FUNCTIONS = {
+    "zakharov": _zakharov, "rosenbrock": _rosenbrock, "schaffer_f7": _schaffer_f7,
+    "step_rastrigin": _step_rastrigin, "levy": levy, "bent_cigar": _bent_cigar,
+    "hgbat": _hgbat, "rastrigin": _rastrigin, "katsuura": _katsuura,
+    "ackley": _ackley, "schwefel": _schwefel, "happycat": _happycat,
+    "grie_rosen": _grie_rosen, "escaffer6": _expanded_schaffer_f6,
+    "griewank": _griewank, "ellips": _ellips, "discus": _discus,
+}
+
+
+def _component(
+    name: str,
+    x: np.ndarray,
+    o: Optional[np.ndarray] = None,
+    matrix: Optional[np.ndarray] = None,
+    rotate_flag: bool = True,
+) -> float:
+    z = _transform(x, o, matrix, _RATES[name], rotate_flag)
+    return float(_RAW_FUNCTIONS[name](z))
+
+
+def _hybrid(
+    x: np.ndarray,
+    o: np.ndarray,
+    matrix: np.ndarray,
+    shuffle_data: np.ndarray,
+    names: Sequence[str],
+    proportions: Sequence[float],
+) -> float:
+    z = _transform(x, o, matrix, 1.0)
+    shuffled = z[shuffle_data.astype(int) - 1]
+    sizes = [int(np.ceil(p * z.size)) for p in proportions[:-1]]
+    sizes.append(z.size - sum(sizes))
     total = 0.0
     start = 0
-    for idx in range(num_funcs):
-        end = start + sizes[idx]
-        sub_vec = z[start:end]
-        if len(sub_vec) > 0:
-            total += sub_funcs[idx](sub_vec)
-        start = end
-    return total
+    for name, size in zip(names, sizes):
+        total += _component(name, shuffled[start : start + size])
+        start += size
+    return float(total)
 
 
-def composition_func(x: np.ndarray, sub_funcs: List[Callable[[np.ndarray], float]],
-                     centros: List[np.ndarray], matrices: List[np.ndarray],
-                     sigmas: List[float], lambdas: List[float],
-                     biases: List[float]) -> float:
-    """
-    Evalúa una función de composición combinando subfunciones con pesos gaussianos.
-    """
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    N = len(sub_funcs)
-    
-    weights = np.zeros(N)
-    fit_vals = np.zeros(N)
-    
-    for i in range(N):
-        o_i = centros[i]
-        M_i = matrices[i]
-        sigma_i = sigmas[i]
-        lambda_i = lambdas[i]
-        
-        diff = x - o_i
-        dist2 = np.sum(diff**2)
-        
-        if dist2 < 1e-15:
-            weights[i] = 1e300 # peso infinitésimo dominante en el centro exacto
+def _composition(
+    x: np.ndarray,
+    shifts: Sequence[np.ndarray],
+    matrices: Sequence[np.ndarray],
+    names: Sequence[str],
+    deltas: Sequence[float],
+    component_biases: Sequence[float],
+    normalizers: Sequence[float],
+    rotate_flags: Optional[Sequence[bool]] = None,
+) -> float:
+    if rotate_flags is None:
+        rotate_flags = [True] * len(names)
+    fits = np.empty(len(names), dtype=float)
+    weights = np.empty(len(names), dtype=float)
+    for i, (name, o, matrix, delta, bias, normalizer, rotate_flag) in enumerate(
+        zip(names, shifts, matrices, deltas, component_biases, normalizers, rotate_flags)
+    ):
+        fits[i] = 10000.0 * _component(name, x, o, matrix, rotate_flag) / normalizer + bias
+        distance2 = float(np.sum((x - o) ** 2))
+        if distance2 == 0.0:
+            weights[i] = np.inf
         else:
-            weights[i] = (1.0 / np.sqrt(dist2)) * np.exp(-dist2 / (2.0 * n * sigma_i**2))
-            
-        z_i = rotate(diff, M_i)
-        g_val = sub_funcs[i](z_i / lambda_i)
-        fit_vals[i] = lambda_i * g_val + biases[i]
-        
-    w_sum = np.sum(weights)
-    if w_sum == 0 or np.isinf(w_sum) or np.isnan(w_sum):
-        weights = np.ones(N) / N
+            weights[i] = (1.0 / np.sqrt(distance2)) * np.exp(
+                -distance2 / (2.0 * x.size * delta**2)
+            )
+    infinite = np.flatnonzero(np.isinf(weights))
+    if infinite.size:
+        return float(fits[infinite[0]])
+    weight_sum = float(np.sum(weights))
+    if not np.isfinite(weight_sum) or weight_sum == 0.0:
+        weights.fill(1.0 / len(weights))
     else:
-        weights = weights / w_sum
-        
-    return float(np.sum(weights * fit_vals))
+        weights /= weight_sum
+    return float(np.dot(weights, fits))
 
 
-# ============================================================================
-# 3. CARGADOR Y GENERADOR DE MATRICES SHIFT Y ROTACIÓN
-# ============================================================================
-
-def _generate_orthogonal_matrix(n: int, rng: np.random.Generator) -> np.ndarray:
-    """Genera una matriz de rotación ortogonal N x N usando QR."""
-    A = rng.normal(0, 1, (n, n))
-    Q, R = np.linalg.qr(A)
-    # Asegurar determinante 1 (rotación pura)
-    d = np.diag(R)
-    ph = d / np.abs(d)
-    Q = Q @ np.diag(ph)
-    if np.linalg.det(Q) < 0:
-        Q[:, 0] = -Q[:, 0]
-    return Q
+def _f1(x, data):
+    return _component("zakharov", x, data[0][0], data[1][0]) + CEC_BIASES[1]
 
 
-def get_shift_matrix_data(func_num: int, n_dim: int, num_subfuncs: int = 1) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-    """
-    Obtiene los vectores de shift y matrices de rotación para una función y dimensión.
-    Si los archivos oficiales existen en input_data/, los carga.
-    De lo contrario, los genera de manera estricta y reproducible (semilla fija).
-    """
-    shift_file = os.path.join(DATA_DIR, f"shift_data_{func_num}.txt")
-    rot_file = os.path.join(DATA_DIR, f"M_{func_num}_D{n_dim}.txt")
-    
-    if os.path.exists(shift_file) and os.path.exists(rot_file):
-        try:
-            raw_shifts = np.loadtxt(shift_file)
-            raw_rot = np.loadtxt(rot_file)
-            
-            shifts = []
-            rots = []
-            if num_subfuncs == 1:
-                shifts.append(raw_shifts[:n_dim])
-                rots.append(raw_rot[:n_dim, :n_dim])
-            else:
-                for i in range(num_subfuncs):
-                    shifts.append(raw_shifts[i, :n_dim])
-                    rots.append(raw_rot[i * n_dim:(i + 1) * n_dim, :n_dim])
-            return shifts, rots
-        except Exception:
-            pass # Si ocurre error al cargar, cae al generador reproducible
-
-    # Generador reproducible si no hay archivos externos
-    seed = 1000 + func_num * 100 + n_dim
-    rng = np.random.default_rng(seed)
-    
-    shifts = []
-    rots = []
-    for _ in range(num_subfuncs):
-        # Shift aleatorio en [-80, 80]
-        s = rng.uniform(-80.0, 80.0, size=n_dim)
-        M = _generate_orthogonal_matrix(n_dim, rng)
-        shifts.append(s)
-        rots.append(M)
-        
-    return shifts, rots
+def _f2(x, data):
+    return _component("rosenbrock", x, data[0][0], data[1][0]) + CEC_BIASES[2]
 
 
-# ============================================================================
-# 4. DEFINICIÓN OFICIAL DE LAS 12 FUNCIONES CEC 2022
-# ============================================================================
+def _f3(x, data):
+    return _component("schaffer_f7", x, data[0][0], data[1][0]) + CEC_BIASES[3]
 
-OFFICIAL_BIASES = {
-    1: 300.0,
-    2: 400.0,
-    3: 600.0,
-    4: 800.0,
-    5: 900.0,
-    6: 1800.0,
-    7: 2000.0,
-    8: 2200.0,
-    9: 2300.0,
-    10: 2400.0,
-    11: 2600.0,
-    12: 2700.0,
+
+def _f4(x, data):
+    return _component("step_rastrigin", x, data[0][0], data[1][0]) + CEC_BIASES[4]
+
+
+def _f5(x, data):
+    return _component("levy", x, data[0][0], data[1][0]) + CEC_BIASES[5]
+
+
+def _f6(x, data):
+    return _hybrid(x, data[0][0], data[1][0], _get_shuffle_data(6, x.size),
+                   ("bent_cigar", "hgbat", "rastrigin"), (0.4, 0.4, 0.2)) + CEC_BIASES[6]
+
+
+def _f7(x, data):
+    return _hybrid(x, data[0][0], data[1][0], _get_shuffle_data(7, x.size),
+                   ("hgbat", "katsuura", "ackley", "rastrigin", "schwefel", "schaffer_f7"),
+                   (0.1, 0.2, 0.2, 0.2, 0.1, 0.2)) + CEC_BIASES[7]
+
+
+def _f8(x, data):
+    return _hybrid(x, data[0][0], data[1][0], _get_shuffle_data(8, x.size),
+                   ("katsuura", "happycat", "grie_rosen", "schwefel", "ackley"),
+                   (0.3, 0.2, 0.2, 0.1, 0.2)) + CEC_BIASES[8]
+
+
+def _f9(x, data):
+    return _composition(
+        x, data[0], data[1],
+        ("rosenbrock", "ellips", "bent_cigar", "discus", "ellips"),
+        (10, 20, 30, 40, 50), (0, 200, 300, 100, 400),
+        (1e4, 1e10, 1e30, 1e10, 1e10), (True, True, True, True, False),
+    ) + CEC_BIASES[9]
+
+
+def _f10(x, data):
+    return _composition(
+        x, data[0], data[1], ("schwefel", "rastrigin", "hgbat"),
+        (20, 10, 10), (0, 200, 100), (10000, 10000, 10000), (False, True, True),
+    ) + CEC_BIASES[10]
+
+
+def _f11(x, data):
+    return _composition(
+        x, data[0], data[1], ("escaffer6", "schwefel", "griewank", "rosenbrock", "rastrigin"),
+        (20, 20, 30, 30, 20), (0, 200, 300, 400, 200),
+        (2e7, 10000, 1000, 10000, 1000),
+    ) + CEC_BIASES[11]
+
+
+def _f12(x, data):
+    return _composition(
+        x, data[0], data[1],
+        ("hgbat", "rastrigin", "schwefel", "bent_cigar", "ellips", "escaffer6"),
+        (10, 20, 30, 40, 50, 60), (0, 300, 500, 100, 400, 200),
+        (1000, 1000, 4000, 1e30, 1e10, 2e7),
+    ) + CEC_BIASES[12]
+
+
+_NUM_SUBFUNCTIONS = {
+    1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1,
+    9: 5, 10: 3, 11: 5, 12: 6,
 }
-
-def cec2022_f1(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F1: Shifted and Rotated Zakharov Function (Unimodal). Bias = 300."""
-    z = sr_func(x, shifts[0], rots[0])
-    return zakharov(z) + OFFICIAL_BIASES[1]
-
-
-def cec2022_f2(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F2: Shifted and Rotated Rosenbrock Function (Basic Multimodal). Bias = 400."""
-    z = sr_func(x, shifts[0], rots[0])
-    return rosenbrock(z) + OFFICIAL_BIASES[2]
-
-
-def cec2022_f3(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F3: Shifted and Rotated Expanded Schaffer's f6 Function (Basic Multimodal). Bias = 600."""
-    z = sr_func(x, shifts[0], rots[0])
-    return expanded_schaffer_f6(z) + OFFICIAL_BIASES[3]
-
-
-def cec2022_f4(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F4: Shifted and Rotated Non-Continuous Rastrigin Function (Basic Multimodal). Bias = 800."""
-    z = sr_func(x, shifts[0], rots[0])
-    return non_continuous_rastrigin(z) + OFFICIAL_BIASES[4]
-
-
-def cec2022_f5(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F5: Shifted and Rotated Levy Function (Basic Multimodal). Bias = 900."""
-    z = sr_func(x, shifts[0], rots[0])
-    return levy(z) + OFFICIAL_BIASES[5]
-
-
-def cec2022_f6(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F6: Hybrid Function 1 (N=3). Bias = 1800."""
-    sub_funcs = [bent_cigar, rastrigin, expanded_schaffer_f6]
-    props = [0.4, 0.3, 0.3]
-    return hybrid_func(x, sub_funcs, props, shifts[0], rots[0]) + OFFICIAL_BIASES[6]
-
-
-def cec2022_f7(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F7: Hybrid Function 2 (N=6). Bias = 2000."""
-    sub_funcs = [hgbat, katsuura, ackley, rastrigin, schwefel, expanded_schaffer_f6]
-    props = [0.1, 0.2, 0.2, 0.2, 0.15, 0.15]
-    return hybrid_func(x, sub_funcs, props, shifts[0], rots[0]) + OFFICIAL_BIASES[7]
-
-
-def cec2022_f8(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F8: Hybrid Function 3 (N=5). Bias = 2200."""
-    sub_funcs = [katsuura, happycat, grie_rosen, schwefel, ackley]
-    props = [0.2, 0.2, 0.2, 0.2, 0.2]
-    return hybrid_func(x, sub_funcs, props, shifts[0], rots[0]) + OFFICIAL_BIASES[8]
-
-
-def cec2022_f9(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F9: Composition Function 1 (N=5). Bias = 2300."""
-    sub_funcs = [rosenbrock, bent_cigar, rastrigin, ackley, schwefel]
-    sigmas = [10.0, 20.0, 30.0, 40.0, 50.0]
-    lambdas = [1.0, 1.0, 1.0, 1.0, 1.0]
-    sub_biases = [0.0, 100.0, 200.0, 300.0, 400.0]
-    return composition_func(x, sub_funcs, shifts, rots, sigmas, lambdas, sub_biases) + OFFICIAL_BIASES[9]
-
-
-def cec2022_f10(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F10: Composition Function 2 (N=4). Bias = 2400."""
-    sub_funcs = [ackley, bent_cigar, griewank, rastrigin]
-    sigmas = [10.0, 20.0, 30.0, 40.0]
-    lambdas = [1.0, 1.0, 1.0, 1.0]
-    sub_biases = [0.0, 100.0, 200.0, 300.0]
-    return composition_func(x, sub_funcs, shifts, rots, sigmas, lambdas, sub_biases) + OFFICIAL_BIASES[10]
-
-
-def cec2022_f11(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F11: Composition Function 3 (N=5). Bias = 2600."""
-    sub_funcs = [expanded_schaffer_f6, schwefel, rosenbrock, rastrigin, bent_cigar]
-    sigmas = [10.0, 20.0, 30.0, 40.0, 50.0]
-    lambdas = [1.0, 1.0, 1.0, 1.0, 1.0]
-    sub_biases = [0.0, 100.0, 200.0, 300.0, 400.0]
-    return composition_func(x, sub_funcs, shifts, rots, sigmas, lambdas, sub_biases) + OFFICIAL_BIASES[11]
-
-
-def cec2022_f12(x: np.ndarray, shifts: List[np.ndarray], rots: List[np.ndarray]) -> float:
-    """F12: Composition Function 4 (N=6). Bias = 2700."""
-    sub_funcs = [hgbat, rastrigin, schwefel, bent_cigar, discus, expanded_schaffer_f6]
-    sigmas = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0]
-    lambdas = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    sub_biases = [0.0, 100.0, 200.0, 300.0, 400.0, 500.0]
-    return composition_func(x, sub_funcs, shifts, rots, sigmas, lambdas, sub_biases) + OFFICIAL_BIASES[12]
-
-
-# ============================================================================
-# 5. FUNCIÓN MAESTRA Y CATÁLOGO CONTINUO
-# ============================================================================
-
-_FUNC_DISPATCH = {
-    1: (cec2022_f1, 1),
-    2: (cec2022_f2, 1),
-    3: (cec2022_f3, 1),
-    4: (cec2022_f4, 1),
-    5: (cec2022_f5, 1),
-    6: (cec2022_f6, 1),
-    7: (cec2022_f7, 1),
-    8: (cec2022_f8, 1),
-    9: (cec2022_f9, 5),
-    10: (cec2022_f10, 4),
-    11: (cec2022_f11, 5),
-    12: (cec2022_f12, 6),
-}
-
-# Caché interno para matrices de shift y rotación por (func_num, n_dim)
+_FUNCTIONS = {1: _f1, 2: _f2, 3: _f3, 4: _f4, 5: _f5, 6: _f6, 7: _f7, 8: _f8,
+              9: _f9, 10: _f10, 11: _f11, 12: _f12}
 _DATA_CACHE: Dict[Tuple[int, int], Tuple[List[np.ndarray], List[np.ndarray]]] = {}
 
 
 def get_cec2022_data(func_num: int, n_dim: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-    """Devuelve (shifts, rots) desde la caché o los carga/genera."""
+    if func_num not in _FUNCTIONS:
+        raise ValueError(f"Número de función inválido: {func_num}. Debe estar entre 1 y 12.")
+    _validate_dimension(func_num, n_dim)
     key = (func_num, n_dim)
     if key not in _DATA_CACHE:
-        _, num_subfuncs = _FUNC_DISPATCH[func_num]
-        _DATA_CACHE[key] = get_shift_matrix_data(func_num, n_dim, num_subfuncs)
+        _DATA_CACHE[key] = get_shift_matrix_data(func_num, n_dim, _NUM_SUBFUNCTIONS[func_num])
     return _DATA_CACHE[key]
 
 
 def cec2022_func(x: np.ndarray, func_num: int, n_dim: Optional[int] = None) -> float:
-    """
-    Función Maestra de Benchmark CEC 2022.
-
-    Parámetros
-    ----------
-    x : np.ndarray
-        Vector de solución de dimensión nD.
-    func_num : int
-        Número de función CEC 2022 (1 a 12).
-    n_dim : Optional[int]
-        Dimensión de la función (si es None, se usa len(x)).
-
-    Retorna
-    -------
-    float
-        Valor de fitness (minimización).
-    """
-    if func_num not in _FUNC_DISPATCH:
+    """Evaluate one official CEC2022 function for a single decision vector."""
+    if func_num not in _FUNCTIONS:
         raise ValueError(f"Número de función inválido: {func_num}. Debe estar entre 1 y 12.")
-
     x_arr = np.asarray(x, dtype=float)
+    if x_arr.ndim != 1:
+        raise ValueError("cec2022_func espera un vector unidimensional.")
     if n_dim is None:
-        n_dim = len(x_arr)
-        
-    fn_impl, _ = _FUNC_DISPATCH[func_num]
-    shifts, rots = get_cec2022_data(func_num, n_dim)
-    
-    return fn_impl(x_arr, shifts, rots)
+        n_dim = x_arr.size
+    if x_arr.size != n_dim:
+        raise ValueError(f"La dimensión de x ({x_arr.size}) no coincide con n_dim ({n_dim}).")
+    data = get_cec2022_data(func_num, n_dim)
+    return float(_FUNCTIONS[func_num](x_arr, data))
 
 
 def get_cec2022_optimum_point(func_num: int, n_dim: int) -> np.ndarray:
-    """Devuelve el vector x óptimo conocido para una función y dimensión dada."""
-    shifts, _ = get_cec2022_data(func_num, n_dim)
-    return shifts[0].copy()
+    """Return the first official shift vector used as the known optimum point."""
+    return get_cec2022_data(func_num, n_dim)[0][0].copy()
 
 
 def get_test_functions(n_dim: int = 20) -> List[ContinuousFunction]:
-    """Retorna los descroptores de las 12 funciones del conjunto CEC 2022."""
+    """Return descriptors for the 12 CEC2022 functions."""
     names = [
-        "F1_Zakharov_Shifted_Rotated",
-        "F2_Rosenbrock_Shifted_Rotated",
-        "F3_Expanded_Schaffer_F6",
-        "F4_NonContinuous_Rastrigin",
-        "F5_Levy_Shifted_Rotated",
+        "F1_Shifted_Rotated_Zakharov",
+        "F2_Shifted_Rotated_Rosenbrock",
+        "F3_Shifted_Rotated_Expanded_Schaffers_F7",
+        "F4_Shifted_Rotated_NonContinuous_Rastrigin",
+        "F5_Shifted_Rotated_Levy",
         "F6_Hybrid_Function_1",
         "F7_Hybrid_Function_2",
         "F8_Hybrid_Function_3",
@@ -573,21 +514,17 @@ def get_test_functions(n_dim: int = 20) -> List[ContinuousFunction]:
         "F11_Composition_Function_3",
         "F12_Composition_Function_4",
     ]
-    
-    functions = []
-    for num in range(1, 13):
-        # Closure seguro para congelar func_num
-        def make_func(f_num: int):
-            return lambda x: cec2022_func(x, f_num, n_dim)
-            
-        functions.append(
-            ContinuousFunction(
-                name    = names[num-1],
-                func    = make_func(num),
-                lb      = -100.0,
-                ub      = 100.0,
-                optimum = OFFICIAL_BIASES[num],
-                n_dim   = n_dim,
-            )
+    _validate_dimension(1, n_dim)
+    if n_dim == 2:
+        raise ValueError("get_test_functions requiere D=10 o D=20 porque F6-F8 no están definidas para D=2.")
+    return [
+        ContinuousFunction(
+            name=name,
+            func=lambda x, f_num=num: cec2022_func(x, f_num, n_dim),
+            lb=-100.0,
+            ub=100.0,
+            optimum=CEC_BIASES[num],
+            n_dim=n_dim,
         )
-    return functions
+        for num, name in enumerate(names, start=1)
+    ]
