@@ -1,23 +1,18 @@
-# Análisis Estadístico Inferencial — Batch MKP HPC (9 instancias)
+# Análisis estadístico global válido — MKP
 
-- **Runs independientes:** 31
-- **Referencia (control):** `mknapcb1_inst00`
-- **Métrica:** Fitness (Maximización MKP)
-- **Friedman χ²:** `245.9527`  |  p-value = `1.241660e-48`  ✅ Diferencia significativa
+> No se comparan valores objetivos crudos entre instancias MKP, porque tienen escalas y BKS diferentes. Cada fila resume pruebas Wilcoxon híbrido–algoritmo base dentro de la misma instancia.
 
-## Tabla de Resultados y p-valores
+- **Corrección:** Holm dentro de cada instancia ($\alpha=0.05$)
+- **Total híbrido:** +41 / =15 / -7 (victorias/similares/derrotas significativas)
 
-| Rank | Algoritmo | Mean Rank | Media | Std | Mediana | IC 95% | Shapiro p | Wilcoxon p | Significancia |
-|------|-----------|-----------|-------|-----|---------|--------|-----------|------------|---------------|
-| 1 | `mknapcb3_inst00` | 1.00 | `117369.967742` | `388.959679` | `117282.000000` | [117233.0437, 117506.8918] | `2.0264e-01` | `9.3132e-10` | **Mejor (+) ***** |
-| 2 | `mknapcb6_inst00` | 2.00 | `114760.612903` | `434.747488` | `114830.000000` | [114607.5703, 114913.6555] | `4.5410e-01` | `1.1728e-06` | **Mejor (+) ***** |
-| 3 | `mknapcb9_inst00` | 3.00 | `113115.096774` | `433.380999` | `113199.000000` | [112962.5352, 113267.6583] | `1.4742e-01` | `9.3132e-10` | **Mejor (+) ***** |
-| 4 | `mknapcb5_inst00` | 4.45 | `58150.290323` | `189.480376` | `58138.000000` | [58083.5882, 58216.9924] | `8.5769e-02` | `1.1735e-06` | **Mejor (+) ***** |
-| 5 | `mknapcb2_inst00` | 4.55 | `58168.419355` | `251.204667` | `58248.000000` | [58079.9887, 58256.8500] | `2.3404e-01` | `1.1735e-06` | **Mejor (+) ***** |
-| 6 | `mknapcb8_inst00` | 6.00 | `55451.129032` | `244.734787` | `55499.000000` | [55364.9759, 55537.2821] | `1.1808e-01` | `9.3132e-10` | **Mejor (+) ***** |
-| 7 | **`mknapcb1_inst00`** | 7.00 | `24142.838710` | `102.533278` | `24152.000000` | [24106.7443, 24178.9331] | `3.2219e-02` | `1.0000e+00` | **=** |
-| 8 | `mknapcb4_inst00` | 8.00 | `22821.967742` | `132.468231` | `22741.000000` | [22775.3354, 22868.6001] | `1.0376e-03` | `1.1735e-06` | **Peor (-) ***** |
-| 9 | `mknapcb7_inst00` | 9.00 | `21691.935484` | `72.507441` | `21676.000000` | [21666.4110, 21717.4600] | `7.1174e-04` | `9.3132e-10` | **Peor (-) ***** |
-
-
-*Leyenda:* `*** p < 0.001`, `** p < 0.01`, `* p < 0.05`, `ns: p ≥ 0.05`.
+| Instancia | Media híbrido | Mejor | BKS | Gap medio (%) | Gap mejor (%) | + | = | - | Significancia estadística |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| `mknapcb1_inst00` | 24142.839 | 24276.000 | 24381.000 | 0.977 | 0.431 | 2 | 4 | 1 | Mixta significativa (+2/=4/-1) |
+| `mknapcb2_inst00` | 58168.419 | 58849.000 | 59312.000 | 1.928 | 0.781 | 6 | 0 | 1 | Mixta significativa (+6/=0/-1) |
+| `mknapcb3_inst00` | 117369.968 | 118015.000 | 120130.000 | 2.298 | 1.761 | 6 | 0 | 1 | Mixta significativa (+6/=0/-1) |
+| `mknapcb4_inst00` | 22821.968 | 23030.000 | 23064.000 | 1.049 | 0.147 | 2 | 4 | 1 | Mixta significativa (+2/=4/-1) |
+| `mknapcb5_inst00` | 58150.290 | 58425.000 | 59187.000 | 1.752 | 1.287 | 6 | 1 | 0 | Favorable significativa (+6/=1/-0) |
+| `mknapcb6_inst00` | 114760.613 | 115701.000 | 117726.000 | 2.519 | 1.720 | 6 | 1 | 0 | Favorable significativa (+6/=1/-0) |
+| `mknapcb7_inst00` | 21691.935 | 21772.000 | 21946.000 | 1.158 | 0.793 | 4 | 1 | 2 | Mixta significativa (+4/=1/-2) |
+| `mknapcb8_inst00` | 55451.129 | 55988.000 | 56693.000 | 2.191 | 1.244 | 3 | 3 | 1 | Mixta significativa (+3/=3/-1) |
+| `mknapcb9_inst00` | 113115.097 | 113974.000 | 115868.000 | 2.376 | 1.635 | 6 | 1 | 0 | Favorable significativa (+6/=1/-0) |

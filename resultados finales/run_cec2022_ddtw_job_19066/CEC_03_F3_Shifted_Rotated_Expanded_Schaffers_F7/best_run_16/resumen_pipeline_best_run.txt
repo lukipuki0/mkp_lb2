@@ -1,0 +1,13 @@
+Funcion            : CEC 3 (F3_Shifted_Rotated_Expanded_Schaffers_F7) (Mejor Run #16)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 600.000000
+Mejor valor global : 600.017585
+Estado del mejor   : Peor que el óptimo
+Total switches     : 5
+
+1. ACO (poblacional) | mejor=600.053421 | 0.0s-1.0s | iters=300
+2. PSO (poblacional) | mejor=600.017720 | 1.0s-1.9s | iters=300
+3. EHO (poblacional) | mejor=600.017714 | 1.9s-2.6s | iters=196
+4. PSO (poblacional) | mejor=600.017714 | 2.6s-2.8s | iters=108
+5. WOA (poblacional) | mejor=600.017585 | 2.8s-3.2s | iters=165

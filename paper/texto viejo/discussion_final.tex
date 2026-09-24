@@ -1,0 +1,311 @@
+% -----------------------------------------------------------------------------
+% Final discussion of the MKP, CEC2022, and HRES2--H2 results.
+% This is an input fragment, not a standalone LaTeX document.
+% Required packages: amsmath, booktabs, graphicx, and array.
+% -----------------------------------------------------------------------------
+
+\section{Discussion}
+\label{sec:discussion-final}
+
+The experiments provide consistent evidence that the proposed
+DTW/DDTW-driven rotational framework is a robust way to exploit a portfolio of
+metaheuristics across discrete, continuous, and engineering optimization
+problems (Tables~\ref{tab:final-mkp-wtl}, \ref{tab:final-cec-wtl}, and
+\ref{tab:final-hres-tests}). Its main benefit is not universal dominance on every problem, but a
+reduction in dependence on the choice of a single standalone solver. This
+distinction is important. In MKP, the framework accumulated between 40 and 41
+significant wins across 63 baseline comparisons, depending on the
+configuration, but it also incurred between 3 and 8 significant losses. In
+CEC2022, DTW and DDTW achieved the best aggregate ranks among the six evaluated
+methods, although specialized baselines remained preferable on some functions.
+In HRES2--H2, both variants produced lower mean LCOE than all ten standalone
+methods and all distributional comparisons remained significant after Holm
+correction. Taken together, these findings support the framework as an
+effective portfolio controller, while ruling out the stronger claim that it
+must outperform every constituent algorithm on every landscape.
+
+\begin{table}[htbp]
+\centering
+\caption{Cross-domain interpretation of the principal empirical findings.}
+\label{tab:discussion-synthesis}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{p{0.12\textwidth}p{0.36\textwidth}p{0.34\textwidth}p{0.30\textwidth}}
+\toprule
+Domain & Main evidence & Interpretation & Scope boundary \\
+\midrule
+MKP & DTW--3K obtained mean rank 1.22; the 3K budget reduced the average gap by 19.3\% for DTW and 21.5\% for DDTW. & Longer search materially improved solution quality, and level-based DTW was the strongest tested configuration. & Nine selected instances and no fixed-schedule or no-monitor control. \\
+CEC2022 & DTW and DDTW obtained mean ranks 2.323 and 2.358, with W/T/L totals of 38/16/6 and 37/19/4. & Both variants were competitive over heterogeneous continuous landscapes; neither alignment mode was uniformly preferable. & Dimension $D=10$, 12 functions, and five standalone baselines. \\
+HRES2--H2 & Both variants reached mean LCOE 0.267160 CNY/kWh and W/T/L $=10/0/0$; direct DTW--DDTW $p=0.593$. & The portfolio reliably reached a narrow high-quality basin, but no DTW--DDTW difference was detected. & One fixed synthetic year and independent hybrid--baseline samples. \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Portfolio adaptation across domains}
+\label{sec:discussion-cross-domain}
+
+The three domains differ in representation, objective scale, constraint
+structure, and landscape geometry. MKP is a discrete, constrained maximization
+problem with plateaus and combinatorial neighborhoods; CEC2022 contains shifted,
+rotated, hybrid, and composition functions in a continuous space; and HRES2--H2
+is a low-dimensional but tightly constrained techno-economic sizing problem in
+which every objective evaluation includes an 8,760-hour dispatch simulation.
+The fact that the framework remained competitive in all three settings is
+therefore more informative than a gain observed on a single benchmark family.
+The use of trajectory shape and run-relative percentile thresholds appears to
+make the switching rule portable across objective scales. This interpretation
+is consistent with the observed results, although the present design does not
+isolate the contribution of percentile normalization from the other framework
+components.
+
+The W/T/L profiles also clarify where the portfolio is most useful. In MKP, the
+hybrid defeated PSO on all nine instances in every configuration and generally
+performed strongly against EHO, ACO, GWO, and WOA. GA was the most difficult
+competitor, causing three significant losses in each DTW campaign and three or
+four in the DDTW campaigns. Thus, rotation does not erase the value of a
+well-matched specialist: on some discrete instances, GA remains a better choice.
+In CEC2022, the most consistent hybrid advantage was against WOA, whereas ACO
+was the strongest baseline in terms of hybrid losses. These patterns suggest
+that the framework's value is greatest when its constituent solvers provide
+complementary search behavior, rather than when one solver is already
+consistently well aligned with the problem.
+
+\subsection{MKP: budget effect and DTW--3K}
+\label{sec:discussion-mkp}
+
+The MKP results in Tables~\ref{tab:mkp_dtw_1k}--\ref{tab:mkp_ddtw_3k}
+provide the clearest discrimination among the four framework configurations.
+The global Friedman test was significant
+($\chi_F^2=24.0667$, $p=2.419\times10^{-5}$), and all six paired configuration
+contrasts remained significant after Holm correction. DTW--3K obtained the
+best mean rank (1.22) and the lowest average normalized gap (1.805\%), followed
+by DDTW--3K (rank 1.78; gap 1.876\%), DTW--1K (rank 3.11; gap 2.237\%), and
+DDTW--1K (rank 3.89; gap 2.391\%); the corrected pairwise results are reported
+in Table~\ref{tab:final-mkp-config-tests}. DTW--3K also achieved the lowest mean gap in
+seven of the nine selected instances, while DDTW--3K was best in
+\texttt{mknapcb2} and \texttt{mknapcb9}. Accordingly, DTW--3K is the best
+supported configuration for this MKP test set.
+
+The budget effect is both statistically and practically relevant. Increasing
+the search from 1,000 to 3,000 iterations reduced the average gap by 19.3\% for
+DTW and 21.5\% for DDTW. This result indicates that the hybrid had not exhausted
+its useful search dynamics at 1,000 iterations. The corresponding mean number
+of switches increased from 7.85 to 26.70 for DTW and from 16.43 to 26.96 for
+DDTW. However, switch frequency and solution quality should not be conflated:
+the logs show that more switching occurred under the longer budget, but they do
+not demonstrate that every individual rotation generated an improvement.
+
+At 1K, DDTW switched approximately twice as often as DTW while obtaining a
+higher mean gap. One plausible explanation is that derivative-based alignment
+is more sensitive to short changes around discrete plateaus and therefore
+triggers more rotations without necessarily improving the incumbent solution.
+By contrast, the absolute level information retained by DTW may be useful when
+fitness trajectories contain long plateaus separated by discrete jumps. This
+is a mechanism-level hypothesis, not a causal conclusion: it should be tested
+with event-level analyses linking each switch to subsequent improvement, and
+with controlled experiments that vary the monitoring window and patience
+parameters.
+
+The improved 3K performance also entails a computational trade-off. The
+observed mean campaign times increased from 306.94 to 756.11 seconds for DTW
+and from 256.43 to 682.21 seconds for DDTW. These measurements combine the
+larger evaluation budget, solver cost, machine conditions, and monitoring
+overhead; consequently, they quantify the empirical quality--time trade-off of
+the campaigns but do not isolate the cost of DTW or DDTW itself. A fair overhead
+study would compare identical solver trajectories with and without the monitor
+under controlled hardware and evaluation counts.
+
+\subsection{CEC2022: competitive but not universal}
+\label{sec:discussion-cec2022}
+
+The CEC2022 experiments in Table~\ref{tab:cec2022_results} show that the
+framework generalizes beyond the discrete setting. DTW and DDTW achieved the
+best aggregate mean ranks among the six evaluated algorithms, 2.323 and 2.358,
+respectively (Table~\ref{tab:final-cec-ranks}). Their Holm-adjusted W/T/L
+totals were 38/16/6 for DTW and 37/19/4 for DDTW across 60
+hybrid--baseline comparisons. All 12 function-wise Friedman tests were
+significant in each campaign, confirming that algorithm choice affected the
+observed objective values. The framework therefore offers broad competitive
+coverage, but the losses and ties show that no single hybrid variant dominated
+the entire suite.
+
+This landscape dependence is also visible in the descriptive results. DTW
+reported the best hybrid mean on F6, F7, F8, and F11, whereas DDTW did so on
+F10 and F12; on other functions, a standalone method could retain the best
+mean. At the best-run level, both variants reached the official optimum on F1,
+F5, and F11. Best-run results demonstrate attainable performance but are more
+sensitive to stochastic selection than distributions over 31 runs, so the
+rank and paired-test results should carry greater inferential weight. The large
+dispersion on F6 (standard deviations of approximately 1,821.985 for DTW and
+1,942.164 for DDTW) further illustrates why isolated best values are
+insufficient to characterize robustness.
+
+The direct DTW--DDTW comparison found no Holm-significant difference on any of
+the 12 functions. DTW had the lower unrounded mean on seven functions and a
+slightly lower average normalized mean gap (10.281\% versus 10.501\%), but the
+evidence does not support declaring one alignment modality generally superior
+for CEC2022. Equally, a non-significant result is not evidence of equivalence.
+An equivalence or non-inferiority design with a prespecified practically
+relevant margin would be required to claim that the two variants are
+interchangeable.
+
+Interestingly, switching activity in CEC2022 was much lower than in the MKP
+3K and HRES2--H2 campaigns: DTW averaged 6.20 switches and DDTW 6.01, with a
+range of four to ten. Because the stopping budgets and search spaces differ,
+these raw counts are not directly comparable as rates. Nevertheless, their
+variation across functions and domains is consistent with a data-dependent
+trigger rather than a fixed rotation timetable. A future analysis should
+normalize events by eligible monitoring iterations and relate them to
+post-switch improvement, diversity recovery, and solver identity.
+
+\subsection{HRES2--H2: statistical evidence and engineering relevance}
+\label{sec:discussion-hres2}
+
+In the engineering case, both variants converged to almost the same economic
+region (Table~\ref{tab:hres2_metrics}). Their archived mean LCOE was 0.267160 CNY/kWh, with best values of
+0.267159 CNY/kWh. The associated mean LCOH values were 17.631382 CNY/kg for DTW
+and 17.631312 CNY/kg for DDTW. The best designs also shared the same reported
+capacity pattern: approximately 174.47 MW of wind, 25.53 MW of photovoltaic
+generation, 70 MW of electrolyzers, and a 50 MW/4 h battery, with annual
+hydrogen production of approximately $8.86\times10^6$ kg. The renewable-share
+constraint was active at, or very near, its 20\% upper bound. This boundary
+solution indicates that the optimizer exploited the allowable grid support to
+minimize cost under the stated formulation.
+
+Against the ten standalone methods, all baseline mean LCOE values were higher,
+and all Mann--Whitney comparisons in Table~\ref{tab:final-hres-tests} remained significant after Holm correction,
+yielding W/T/L $=10/0/0$ for each framework variant. The magnitude of the
+improvement was nevertheless heterogeneous. The relative reduction in mean
+LCOE ranged from approximately 0.009\% against ILS to 6.73\% against SA for
+DTW, and from approximately 0.009\% against ILS to 7.90\% against SA for
+DDTW. Therefore, statistical significance should not be interpreted as uniform
+engineering importance. Against ILS and TS, the absolute advantage is very
+small and becomes statistically detectable because the distributions are
+highly concentrated; against weaker baselines such as SA, the economic
+difference is materially larger.
+
+The direct same-seed comparison between DTW and DDTW produced a mean LCOE
+difference of only $7.419\times10^{-7}$ CNY/kWh and a two-sided Wilcoxon
+$p=0.593$. The data therefore do not detect a performance difference between
+the alignment variants in this case. They do not establish formal equivalence,
+particularly because objective values were archived at six decimal places and
+the between-run dispersion was extremely small. The narrow distributions may
+reflect stable behavior of the framework, but they may also arise from the
+low-dimensional constrained basin, the deterministic dispatch rules, and the
+use of one fixed weather and load profile.
+
+The HRES2--H2 interpretation must also remain aligned with the implemented
+system boundary. The case models grid-connected wind, photovoltaic generation,
+an electrolyzer, and a battery for annual hydrogen production. It does not
+include a hydrogen storage tank, fuel-cell reconversion, or a minimum hydrogen
+demand constraint. Consequently, the results validate the optimizer for the
+specified wind--PV--electrolyzer--battery sizing and dispatch problem, not for
+every configuration commonly described as a complete hydrogen-storage
+microgrid. Robust engineering conclusions will require multiple weather and
+price years, demand scenarios, technology-cost trajectories, and uncertainty
+or reliability constraints.
+
+\subsection{What can be inferred from the switching dynamics}
+\label{sec:discussion-switching}
+
+The switch counts differed substantially by domain and budget: 7.85 and 16.43
+for DTW--1K and DDTW--1K in MKP; 26.70 and 26.96 under the 3K budget; 6.20 and
+6.01 in CEC2022; and 21.00 and 21.68 in HRES2--H2. This heterogeneity is
+compatible with the intended behavior of an adaptive controller whose trigger
+depends on the recent trajectory rather than on a fixed number of iterations.
+The similarity between DTW and DDTW in CEC2022 and HRES2--H2 also suggests that
+both representations identified comparable stagnation structure in those
+campaigns, whereas their larger separation in MKP--1K points to a stronger
+effect of trajectory representation on discrete plateaus.
+
+The synchronized HRES2--H2 convergence and diagnostic profiles in
+Figures~\ref{fig:hres2_dtw_conv}--\ref{fig:hres2_ddtw_delta} visually connect
+fitness plateaus with the monitor signals and solver handoffs. These plots are
+useful for explaining the operating principle, but they correspond to selected
+best-run traces rather than an average trajectory over 31 runs. They should
+therefore be interpreted as mechanism illustrations, not as independent
+evidence that the same temporal sequence occurred in every run.
+
+These counts remain diagnostic rather than causal evidence. They do not state
+which solver was entered or left, whether diversity increased, how long the
+benefit persisted, or whether an improvement would have occurred without the
+switch. A stronger causal analysis would compare the observed policy with
+fixed-period rotation, random rotation, a no-switch portfolio, and the same
+solvers run independently under equal evaluation budgets. Event studies could
+then estimate the change in improvement rate immediately before and after a
+trigger and identify which transitions contribute most to performance.
+
+\subsection{Role of shared elitist memory}
+\label{sec:discussion-memory}
+
+The framework transfers the incumbent elite solution across solver rotations.
+This design is important because it protects the best solution found so far
+while allowing the active search dynamics to change. It offers a plausible
+explanation for why rotation can diversify the search without sacrificing
+accumulated progress, especially in MKP and HRES2--H2 where returning to a
+previously identified high-quality region is valuable. At the same time,
+aggressive elitist transfer can reduce effective diversity if each solver is
+reinitialized too close to the same incumbent. The current results demonstrate
+the performance of the complete framework but do not separate the effects of
+the monitor, solver rotation, and elite transfer. A factorial ablation with and
+without memory, adaptive triggering, and portfolio diversity is needed for
+component-level attribution.
+
+\subsection{Statistical reliability and remaining validity threats}
+\label{sec:discussion-validity}
+
+The inferential protocol strengthens the conclusions in several ways. Each
+configuration used 31 stochastic runs; non-normal distributions were handled
+with rank-based tests; paired designs were used where common seeds were
+documented; and Holm correction controlled family-wise error within the stated
+comparison families. Conclusions were synthesized using normalized gaps,
+within-problem ranks, and W/T/L decisions rather than by pooling incompatible
+raw objective scales. This is essential because fitness in MKP, error in
+CEC2022, and LCOE in HRES2--H2 are not directly commensurable.
+
+Several limitations remain. First, the test coverage is finite: MKP uses the
+first instance from nine Chu--Beasley families, CEC2022 is evaluated only at
+$D=10$, and HRES2--H2 represents one synthetic annual scenario. Second, the
+present parameter study compares alignment mode and MKP budget, but it does not
+systematically vary the monitoring-window length, Sakoe--Chiba band,
+percentiles, no-improvement threshold, or patience. Third, raw per-run baseline
+arrays were not archived for MKP and HRES2--H2. The reported HRES2--H2
+Mann--Whitney probabilities and Holm arithmetic can be checked, but the base
+statistics and effect sizes cannot be independently reconstructed from the
+available summaries. The HRES2--H2 hybrid--baseline samples also lack the
+common-seed pairing available for the direct DTW--DDTW comparison. Fourth, the
+analysis reports significance and directional summaries but does not include
+confidence intervals for paired differences or standardized non-parametric
+effect sizes. Finally, post hoc selection of the best observed configuration
+should not be treated as validation on unseen instances.
+
+These limitations motivate a clear validation agenda: archive all run-level
+outputs; preregister comparison families and practically meaningful margins;
+report effect sizes and bootstrap confidence intervals; test additional MKP
+instances and CEC dimensions; evaluate HRES2--H2 under multiple annual and
+economic scenarios; and conduct controlled component ablations. An external
+test set or nested configuration protocol would further distinguish genuine
+generalization from benchmark-specific tuning.
+
+\subsection{Practical implications}
+\label{sec:discussion-implications}
+
+For the tested MKP setting, DTW--3K is the most defensible default when the
+additional computational budget is acceptable. For CEC2022 and HRES2--H2, the
+current evidence does not justify a universal preference between DTW and DDTW;
+the simpler level-based DTW variant is competitive, while DDTW remains useful
+when trajectory shape is expected to be more informative than absolute level.
+In either case, selection should be validated on representative instances and
+should account for the cost of objective evaluation.
+
+Overall, the strongest conclusion is that trajectory-triggered portfolio
+rotation can provide reliable cross-domain performance without requiring a
+single standalone metaheuristic to be optimal everywhere. The evidence is most
+decisive for the budgeted MKP comparison and for the hybrid's distributional
+advantage in the specific HRES2--H2 case; it is more nuanced on CEC2022, where
+the framework is the best aggregate performer but specialized methods remain
+competitive on individual functions. This balance between robustness and
+specialization should define the contribution: the framework is an adaptive
+portfolio mechanism with broad empirical strength, not a universal dominance
+guarantee.

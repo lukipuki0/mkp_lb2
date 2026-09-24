@@ -1,0 +1,335 @@
+% -----------------------------------------------------------------------------
+% Statistical analysis for the new DTW continuous benchmark.
+% This is an input fragment, not a standalone LaTeX document.
+% Required packages in the main document: booktabs, graphicx, amsmath,
+% longtable, array, and (optionally) threeparttable.
+% Sources: continuous_benchmark/resultados/run_dtw_job_19070/
+%          continuous_benchmark/resultados/run_ddtw_job_19066/
+% -----------------------------------------------------------------------------
+
+\section{Statistical Analysis of the CEC 2022 DTW Benchmark}
+\label{sec:cec2022-dtw-statistics}
+
+This section provides the complete statistical interpretation of the new DTW
+benchmark. The analysis is based on 31 independent runs of seven algorithms on
+each of the 12 CEC 2022 functions. Because the functions have different
+scales and optima, all global conclusions are obtained from per-function
+ranks and paired per-function comparisons; raw objective values are used only
+for descriptive summaries. DTW and DDTW are analyzed as two variants of the
+hybrid pipeline under the same experimental protocol.
+
+\subsection{Analysis protocol}
+
+For each function, the seven algorithms were run with the same number of
+iterations and independent-run budget. Each hybrid is the reference method in
+its own pairwise tests. The null hypotheses are:
+
+\begin{itemize}
+  \item $H_0^{\mathrm{F}}$: all seven algorithms have the same distribution of
+  performance ranks on a given function;
+  \item $H_0^{\mathrm{W}}$: a given hybrid and comparator have the same
+  paired performance distribution;
+  \item $H_0^{\mathrm{MW}}$: a given hybrid and comparator have the same
+  marginal performance distribution.
+\end{itemize}
+
+The Friedman test is applied independently to the seven algorithm columns for
+each function. When it is significant, the two-sided Wilcoxon signed-rank test
+is used for the paired comparison between each hybrid and each standalone
+method. A two-sided Mann--Whitney $U$ test is also recorded as a complementary
+distributional check. The significance level is $\alpha=0.05$. The generated
+CSV and Markdown reports contain both raw and Holm-adjusted Wilcoxon p-values.
+Significance labels are based on the Holm-adjusted values within each function
+(the five hybrid-versus-baseline comparisons). The per-function Friedman tests
+are the primary omnibus evidence.
+
+The Wilcoxon conclusion is expressed from the perspective of the hybrid under
+analysis:
+``better'' means that the hybrid has the lower objective values, ``worse''
+means that the comparator has the lower values, and ``similar'' means that the
+test did not reject equality at $\alpha=0.05$. Since this is a minimization
+benchmark, lower values always imply better performance.
+
+\subsection{Aggregate rankings}
+
+For every function, algorithms are ranked from 1 (best) to 7 (worst) for each
+run, and the mean rank is then averaged across the 12 functions. Table~\ref{tab:cec2022-dtw-ranks}
+shows the resulting aggregate ranking.
+
+\begin{table}[htbp]
+\centering
+\caption{Aggregate mean ranks over the 12 CEC 2022 functions.}
+\label{tab:cec2022-dtw-ranks}
+\begin{tabular}{lrr}
+\toprule
+Algorithm & DTW average rank & DDTW average rank\\
+\midrule
+Hybrid DTW  & \textbf{2.322} & --\\
+Hybrid DDTW & -- & \textbf{2.358}\\
+EHO         & 3.156 & 3.143\\
+ACO         & 3.256 & 3.269\\
+PSO         & 3.372 & 3.363\\
+GWO         & 3.617 & 3.597\\
+WOA         & 5.277 & 5.269\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each hybrid obtains the lowest average rank in its own campaign, with DTW
+slightly ahead of DDTW (2.322 versus 2.358). The DTW--DDTW difference is only
+0.036 rank units, so it is a modest descriptive advantage. In the DTW campaign,
+the margins over EHO and ACO are 0.834 and 0.934 rank units; in the DDTW
+campaign, the margins over EHO and ACO are 0.785 and 0.911, respectively. WOA
+has the largest average rank because of
+very poor results on several functions, although it is the best standalone
+method by mean on F6. The rank summary is therefore more informative than
+averaging raw objective values across functions.
+
+\subsection{Pairwise outcomes against the DTW and DDTW hybrids}
+
+Table~\ref{tab:cec2022-dtw-pairwise-counts} aggregates the 60 pairwise
+comparisons (five baselines times 12 functions) for each variant. ``Better''
+counts a significant result in favor of the hybrid shown in the column group,
+while ``worse'' counts a significant result in favor of the comparator.
+
+\begin{table}[htbp]
+\centering
+\caption{Wilcoxon signed-rank outcomes relative to the DTW and DDTW hybrids.}
+\label{tab:cec2022-dtw-pairwise-counts}
+\begin{tabular}{lrrrrrr}
+\toprule
+Comparator & \multicolumn{3}{c}{DTW} & \multicolumn{3}{c}{DDTW}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+ & Better & Similar & Worse & Better & Similar & Worse\\
+\midrule
+PSO & 7 & 3 & 2 & 6 & 5 & 1\\
+GWO & 8 & 4 & 0 & 8 & 4 & 0\\
+WOA & 11 & 1 & 0 & 11 & 1 & 0\\
+EHO & 7 & 4 & 1 & 6 & 5 & 1\\
+ACO & 5 & 4 & 3 & 6 & 4 & 2\\
+\midrule
+Total & \textbf{38} & 16 & 6 & \textbf{37} & 19 & 4\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For DTW, 38 of the 60 comparisons are significant in favor of the hybrid, 16
+are statistically similar, and 6 favor a baseline. For DDTW, the corresponding
+counts are 37, 19, and 4. Thus, DTW has one more significant win, whereas DDTW
+has two fewer significant losses. In both
+variants, the strongest pairwise pattern is against WOA. ACO is the most
+competitive baseline, especially for DTW, with six similar comparisons.
+
+\subsection{Per-function omnibus tests}
+
+Table~\ref{tab:cec2022-dtw-friedman} reports the Friedman statistic and p-value
+for each function for both variants. Every omnibus test rejects $H_0^{\mathrm{F}}$ at
+$\alpha=0.05$, showing that the seven algorithms do not have equivalent rank
+distributions on any of the 12 functions. This result justifies examining the
+direction and magnitude of the pairwise comparisons, while not implying that
+either hybrid is the best method on every function.
+
+\begin{table}[htbp]
+\centering
+\caption{Friedman omnibus tests for the CEC 2022 functions.}
+\label{tab:cec2022-dtw-friedman}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Function & DTW $\chi^2$ & DTW p-value & DTW rank & DDTW $\chi^2$ & DDTW p-value & DDTW rank\\
+\midrule
+F1  & 146.3547 & $7.967\times10^{-30}$ & 2.74 & 146.5888 & $7.104\times10^{-30}$ & 2.79\\
+F2  & 32.2326  & $5.343\times10^{-6}$  & 2.85 & 32.5094  & $4.709\times10^{-6}$  & 2.87\\
+F3  & 119.2396 & $4.548\times10^{-24}$ & 2.74 & 118.4133 & $6.804\times10^{-24}$ & 2.85\\
+F4  & 71.7841  & $4.357\times10^{-14}$ & 2.68 & 69.0529  & $1.613\times10^{-13}$ & 2.68\\
+F5  & 107.6177 & $1.306\times10^{-21}$ & 2.23 & 107.9151 & $1.130\times10^{-21}$ & 2.18\\
+F6  & 34.1336  & $2.239\times10^{-6}$  & 2.94 & 32.4378  & $4.866\times10^{-6}$  & 2.97\\
+F7  & 81.3779  & $4.320\times10^{-16}$ & 2.06 & 78.1152  & $2.080\times10^{-15}$ & 2.16\\
+F8  & 78.4470  & $1.773\times10^{-15}$ & 1.81 & 75.0000  & $9.303\times10^{-15}$ & 1.94\\
+F9  & 118.4173 & $6.790\times10^{-24}$ & 1.89 & 118.4173 & $6.790\times10^{-24}$ & 1.89\\
+F10 & 77.5069  & $2.787\times10^{-15}$ & 2.00 & 76.6406  & $4.228\times10^{-15}$ & 2.03\\
+F11 & 56.2071  & $7.367\times10^{-11}$ & 1.77 & 51.0761  & $8.344\times10^{-10}$ & 1.92\\
+F12 & 105.5725 & $3.529\times10^{-21}$ & 2.16 & 106.8727 & $1.876\times10^{-21}$ & 2.02\\
+\bottomrule
+\end{tabular}
+}%
+\end{table}
+
+\subsection{Detailed Wilcoxon comparisons}
+
+Table~\ref{tab:cec2022-dtw-wilcoxon} gives the exact raw Wilcoxon
+signed-rank p-values from the archived per-function analysis files; the
+current generated reports additionally provide the Holm-adjusted values. The lowest
+p-value in a row is not automatically the most important result: the
+direction must be read together with the descriptive means in the results
+appendix. For example, a very small p-value can indicate that the comparator
+is significantly better than the hybrid.
+
+\scriptsize
+\begin{longtable}{lrrrrr}
+\caption{Unadjusted two-sided Wilcoxon p-values: comparator versus Hybrid DTW.}\label{tab:cec2022-dtw-wilcoxon}\\
+\toprule
+Function & PSO & GWO & WOA & EHO & ACO\\
+\midrule
+\endfirsthead
+\toprule
+Function & PSO & GWO & WOA & EHO & ACO\\
+\midrule
+\endhead
+F1  & $1.477\times10^{-5}$  & $9.313\times10^{-10}$ & $9.313\times10^{-10}$ & $1.162\times10^{-5}$  & $9.313\times10^{-10}$\\
+F2  & $4.810\times10^{-3}$  & $7.640\times10^{-4}$  & $9.737\times10^{-3}$  & $2.012\times10^{-1}$  & $2.474\times10^{-1}$\\
+F3  & $3.211\times10^{-2}$  & $3.884\times10^{-1}$  & $9.313\times10^{-10}$ & $5.318\times10^{-6}$  & $8.020\times10^{-6}$\\
+F4  & $1.021\times10^{-1}$  & $3.558\times10^{-2}$  & $1.577\times10^{-6}$  & $1.535\times10^{-4}$  & $6.948\times10^{-2}$\\
+F5  & $2.701\times10^{-2}$  & $2.158\times10^{-3}$  & $9.313\times10^{-10}$ & $1.485\times10^{-5}$  & $9.840\times10^{-3}$\\
+F6  & $1.821\times10^{-1}$  & $1.320\times10^{-2}$  & $6.219\times10^{-1}$  & $5.551\times10^{-1}$  & $4.619\times10^{-6}$\\
+F7  & $1.668\times10^{-2}$  & $3.570\times10^{-5}$  & $9.313\times10^{-10}$ & $1.604\times10^{-4}$  & $3.350\times10^{-3}$\\
+F8  & $6.640\times10^{-3}$  & $3.350\times10^{-3}$  & $9.313\times10^{-10}$ & $2.893\times10^{-2}$  & $9.313\times10^{-10}$\\
+F9  & $3.604\times10^{-3}$  & $9.313\times10^{-10}$  & $9.313\times10^{-10}$ & $3.173\times10^{-1}$  & $2.111\times10^{-5}$\\
+F10 & $4.005\times10^{-5}$  & $4.619\times10^{-6}$  & $9.313\times10^{-10}$  & $3.570\times10^{-5}$  & $2.639\times10^{-1}$\\
+F11 & $1.304\times10^{-8}$  & $6.266\times10^{-5}$  & $9.313\times10^{-10}$  & $6.232\times10^{-3}$  & $2.901\times10^{-3}$\\
+F12 & $2.794\times10^{-9}$  & $5.422\times10^{-1}$  & $9.313\times10^{-10}$  & $9.818\times10^{-2}$  & $8.561\times10^{-2}$\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+The Holm-adjusted decisions for DTW are: against PSO, the hybrid is better on
+F2, F7, F8, F9, F10, F11, and F12, worse on F1 and F5, and similar on F3,
+F4, and F6. Against GWO, it is better on F1, F2, F5, F7, F8, F9, F10, and
+F11, and similar on F3, F4, F6, and F12. Against WOA, it is better on all
+functions except F6, where the result is similar. Against EHO, it is better
+on F3, F4, F5, F7, F8, F10, and F11, worse on F1, and similar on F2, F6, F9,
+and F12. Against ACO, it is better on F1, F6, F7, F8, and F11, worse on F3,
+F5, and F9, and similar on F2, F4, F10, and F12.
+
+\subsection{Detailed DDTW comparisons}
+
+Table~\ref{tab:cec2022-ddtw-wilcoxon} reports the corresponding raw Wilcoxon
+p-values for the DDTW hybrid; the current generated reports additionally
+provide the Holm-adjusted values. The direction of each significant result
+is determined from the means in the results appendix.
+
+\scriptsize
+\begin{longtable}{lrrrrr}
+\caption{Unadjusted two-sided Wilcoxon p-values: comparator versus Hybrid DDTW.}\label{tab:cec2022-ddtw-wilcoxon}\\
+\toprule
+Function & PSO & GWO & WOA & EHO & ACO\\
+\midrule
+\endfirsthead
+\toprule
+Function & PSO & GWO & WOA & EHO & ACO\\
+\midrule
+\endhead
+F1  & $7.001\times10^{-6}$  & $9.313\times10^{-10}$ & $9.313\times10^{-10}$ & $6.906\times10^{-6}$  & $9.313\times10^{-10}$\\
+F2  & $3.002\times10^{-3}$  & $8.312\times10^{-4}$  & $9.148\times10^{-3}$  & $2.180\times10^{-1}$  & $2.368\times10^{-1}$\\
+F3  & $8.286\times10^{-2}$  & $4.214\times10^{-1}$  & $9.313\times10^{-10}$ & $3.724\times10^{-5}$  & $7.097\times10^{-7}$\\
+F4  & $1.558\times10^{-1}$  & $7.865\times10^{-2}$  & $2.111\times10^{-6}$  & $3.628\times10^{-5}$  & $1.485\times10^{-2}$\\
+F5  & $5.442\times10^{-2}$  & $6.440\times10^{-4}$  & $9.313\times10^{-10}$ & $1.936\times10^{-5}$  & $1.681\times10^{-2}$\\
+F6  & $1.887\times10^{-1}$  & $1.766\times10^{-2}$  & $5.948\times10^{-1}$  & $3.992\times10^{-1}$  & $9.162\times10^{-6}$\\
+F7  & $6.642\times10^{-2}$  & $2.505\times10^{-3}$  & $9.313\times10^{-10}$ & $3.350\times10^{-3}$  & $1.156\times10^{-1}$\\
+F8  & $3.350\times10^{-3}$  & $1.869\times10^{-2}$  & $9.313\times10^{-10}$ & $7.934\times10^{-2}$  & $2.328\times10^{-8}$\\
+F9  & $3.604\times10^{-3}$  & $9.313\times10^{-10}$  & $9.313\times10^{-10}$ & $3.173\times10^{-1}$  & $4.961\times10^{-6}$\\
+F10 & $1.968\times10^{-5}$  & $2.370\times10^{-4}$  & $9.313\times10^{-10}$ & $9.620\times10^{-5}$  & $2.639\times10^{-1}$\\
+F11 & $4.005\times10^{-8}$  & $4.954\times10^{-4}$  & $4.005\times10^{-8}$  & $2.067\times10^{-2}$  & $3.118\times10^{-3}$\\
+F12 & $1.429\times10^{-6}$  & $2.023\times10^{-1}$  & $9.313\times10^{-10}$  & $5.025\times10^{-2}$  & $2.563\times10^{-2}$\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\paragraph{Holm-adjusted interpretation for DDTW.}
+Against PSO, DDTW is better on F2, F8, F9, F10, F11, and F12, worse on F1,
+and similar on F3--F7. Against GWO, it is better on F1, F2, F5, F7, F8, F9,
+F10, and F11, and similar on F3, F4, F6, and F12. Against WOA, it is better
+on all functions except F6, where the result is similar. Against EHO, it is
+better on F3, F4, F5, F7, F10, and F11, worse on F1, and similar on F2, F6,
+F8, F9, and F12. Against ACO, it is better on F1, F4, F6, F8, F9, and F11,
+worse on F3 and F5, and similar on F2, F7, F10, and F12.
+
+\subsection{Direct DTW--DDTW comparison}
+
+To compare the two variants directly, the 31 run values with the same function
+and run index were paired between the two result directories. Table~\ref{tab:cec2022-dtw-ddtw-direct-stats}
+shows the resulting two-sided Wilcoxon p-values. These tests are additional to
+the generated per-function algorithm-versus-baseline analyses and use the raw
+run files from both folders.
+
+The DTW and DDTW values in this direct-comparison table are 31-run means, not
+the best values observed in the campaigns. The corresponding best observed
+values are reported separately in Table~\ref{tab:cec2022-dtw-best-observed} of
+the results fragment.
+
+\begin{table}[htbp]
+\centering
+\caption{Direct paired comparison between DTW and DDTW hybrids.}
+\label{tab:cec2022-dtw-ddtw-direct-stats}
+\scriptsize
+\begin{tabular}{lrrrrr}
+\toprule
+Function & DTW mean & DDTW mean & Winner (full precision) & Holm p-value & Significance\\
+\midrule
+F1  & 300.451 & 300.469 & DTW  & 1.000 & Not significant\\
+F2  & 405.995 & 405.936 & DDTW & 1.000 & Not significant\\
+F3  & 603.534 & 603.688 & DTW  & 1.000 & Not significant\\
+F4  & 816.258 & 815.742 & DDTW & 1.000 & Not significant\\
+F5  & 901.672 & 901.972 & DTW  & 1.000 & Not significant\\
+F6  & 3488.597 & 3532.530 & DTW  & 0.822 & Not significant\\
+F7  & 2020.433 & 2022.698 & DTW  & 0.822 & Not significant\\
+F8  & 2220.337 & 2221.177 & DTW  & 1.000 & Not significant\\
+F9  & 2529.284 & 2529.284 & DDTW & 1.000 & Not significant\\
+F10 & 2522.945 & 2522.830 & DDTW & 1.000 & Not significant\\
+F11 & 2651.787 & 2653.690 & DTW  & 1.000 & Not significant\\
+F12 & 2863.930 & 2863.757 & DDTW & 1.000 & Not significant\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+None of the 12 direct paired tests rejects equality at $\alpha=0.05$, including
+after Holm correction. Thus,
+DDTW is descriptively better at full precision on five functions, while DTW is
+lower on seven; the F9 difference is negligible and numerically tied at the
+reported precision. DTW has the lower aggregate mean rank (2.322 versus
+2.358), but the present 31-run sample does not provide statistically significant
+evidence that either variant is superior to the other on any single function.
+The correct overall conclusion is that both variants are statistically
+indistinguishable in the direct comparison.
+
+\subsection{Normality and robustness considerations}
+
+The Shapiro--Wilk diagnostic for both hybrids rejects normality at the 5\%
+level on 10 of the 12 functions. For DTW, F4 and F12 are the only functions
+with p-values above 0.05 (approximately 0.181 and 0.124); for DDTW, the
+corresponding p-values are approximately 0.811 and 0.238. This supports the use of
+rank-based tests rather than relying on a normal-theory comparison of means.
+It also reinforces the need to report medians and dispersion in addition to
+means.
+
+The statistical evidence is strongest for the cross-function rank conclusion:
+both hybrids have the lowest average ranks and are significantly better in more
+pairwise comparisons than any baseline. Nevertheless, F6 shows substantial
+variance and standalone methods outperform the hybrids in selected landscapes.
+The appropriate conclusion is therefore that DTW and DDTW provide competitive
+and robust overall performance, with a small descriptive rank advantage for
+DTW, not that either variant provides universal dominance.
+
+\subsection{Limitations and reproducibility}
+
+The generated benchmark reports apply Holm correction separately within each
+function to the five baseline comparisons for each hybrid. The appendix tables
+below retain the raw Wilcoxon p-values from the archived campaign; therefore,
+their numerical decisions should be regenerated from the corresponding
+per-function CSV files when multiplicity-adjusted decisions are required. The
+benchmark output stores both Wilcoxon and
+Mann--Whitney p-values, but it does not store a standardized effect size or a
+confidence interval; these should be added in a future rerun if effect-size
+reporting is required.
+
+It is not valid to combine the raw objective values of F1--F12 into a single
+Friedman test because the functions have different scales and shifted
+optima. The per-function Friedman tests, per-function ranks, and the
+cross-function average of normalized ranks used here avoid that scale
+problem. All numerical inputs can be reproduced from
+\texttt{continuous\_benchmark/resultados/run\_dtw\_job\_19070/} and
+\texttt{continuous\_benchmark/resultados/run\_ddtw\_job\_19066/}, in
+particular from each \texttt{resumen\_global.csv}, each
+\texttt{runs\_resultados.csv}, and each
+\texttt{analisis\_estadistico\_pvalues.csv}.

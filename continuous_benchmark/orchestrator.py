@@ -4,7 +4,7 @@ continuous_benchmark/orchestrator.py
 Orquestador del Pipeline Hibrido de Rotacion de Metaheuristicas
 para funciones matematicas continuas (minimizacion).
 
-Contiene SOLO metaheuristicas poblacionales: PSO, GWO, WOA, EHO, ACO, GA, ABC.
+Contiene metaheuristicas poblacionales y el híbrido continuo WOA-ABC.
 El monitor DTW detecta estancamiento y aborta el epoch para rotar a la siguiente MH.
 
 Para HRES2-H2 (que incluye MHs de trayectoria) usar HRES2-H2/orchestrator.py.
@@ -29,9 +29,17 @@ from continuous_benchmark.mh.woa import WOAParams, ejecutar_epoch as _woa_epoch
 from continuous_benchmark.mh.eho import EHOParams, ejecutar_epoch as _eho_epoch
 from continuous_benchmark.mh.aco import ACOParams, ejecutar_epoch as _aco_epoch
 from continuous_benchmark.mh.abc import ABCParams, ejecutar_epoch as _abc_epoch
+from woa_abc.cooperativo_cec_dtw import (
+    CooperativeCECParams,
+    ejecutar_epoch as _cooperative_cec_epoch,
+)
 
 
-POOL_POBLACIONAL = ["PSO", "GWO", "WOA", "EHO", "ACO"]
+# El orden también fija el primer bloque para una semilla dada. WOA se coloca
+# primero porque aporta la exploración más robusta en las funciones híbridas y
+# de composición; los demás operadores siguen disponibles para la rotación.
+POOL_POBLACIONAL = ["WOA", "PSO", "EHO", "GWO", "ACO"]
+MH_POBLACIONAL_DISPONIBLES = [*POOL_POBLACIONAL, "WOA-ABC"]
 
 COLORES_MH = {
     "PSO": "#2196F3",
@@ -39,6 +47,7 @@ COLORES_MH = {
     "WOA": "#E040FB",
     "EHO": "#00BCD4",
     "ACO": "#8D6E63",
+    "WOA-ABC": "#FF7043",
 }
 
 
@@ -82,7 +91,7 @@ def ejecutar_pipeline(
     max_iters          : int | None = 1000,
     tiempo_max         : float | None = None,
     stag_cfg           : StagnationConfig | None = None,
-    pop_injection_mode : str = "mixed",
+    pop_injection_mode : str = "random",
     verbose            : bool = True,
     on_epoch_callback  = None,
     pool_poblacional   : list[str] | None = None,
@@ -262,9 +271,25 @@ def _ejecutar_mh(
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
+    elif mh_nombre in {"WOA-ABC", "WOA_ABC", "WOAABC"}:
+        params = CooperativeCECParams(
+            pop_size=30,
+            iterations=300,
+            epochs=1,
+            use_dtw=True,
+            stag_cfg=stag_cfg,
+        )
+        return _cooperative_cec_epoch(
+            func,
+            params,
+            epoch_idx=epoch_idx,
+            verbose=verbose,
+            sol_inyectada=solucion_global,
+        )
+
     else:
         raise ValueError(f"MH poblacional no soportada: '{mh_nombre}'. "
-                         f"Opciones válidas: {POOL_POBLACIONAL}")
+                         f"Opciones válidas: {MH_POBLACIONAL_DISPONIBLES}")
 
 
 def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
@@ -283,6 +308,12 @@ def ejecutar_mh_standalone(func, mh_nombre: str, max_iters: int = 1000):
         return _aco_epoch(func, ACOParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
     elif mh_nombre == "ABC":
         return _abc_epoch(func, ABCParams(pop_size=30, iterations=max_iters, use_stagnation=False), verbose=False)
+    elif mh_nombre in {"WOA-ABC", "WOA_ABC", "WOAABC"}:
+        return _cooperative_cec_epoch(
+            func,
+            CooperativeCECParams(pop_size=30, iterations=max_iters, use_dtw=False),
+            verbose=False,
+        )
     else:
         raise ValueError(f"MH poblacional no soportada: '{mh_nombre}'. "
-                         f"Opciones válidas: {POOL_POBLACIONAL}")
+                         f"Opciones válidas: {MH_POBLACIONAL_DISPONIBLES}")

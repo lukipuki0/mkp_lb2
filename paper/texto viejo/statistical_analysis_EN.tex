@@ -1,0 +1,396 @@
+% Independent statistical-analysis section for CEC2022, MKP, and HRES2-H2.
+% Include from a document located in paper/ with:
+%   \input{statistical_analysis_EN}
+% Required packages: booktabs and amsmath.
+
+\section{Inferential Statistical Analysis}
+\label{sec:global-statistical-analysis}
+
+Because metaheuristic outcomes are stochastic, normality was not assumed without prior verification. The three experimental domains were therefore analysed using a common non-parametric protocol based on 31 runs per method, instance, or function, with corresponding executions treated as paired under the same randomization conditions.
+
+Normality was assessed with the Shapiro--Wilk test at $\alpha=0.05$. Paired
+comparisons between the hybrid framework and each standalone metaheuristic used
+the Wilcoxon signed-rank test. Whenever multiple pairwise comparisons were
+performed in the MKP and CEC2022 campaigns, $p$-values were adjusted using the
+Holm step-down procedure. For HRES2--H2, the archived analysis reports
+unadjusted pairwise $p$-values, as specified in its dedicated subsection below.
+The Friedman test was used for omnibus comparisons and mean-rank calculations.
+A result was considered statistically significant at $\alpha=0.05$ according
+to the procedure stated for each campaign.
+
+\begin{table}[htbp]
+\centering
+\caption{Summary of the statistical protocol and inferential results by domain.}
+\label{tab:statistical-summary-domains}
+\small
+\begin{tabular}{p{0.18\linewidth}p{0.25\linewidth}p{0.25\linewidth}p{0.22\linewidth}}
+\toprule
+Domain & Metric and design & Global comparison & Main result \\
+\midrule
+MKP & Normalized percentage gap; 9 instances and 4 configurations & Friedman across DTW/DDTW and 1K/3K; Holm-adjusted paired Wilcoxon & Significant global difference; DTW--3K obtains the best mean rank \\
+CEC2022 & Objective error; 12 functions & Friedman and within-function Wilcoxon against five baselines & The framework is competitive; no alignment modality is universally superior \\
+HRES2--H2 & LCOE (CNY/kWh); one engineering case & Friedman against ten baselines; unadjusted paired Wilcoxon DTW--DDTW & Both frameworks significantly outperform the baselines; DTW and DDTW are equivalent \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Multidimensional Knapsack Problem (MKP)}
+\label{sec:statistical-mkp-en}
+
+The Shapiro--Wilk test rejected normality in 14 of the 36
+instance--configuration distributions. Inference was therefore based on the
+normalized mean percentage gap. The Friedman test detected differences among
+the four framework configurations ($\chi_F^2=24.067$,
+$p=2.42\times10^{-5}$). Mean ranks were 1.22 for DTW--3K, 1.78 for DDTW--3K,
+3.11 for DTW--1K, and 3.89 for DDTW--1K; lower ranks indicate smaller gaps.
+
+All six pairwise configuration contrasts remained significant after Holm
+adjustment ($p_{\mathrm{Holm}}\leq0.0391$). Increasing the iteration budget
+reduced the average gap from 2.237\% to 1.805\% for DTW, a 19.3\% relative
+reduction, and from 2.391\% to 1.876\% for DDTW, a 21.5\% relative reduction.
+
+At the instance level, Friedman tests detected differences between the hybrid
+framework and the seven standalone metaheuristics in all 36 campaigns
+($36/36$, $p<0.05$). Across the 63 Holm-adjusted comparisons in each campaign,
+the framework win/tie/loss records were $41/19/3$ for DTW--1K, $40/16/7$ for
+DDTW--1K, $41/15/7$ for DTW--3K, and $40/15/8$ for DDTW--3K. These results
+support portfolio robustness rather than universal dominance: GA achieved a
+significant advantage in three DTW--1K instances, three DTW--3K instances,
+three DDTW--1K instances, and four DDTW--3K instances.
+
+Based on these results, the configuration yielding the lowest mean gap was
+selected for each instance: DTW--3K for mknapcb1 and mknapcb3--mknapcb8, and
+DDTW--3K for mknapcb2 and mknapcb9. This selection criterion is purely
+descriptive and should not be interpreted as an additional pairwise
+significance claim for every instance.
+
+Tables~\ref{tab:mkp-global-dtw-1k-en}--\ref{tab:mkp-global-ddtw-3k-en}
+present the instance-level Friedman rankings and paired Wilcoxon tests for each
+of the four MKP framework configurations. In each table, the control instance
+is mknapcb1\_inst00 and the Wilcoxon direction is relative to that control.
+Because the instances differ in objective magnitude, these tables serve as
+supplementary detail; the normalized-gap analysis presented above constitutes
+the primary inferential comparison among configurations.
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Global statistical report for MKP, DTW, $T_{\max}=1{,}000$ ($N=31$). Friedman $\chi^2=245.6774$, $p=1.420135\times10^{-48}$.}
+\label{tab:mkp-global-dtw-1k-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrll}
+\toprule
+Rank & Instance & Mean rank & Mean & Std. & Median & 95\% CI & Shapiro $p$ & Wilcoxon $p$ & Result \\
+\midrule
+1 & mknapcb3 & 1.00 & 116596.194 & 744.985 & 116696 & [116333.939,116858.448] & $2.4890\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+2 & mknapcb6 & 2.03 & 114337.613 & 511.386 & 114464 & [114157.592,114517.634] & $1.8839\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+3 & mknapcb9 & 2.97 & 112773.129 & 484.816 & 112734 & [112602.461,112943.797] & $4.5367\times10^{-2}$ & $1.1735\times10^{-6}$ & Better*** \\
+4 & mknapcb5 & 4.48 & 57902.419 & 379.077 & 57987 & [57768.974,58035.864] & $1.9524\times10^{-3}$ & $1.1728\times10^{-6}$ & Better*** \\
+5 & mknapcb2 & 4.52 & 57958.839 & 328.596 & 57947 & [57843.164,58074.513] & $2.7484\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+6 & mknapcb8 & 6.00 & 55244.710 & 276.381 & 55249 & [55147.416,55342.003] & $3.0168\times10^{-1}$ & $1.1735\times10^{-6}$ & Better*** \\
+7 & mknapcb1 (control) & 7.00 & 24040.645 & 124.976 & 23988 & [23996.650,24084.640] & $1.6764\times10^{-2}$ & 1.0000 & Equal \\
+8 & mknapcb4 & 8.00 & 22699.581 & 148.626 & 22696 & [22647.260,22751.901] & $6.6642\times10^{-2}$ & $1.1735\times10^{-6}$ & Worse*** \\
+9 & mknapcb7 & 9.00 & 21582.516 & 150.083 & 21634 & [21529.683,21635.349] & $1.8149\times10^{-4}$ & $9.3132\times10^{-10}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Global statistical report for MKP, DDTW, $T_{\max}=1{,}000$ ($N=31$). Friedman $\chi^2=245.6774$, $p=1.420135\times10^{-48}$.}
+\label{tab:mkp-global-ddtw-1k-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrll}
+\toprule
+Rank & Instance & Mean rank & Mean & Std. & Median & 95\% CI & Shapiro $p$ & Wilcoxon $p$ & Result \\
+\midrule
+1 & mknapcb3 & 1.00 & 116168.000 & 718.087 & 116135 & [115915.214,116420.786] & $9.8258\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+2 & mknapcb6 & 2.03 & 113874.355 & 548.740 & 113942 & [113681.184,114067.526] & $1.0198\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+3 & mknapcb9 & 2.97 & 112591.903 & 428.980 & 112621 & [112440.891,112742.915] & $2.2645\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+4 & mknapcb2 & 4.48 & 57879.129 & 208.237 & 57855 & [57805.824,57952.434] & $8.1150\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+5 & mknapcb5 & 4.52 & 57771.290 & 299.121 & 57757 & [57665.992,57876.589] & $3.3289\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+6 & mknapcb8 & 6.00 & 55207.097 & 242.602 & 55289 & [55121.695,55292.499] & $9.2538\times10^{-3}$ & $9.3132\times10^{-10}$ & Better*** \\
+7 & mknapcb1 (control) & 7.00 & 24014.355 & 151.123 & 24026 & [23961.156,24067.554] & $1.1274\times10^{-1}$ & 1.0000 & Equal \\
+8 & mknapcb4 & 8.00 & 22682.903 & 187.891 & 22689 & [22616.761,22749.046] & $2.0187\times10^{-1}$ & $9.3132\times10^{-10}$ & Worse*** \\
+9 & mknapcb7 & 9.00 & 21608.935 & 152.651 & 21649 & [21555.198,21662.673] & $1.0824\times10^{-4}$ & $1.1728\times10^{-6}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Global statistical report for MKP, DTW, $T_{\max}=3{,}000$ ($N=31$). Friedman $\chi^2=245.9527$, $p=1.241660\times10^{-48}$.}
+\label{tab:mkp-global-dtw-3k-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrll}
+\toprule
+Rank & Instance & Mean rank & Mean & Std. & Median & 95\% CI & Shapiro $p$ & Wilcoxon $p$ & Result \\
+\midrule
+1 & mknapcb3 & 1.00 & 117369.968 & 388.960 & 117282 & [117233.044,117506.892] & $2.0264\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+2 & mknapcb6 & 2.00 & 114760.613 & 434.747 & 114830 & [114607.570,114913.655] & $4.5410\times10^{-1}$ & $1.1728\times10^{-6}$ & Better*** \\
+3 & mknapcb9 & 3.00 & 113115.097 & 433.381 & 113199 & [112962.535,113267.658] & $1.4742\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+4 & mknapcb5 & 4.45 & 58150.290 & 189.480 & 58138 & [58083.588,58216.992] & $8.5769\times10^{-2}$ & $1.1735\times10^{-6}$ & Better*** \\
+5 & mknapcb2 & 4.55 & 58168.419 & 251.205 & 58248 & [58079.989,58256.851] & $2.3404\times10^{-1}$ & $1.1735\times10^{-6}$ & Better*** \\
+6 & mknapcb8 & 6.00 & 55451.129 & 244.735 & 55499 & [55364.975,55537.282] & $1.1808\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+7 & mknapcb1 (control) & 7.00 & 24142.839 & 102.533 & 24152 & [24106.744,24178.934] & $3.2219\times10^{-2}$ & 1.0000 & Equal \\
+8 & mknapcb4 & 8.00 & 22821.968 & 132.468 & 22741 & [22775.335,22868.600] & $1.0376\times10^{-3}$ & $1.1735\times10^{-6}$ & Worse*** \\
+9 & mknapcb7 & 9.00 & 21691.935 & 72.507 & 21676 & [21666.411,21717.460] & $7.1174\times10^{-4}$ & $9.3132\times10^{-10}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Global statistical report for MKP, DDTW, $T_{\max}=3{,}000$ ($N=31$). Friedman $\chi^2=246.4172$, $p=9.898574\times10^{-49}$.}
+\label{tab:mkp-global-ddtw-3k-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrll}
+\toprule
+Rank & Instance & Mean rank & Mean & Std. & Median & 95\% CI & Shapiro $p$ & Wilcoxon $p$ & Result \\
+\midrule
+1 & mknapcb3 & 1.00 & 117205.452 & 462.724 & 117215 & [117042.561,117368.343] & $2.2000\times10^{-1}$ & $1.1728\times10^{-6}$ & Better*** \\
+2 & mknapcb6 & 2.00 & 114697.129 & 421.798 & 114759 & [114548.645,114845.613] & $2.2668\times10^{-2}$ & $9.3132\times10^{-10}$ & Better*** \\
+3 & mknapcb9 & 3.00 & 113115.871 & 385.020 & 113188 & [112980.333,113251.408] & $2.0964\times10^{-2}$ & $9.3132\times10^{-10}$ & Better*** \\
+4 & mknapcb2 & 4.26 & 58195.355 & 244.526 & 58186 & [58109.275,58281.435] & $3.8177\times10^{-1}$ & $1.1735\times10^{-6}$ & Better*** \\
+5 & mknapcb5 & 4.74 & 58058.129 & 204.752 & 58052 & [57986.051,58130.207] & $5.0556\times10^{-1}$ & $9.3132\times10^{-10}$ & Better*** \\
+6 & mknapcb8 & 6.00 & 55388.677 & 203.671 & 55440 & [55316.980,55460.375] & $2.9701\times10^{-3}$ & $9.3132\times10^{-10}$ & Better*** \\
+7 & mknapcb1 (control) & 7.00 & 24131.032 & 89.838 & 24134 & [24099.407,24162.658] & $1.1412\times10^{-1}$ & 1.0000 & Equal \\
+8 & mknapcb4 & 8.00 & 22795.161 & 110.249 & 22764 & [22756.351,22833.972] & $1.3915\times10^{-2}$ & $1.1735\times10^{-6}$ & Worse*** \\
+9 & mknapcb7 & 9.00 & 21678.129 & 72.056 & 21649 & [21652.764,21703.495] & $5.2693\times10^{-4}$ & $1.1728\times10^{-6}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{IEEE CEC2022 Continuous Benchmark}
+\label{sec:statistical-cec-en}
+
+Normality was rejected for the hybrid distribution in 10 of the 12 functions
+for each alignment modality. After Holm adjustment of the five paired baseline
+comparisons within each function, DTW achieved a win/tie/loss record of
+$38/16/6$ across 60 comparisons and a mean within-function rank of 2.322.
+DDTW achieved $37/19/4$ and a mean rank of 2.358.
+
+The clearest advantage for both modalities occurred against WOA, for which each
+framework recorded eleven significant wins, one tie, and no losses. PSO, GWO, EHO,
+and ACO remained competitive on selected functions; consequently, the
+aggregate evidence supports robustness and competitiveness rather than
+unconditional superiority.
+
+Although DDTW obtained a lower mean objective than DTW at full precision in 5
+of the 12 functions (with DTW lower on 7 and F9 tied at the reported precision), the paired DTW--DDTW comparison produced no significant contrast
+after Holm correction ($0/12$ significant comparisons). The available evidence
+therefore does not establish one alignment modality as statistically superior
+across the CEC2022 suite.
+
+Because the CEC2022 functions differ in bias and objective scale, raw objective
+values are not combined in a cross-function Friedman test. The average of the
+within-function ranks and the paired comparisons reported above provide the
+primary inferential evidence.
+
+Table~\ref{tab:cec-aggregate-ranks-en} reports the average rank across the 12
+functions. The ranks are computed within each function, so they are not
+distorted by the different objective scales and bias terms.
+
+\begin{table}[p]
+\centering
+\caption{Aggregate mean ranks across the 12 CEC2022 functions.}
+\label{tab:cec-aggregate-ranks-en}
+\begin{tabular}{lrr}
+\toprule
+Algorithm & DTW campaign & DDTW campaign \\
+\midrule
+Hybrid DTW & \textbf{2.322} & -- \\
+Hybrid DDTW & -- & \textbf{2.358} \\
+EHO & 3.156 & 3.143 \\
+ACO & 3.256 & 3.269 \\
+PSO & 3.372 & 3.363 \\
+GWO & 3.617 & 3.597 \\
+WOA & 5.277 & 5.269 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each hybrid obtained the lowest aggregate rank in its own campaign. The
+difference between DTW and DDTW was only 0.036 rank units, which is a modest
+descriptive difference and not evidence of statistical superiority.
+
+The 60 Holm-adjusted paired comparisons against the five standalone
+metaheuristics are decomposed by comparator in Table~\ref{tab:cec-outcomes-en}.
+Here, a better result means a significant result in favor of the hybrid,
+whereas a worse result means significance in favor of the comparator.
+
+\begin{table}[p]
+\centering
+\caption{CEC2022 Wilcoxon outcomes relative to each hybrid, after Holm correction.}
+\label{tab:cec-outcomes-en}
+\begin{tabular}{lrrrrrr}
+\toprule
+Comparator & \multicolumn{3}{c}{DTW} & \multicolumn{3}{c}{DDTW} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+ & Better & Similar & Worse & Better & Similar & Worse \\
+\midrule
+PSO & 7 & 3 & 2 & 6 & 5 & 1 \\
+GWO & 8 & 4 & 0 & 8 & 4 & 0 \\
+WOA & 11 & 1 & 0 & 11 & 1 & 0 \\
+EHO & 7 & 4 & 1 & 6 & 5 & 1 \\
+ACO & 5 & 4 & 3 & 6 & 4 & 2 \\
+\midrule
+Total & \textbf{38} & 16 & 6 & \textbf{37} & 19 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All 12 per-function Friedman tests were significant for both modalities. The
+test statistics and the corresponding hybrid mean ranks are shown in
+Table~\ref{tab:cec-friedman-functions-en}.
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Per-function Friedman omnibus tests for the CEC2022 suite.}
+\label{tab:cec-friedman-functions-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{lrrrrrr}
+\toprule
+Function & DTW $\chi^2$ & DTW $p$ & DTW rank & DDTW $\chi^2$ & DDTW $p$ & DDTW rank \\
+\midrule
+F1 & 146.3547 & $7.967\times10^{-30}$ & 2.74 & 146.5888 & $7.104\times10^{-30}$ & 2.79 \\
+F2 & 32.2326 & $5.343\times10^{-6}$ & 2.85 & 32.5094 & $4.709\times10^{-6}$ & 2.87 \\
+F3 & 119.2396 & $4.548\times10^{-24}$ & 2.74 & 118.4133 & $6.804\times10^{-24}$ & 2.85 \\
+F4 & 71.7841 & $4.357\times10^{-14}$ & 2.68 & 69.0529 & $1.613\times10^{-13}$ & 2.68 \\
+F5 & 107.6177 & $1.306\times10^{-21}$ & 2.23 & 107.9151 & $1.130\times10^{-21}$ & 2.18 \\
+F6 & 34.1336 & $2.239\times10^{-6}$ & 2.94 & 32.4378 & $4.866\times10^{-6}$ & 2.97 \\
+F7 & 81.3779 & $4.320\times10^{-16}$ & 2.06 & 78.1152 & $2.080\times10^{-15}$ & 2.16 \\
+F8 & 78.4470 & $1.773\times10^{-15}$ & 1.81 & 75.0000 & $9.303\times10^{-15}$ & 1.94 \\
+F9 & 118.4173 & $6.790\times10^{-24}$ & 1.89 & 118.4173 & $6.790\times10^{-24}$ & 1.89 \\
+F10 & 77.5069 & $2.787\times10^{-15}$ & 2.00 & 76.6406 & $4.228\times10^{-15}$ & 2.03 \\
+F11 & 56.2071 & $7.367\times10^{-11}$ & 1.77 & 51.0761 & $8.344\times10^{-10}$ & 1.92 \\
+F12 & 105.5725 & $3.529\times10^{-21}$ & 2.16 & 106.8727 & $1.876\times10^{-21}$ & 2.02 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Table~\ref{tab:cec-global-dtw-en} presents the direct DTW--DDTW comparison
+within each function. Raw objective values are not combined across functions;
+the Holm-adjusted paired tests are the inferential basis for the global
+conclusion.
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Direct paired comparison between the DTW and DDTW hybrids on CEC2022 ($N=31$).}
+\label{tab:cec-global-dtw-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{lrrrll}
+\toprule
+Function & DTW mean & DDTW mean & Winner (full precision) & Holm $p$ & Significance \\
+\midrule
+F1 & 300.451 & 300.469 & DTW & 1.000 & Not significant \\
+F2 & 405.995 & 405.936 & DDTW & 1.000 & Not significant \\
+F3 & 603.534 & 603.688 & DTW & 1.000 & Not significant \\
+F4 & 816.258 & 815.742 & DDTW & 1.000 & Not significant \\
+F5 & 901.672 & 901.972 & DTW & 1.000 & Not significant \\
+F6 & 3488.597 & 3532.530 & DTW & 0.822 & Not significant \\
+F7 & 2020.433 & 2022.698 & DTW & 0.822 & Not significant \\
+F8 & 2220.337 & 2221.177 & DTW & 1.000 & Not significant \\
+F9 & 2529.284 & 2529.284 & DDTW & 1.000 & Not significant \\
+F10 & 2522.945 & 2522.830 & DDTW & 1.000 & Not significant \\
+F11 & 2651.787 & 2653.690 & DTW & 1.000 & Not significant \\
+F12 & 2863.930 & 2863.757 & DDTW & 1.000 & Not significant \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+\subsection{HRES2--H2 Engineering Case}
+\label{sec:statistical-hres2-en}
+
+The HRES2--H2 experiment evaluates the sizing and rule-based dispatch of a
+grid-connected wind--photovoltaic--electrolyzer--battery (WPEB) system. The
+current implementation calculates annual hydrogen production from the
+electrolyzer load, but it does not model a minimum hydrogen-demand target, a
+hydrogen storage tank, or a fuel-cell conversion subsystem. The case study is
+therefore interpreted as WPEB sizing with annual hydrogen production.
+
+Each method was evaluated in 31 stochastic optimization runs with a maximum budget of 1,000 iterations, and each objective evaluation simulates 8,760 hourly dispatch steps. The benchmark uses one fixed synthetic weather profile for all runs, and corresponding executions were treated as paired for the inferential comparison. The HRES2--H2 pairwise values reported below are unadjusted $p$-values; no Holm correction is applied.
+
+The Shapiro--Wilk test rejected normality for both hybrid LCOE distributions
+($p<10^{-11}$). Omnibus Friedman tests detected differences among methods for
+both DTW ($\chi_F^2=129.166$, $p=6.91\times10^{-23}$) and DDTW
+($\chi_F^2=123.474$, $p=9.97\times10^{-22}$). Mean ranks were 1.71 for DTW
+and 1.95 for DDTW.
+
+Using the unadjusted Wilcoxon tests, all ten standalone metaheuristics had
+$p<0.001$ against the corresponding proposed control and a higher mean rank,
+yielding a $10/0/0$ win/tie/loss record at the unadjusted $\alpha=0.05$ level.
+The independent Mann--Whitney sensitivity test also returned $p<0.05$ for all
+ten baseline comparisons in both variants. These results support the observed
+LCOE advantage on this fixed engineering scenario, without claiming
+multiplicity-adjusted inference.
+
+The direct paired comparison between DTW and DDTW found no significant LCOE
+difference (Wilcoxon $p=0.593$). The observed difference in archived means was
+only $7.42\times10^{-7}$ CNY/kWh, below the six-decimal reporting precision.
+Therefore, the available evidence supports comparable economic performance of
+the two alignment modalities rather than a meaningful economic advantage of
+one modality over the other.
+
+Because all methods in this engineering case share the same LCOE scale, the
+Friedman and unadjusted Wilcoxon results can be compared directly without
+normalization.
+
+Tables~\ref{tab:hres2-pvalues-dtw-en} and~\ref{tab:hres2-pvalues-ddtw-en}
+present the complete inferential results for the HRES2--H2 case. The control
+in both tables is the corresponding hybrid framework; therefore, a ``Worse''
+result indicates a higher (less desirable) LCOE than the hybrid control. The
+pairwise $p$-values are unadjusted.
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{HRES2--H2 inferential report for the DTW framework over $N=31$ runs. The pairwise values are unadjusted Wilcoxon $p$-values. Friedman $\chi^2=129.1662$, $p=6.910283\times10^{-23}$.}
+\label{tab:hres2-pvalues-dtw-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrl}
+\toprule
+Rank & Algorithm & Mean rank & Mean LCOE & Std. & Median & Shapiro $p$ & Unadjusted Wilcoxon $p$ & Significance vs. control \\
+\midrule
+1 & Hybrid DTW (control) & 1.71 & 0.267160 & 0.000001 & 0.267159 & $4.6383\times10^{-12}$ & 1.0000 & Equal \\
+2 & GWO & 4.00 & 0.268066 & 0.002815 & 0.267160 & $1.0391\times10^{-10}$ & $1.3812\times10^{-6}$ & Worse*** \\
+3 & VNS & 5.19 & 0.267806 & 0.002465 & 0.267168 & $2.7555\times10^{-11}$ & $9.3132\times10^{-10}$ & Worse*** \\
+4 & TS & 5.35 & 0.267188 & 0.000038 & 0.267176 & $2.9576\times10^{-7}$ & $4.6566\times10^{-9}$ & Worse*** \\
+5 & ACO & 5.58 & 0.273288 & 0.007584 & 0.267159 & $5.4906\times10^{-6}$ & $1.7539\times10^{-5}$ & Worse*** \\
+6 & ILS & 5.58 & 0.267184 & 0.000023 & 0.267178 & $2.9034\times10^{-5}$ & $9.3132\times10^{-10}$ & Worse*** \\
+7 & PSO & 6.00 & 0.277289 & 0.010939 & 0.274579 & $2.3162\times10^{-5}$ & $3.6279\times10^{-4}$ & Worse*** \\
+8 & WOA & 7.26 & 0.277227 & 0.009567 & 0.276524 & $1.4918\times10^{-4}$ & $1.6455\times10^{-5}$ & Worse*** \\
+9 & EHO & 7.84 & 0.277728 & 0.007382 & 0.276524 & $3.4063\times10^{-4}$ & $6.1660\times10^{-6}$ & Worse*** \\
+10 & ABC & 7.84 & 0.272971 & 0.004761 & 0.273567 & $2.3789\times10^{-2}$ & $1.1714\times10^{-6}$ & Worse*** \\
+11 & SA & 9.65 & 0.286431 & 0.013206 & 0.281339 & $3.9087\times10^{-3}$ & $9.3132\times10^{-10}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{HRES2--H2 inferential report for the DDTW framework over $N=31$ runs. The pairwise values are unadjusted Wilcoxon $p$-values. Friedman $\chi^2=123.4738$, $p=9.966826\times10^{-22}$.}
+\label{tab:hres2-pvalues-ddtw-en}
+\resizebox{\textwidth}{!}{\begin{tabular}{clrrrrrrl}
+\toprule
+Rank & Algorithm & Mean rank & Mean LCOE & Std. & Median & Shapiro $p$ & Unadjusted Wilcoxon $p$ & Significance vs. control \\
+\midrule
+1 & Hybrid DDTW (control) & 1.95 & 0.267160 & 0.000005 & 0.267159 & $4.9783\times10^{-12}$ & 1.0000 & Equal \\
+2 & GWO & 4.06 & 0.268395 & 0.004126 & 0.267160 & $1.0536\times10^{-10}$ & $1.6196\times10^{-6}$ & Worse*** \\
+3 & VNS & 5.00 & 0.267806 & 0.002469 & 0.267166 & $2.7183\times10^{-11}$ & $1.3812\times10^{-6}$ & Worse*** \\
+4 & TS & 5.52 & 0.267184 & 0.000031 & 0.267175 & $3.3746\times10^{-6}$ & $9.3132\times10^{-10}$ & Worse*** \\
+5 & ILS & 5.58 & 0.267183 & 0.000027 & 0.267171 & $6.6502\times10^{-6}$ & $3.4552\times10^{-7}$ & Worse*** \\
+6 & ACO & 5.68 & 0.273617 & 0.007941 & 0.267159 & $4.0201\times10^{-6}$ & $4.1782\times10^{-4}$ & Worse*** \\
+7 & WOA & 5.97 & 0.276477 & 0.009783 & 0.276524 & $1.5567\times10^{-5}$ & $2.9334\times10^{-4}$ & Worse*** \\
+8 & PSO & 7.00 & 0.280068 & 0.010658 & 0.286723 & $2.7009\times10^{-5}$ & $8.0432\times10^{-5}$ & Worse*** \\
+9 & ABC & 7.34 & 0.270993 & 0.003544 & 0.269869 & $5.3412\times10^{-4}$ & $1.1714\times10^{-6}$ & Worse*** \\
+10 & EHO & 8.06 & 0.278524 & 0.007637 & 0.276524 & $1.0747\times10^{-4}$ & $2.2878\times10^{-6}$ & Worse*** \\
+11 & SA & 9.84 & 0.290062 & 0.011983 & 0.289216 & $1.0579\times10^{-1}$ & $9.3132\times10^{-10}$ & Worse*** \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Inferential Synthesis}
+\label{sec:statistical-synthesis-en}
+
+All three domains show statistically detectable global structure, but the
+interpretation depends on the objective and scale of each problem. In MKP, the
+3,000-iteration budget significantly reduces the gap and DTW--3K obtains the
+best global rank. In CEC2022, DTW and DDTW are competitive variants with no
+significant difference between them. In HRES2--H2, both variants significantly
+outperform the standalone methods under the unadjusted pairwise comparisons,
+and no significant difference was detected between them. The overall evidence
+therefore supports framework robustness and stability, without implying
+universal dominance on every problem or function.

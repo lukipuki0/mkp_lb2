@@ -95,12 +95,14 @@ def grafico_dtw_delta(
 
 
 
-    ax.set_title("DTW Delta per Iteration  [+ = stagnation | - = active improvement]",
+    ax.set_title("DTW/DDTW Delta per Iteration  [+ = stagnation | - = active improvement]",
                  fontsize=20, fontweight="bold")
     ax.set_xlabel("Accumulated Iterations", fontsize=18)
     ax.set_ylabel("DTW Delta", fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
-    ax.legend(handles=legend_patches, loc="lower right", fontsize=15)
+    # Keep the legend inside the axes, anchored at the lower-right corner.
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=15,
+              borderaxespad=0.25, frameon=True, framealpha=0.88)
 
     ax.grid(True, alpha=0.3)
     fig.tight_layout()

@@ -6,6 +6,7 @@ Módulo de Análisis Estadístico Inferencial para benchmarks continuos CEC2022.
 Pruebas implementadas:
   - Shapiro-Wilk     : Normalidad de las distribuciones de cada algoritmo
   - Wilcoxon Signed-Rank : Comparación pareada vs algoritmo de referencia
+  - Holm step-down       : Corrección de las comparaciones pareadas
   - Mann-Whitney U   : Comparación independiente vs algoritmo de referencia
   - Friedman         : Ranking global no paramétrico entre todos los algoritmos
   - IC 95%           : Intervalo de confianza para la media de cada algoritmo
@@ -25,6 +26,23 @@ import scipy.stats as stats
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+
+def ajustar_pvalues_holm(pvalues: list[float]) -> list[float]:
+    """Aplica Holm step-down y devuelve los p-valores en el orden original."""
+    adjusted = [float("nan")] * len(pvalues)
+    valid = [(i, float(p)) for i, p in enumerate(pvalues) if np.isfinite(p)]
+    if not valid:
+        return adjusted
+
+    ordered = sorted(valid, key=lambda item: item[1])
+    m = len(ordered)
+    running_max = 0.0
+    for rank, (original_index, pvalue) in enumerate(ordered, start=1):
+        corrected = min(1.0, (m - rank + 1) * pvalue)
+        running_max = max(running_max, corrected)
+        adjusted[original_index] = running_max
+    return adjusted
 
 
 def realizar_analisis_estadistico(
@@ -65,13 +83,17 @@ def realizar_analisis_estadistico(
 
     ref_vals = np.array(resultados_dict[algoritmo_referencia])
     n_runs   = len(ref_vals)
+    if n_runs < 2:
+        raise ValueError("Se requieren al menos 2 runs por algoritmo.")
+    if any(len(resultados_dict[alg]) != n_runs for alg in nombres_algs):
+        raise ValueError("Todos los algoritmos deben tener el mismo número de runs.")
 
     print("\n" + "=" * 85)
     print(f"  ANÁLISIS ESTADÍSTICO INFERENCIAL — {titulo_benchmark} ({n_runs} RUNS)")
     print(f"  Referencia: '{algoritmo_referencia}' | Métrica: {metrica_label}")
     print("=" * 85)
 
-    # ── 1. Estadísticas Descriptivas + Shapiro-Wilk + Wilcoxon + Mann-Whitney ──
+    # ── 1. Estadísticas descriptivas y pruebas por algoritmo ────────────────
     tabla_resumen: list[dict] = []
     data_matrix:   list[np.ndarray] = []
 
@@ -115,33 +137,9 @@ def realizar_analisis_estadistico(
             except Exception:
                 p_mwu = 1.0
 
-            # Símbolo de significancia
-            if p_wilc < 0.001:
-                sym = "***"
-            elif p_wilc < 0.01:
-                sym = "**"
-            elif p_wilc < 0.05:
-                sym = "*"
-            else:
-                sym = "ns"
-
-            ref_mean = float(np.mean(ref_vals))
-            if minimizacion:
-                # Menor es mejor: si el comparado es mayor y significativo → Peor
-                if mean_v > ref_mean and p_wilc < 0.05:
-                    sig_label = f"Peor (-) {sym}"
-                elif mean_v < ref_mean and p_wilc < 0.05:
-                    sig_label = f"Mejor (+) {sym}"
-                else:
-                    sig_label = f"Similar (=) {sym}"
-            else:
-                # Mayor es mejor: si el comparado es menor y significativo → Peor
-                if mean_v < ref_mean and p_wilc < 0.05:
-                    sig_label = f"Peor (-) {sym}"
-                elif mean_v > ref_mean and p_wilc < 0.05:
-                    sig_label = f"Mejor (+) {sym}"
-                else:
-                    sig_label = f"Similar (=) {sym}"
+            # La significancia se determina después de ajustar conjuntamente
+            # todas las comparaciones pareadas contra la referencia.
+            sig_label = "Pendiente de Holm"
 
         tabla_resumen.append({
             "algoritmo":  alg,
@@ -155,11 +153,51 @@ def realizar_analisis_estadistico(
             "ci95_high":  ci95_high,
             "shapiro_p":  p_sw,
             "wilcoxon_p": p_wilc,
+            "wilcoxon_p_holm": float("nan"),
             "mwu_p":      p_mwu,
             "significancia": sig_label,
         })
 
-    # ── 2. Test de Friedman ───────────────────────────────────────────────────
+    # ── 2. Corrección de Holm dentro de la familia de comparaciones ─────────
+    comparables = [
+        d for d in tabla_resumen if d["algoritmo"] != algoritmo_referencia
+    ]
+    pvalues_holm = ajustar_pvalues_holm([d["wilcoxon_p"] for d in comparables])
+    for d, p_holm in zip(comparables, pvalues_holm):
+        d["wilcoxon_p_holm"] = p_holm
+
+    ref_mean = float(np.mean(ref_vals))
+    for d in tabla_resumen:
+        if d["algoritmo"] == algoritmo_referencia:
+            d["wilcoxon_p_holm"] = 1.0
+            d["significancia"] = "="
+            continue
+
+        p_holm = d["wilcoxon_p_holm"]
+        if p_holm < 0.001:
+            sym = "***"
+        elif p_holm < 0.01:
+            sym = "**"
+        elif p_holm < 0.05:
+            sym = "*"
+        else:
+            sym = "ns"
+
+        if minimizacion:
+            # La etiqueta se expresa desde la perspectiva de la referencia
+            # (Hybrid DTW/DDTW): menor fitness significa que la referencia es
+            # mejor cuando el comparador tiene una media mayor.
+            referencia_es_mejor = d["mean"] > ref_mean
+        else:
+            referencia_es_mejor = d["mean"] < ref_mean
+        if p_holm < 0.05:
+            d["significancia"] = (
+                f"Mejor (+) {sym}" if referencia_es_mejor else f"Peor (-) {sym}"
+            )
+        else:
+            d["significancia"] = f"Similar (=) {sym}"
+
+    # ── 3. Test de Friedman ───────────────────────────────────────────────────
     try:
         stat_fried, p_fried = stats.friedmanchisquare(*data_matrix)
     except Exception:
@@ -181,19 +219,19 @@ def realizar_analisis_estadistico(
     # Ordenar por mean_rank ascendente
     tabla_resumen.sort(key=lambda x: x["mean_rank"])
 
-    # ── 3. Consola ────────────────────────────────────────────────────────────
+    # ── 4. Consola ────────────────────────────────────────────────────────────
     print(f"\n--- TEST DE FRIEDMAN GLOBAL ---")
     print(f"  Chi2 = {stat_fried:.4f}  |  p-value = {p_fried:.6e}  "
           + ("(Significativo p < 0.05)" if p_fried < 0.05 else "(Sin diferencia global significativa)"))
     print("\n--- RANKING NO PARAMÉTRICO (VS REFERENCIA) ---")
-    header = f"{'Rank':<5} {'Algoritmo':<20} {'Media':>14} {'Std':>10} {'Mediana':>12} {'Shapiro p':>12} {'Wilcoxon p':>12} {'Significancia':<18}"
+    header = f"{'Rank':<5} {'Algoritmo':<20} {'Media':>14} {'Std':>10} {'Mediana':>12} {'Shapiro p':>12} {'Wilcoxon p(Holm)':>17} {'Significancia':<18}"
     print(header)
     print("-" * len(header))
     for r_idx, d in enumerate(tabla_resumen, 1):
         print(f"{r_idx:<5d} {d['algoritmo']:<20s} {d['mean']:>14.6f} {d['std']:>10.6f} "
-              f"{d['median']:>12.6f} {d['shapiro_p']:>12.4e} {d['wilcoxon_p']:>12.4e} {d['significancia']:<18s}")
+              f"{d['median']:>12.6f} {d['shapiro_p']:>12.4e} {d['wilcoxon_p_holm']:>17.4e} {d['significancia']:<18s}")
 
-    # ── 4. Boxplot Comparativo ────────────────────────────────────────────────
+    # ── 5. Boxplot Comparativo ────────────────────────────────────────────────
     algs_sorted = [d["algoritmo"] for d in tabla_resumen]
     vals_sorted = [resultados_dict[alg] for alg in algs_sorted]
 
@@ -228,14 +266,15 @@ def realizar_analisis_estadistico(
     plt.close(fig)
     print(f"\n  [plot] {boxplot_path}")
 
-    # ── 5. CSV ────────────────────────────────────────────────────────────────
+    # ── 6. CSV ────────────────────────────────────────────────────────────────
     csv_path = os.path.join(output_dir, csv_filename)
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([
             "rank", "algoritmo", "mean_rank", "media", "std",
             "mediana", "iqr", "ci95_low", "ci95_high", "min", "max",
-            "shapiro_pvalue", "wilcoxon_pvalue", "mannwhitney_pvalue", "significancia"
+            "shapiro_pvalue", "wilcoxon_pvalue_raw", "wilcoxon_pvalue_holm",
+            "mannwhitney_pvalue_raw", "significancia"
         ])
         for r_idx, d in enumerate(tabla_resumen, 1):
             writer.writerow([
@@ -243,29 +282,35 @@ def realizar_analisis_estadistico(
                 f"{d['mean']:.6f}", f"{d['std']:.6f}", f"{d['median']:.6f}",
                 f"{d['iqr']:.6f}", f"{d['ci95_low']:.6f}", f"{d['ci95_high']:.6f}",
                 f"{d['min']:.6f}", f"{d['max']:.6f}",
-                f"{d['shapiro_p']:.6e}", f"{d['wilcoxon_p']:.6e}", f"{d['mwu_p']:.6e}",
+                f"{d['shapiro_p']:.6e}", f"{d['wilcoxon_p']:.6e}",
+                f"{d['wilcoxon_p_holm']:.6e}", f"{d['mwu_p']:.6e}",
                 d["significancia"]
             ])
     print(f"  [csv]  {csv_path}")
 
-    # ── 6. Markdown ───────────────────────────────────────────────────────────
+    # ── 7. Markdown ───────────────────────────────────────────────────────────
     md_path = os.path.join(output_dir, md_filename)
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(f"# Análisis Estadístico Inferencial — {titulo_benchmark}\n\n")
         f.write(f"- **Runs independientes:** {n_runs}\n")
         f.write(f"- **Referencia (control):** `{algoritmo_referencia}`\n")
         f.write(f"- **Métrica:** {metrica_label}\n")
+        f.write("- **Desviación estándar:** muestral (`ddof=1`)\n")
+        f.write("- **IC 95%:** aproximación normal `media ± 1.96·SE`\n")
+        f.write(f"- **Corrección por comparaciones múltiples:** Holm sobre "
+                f"{len(comparables)} comparaciones pareadas contra la referencia.\n")
         f.write(f"- **Friedman χ²:** `{stat_fried:.4f}`  |  p-value = `{p_fried:.6e}`")
         f.write("  ✅ Diferencia significativa\n\n" if p_fried < 0.05 else "  ❌ Sin diferencia global significativa\n\n")
         f.write("## Tabla de Resultados y p-valores\n\n")
-        f.write("| Rank | Algoritmo | Mean Rank | Media | Std | Mediana | IC 95% | Shapiro p | Wilcoxon p | Significancia |\n")
-        f.write("|------|-----------|-----------|-------|-----|---------|--------|-----------|------------|---------------|\n")
+        f.write("| Rank | Algoritmo | Mean Rank | Media | Std | Mediana | IC 95% | Shapiro p | Wilcoxon p bruto | Wilcoxon p Holm | Significancia |\n")
+        f.write("|------|-----------|-----------|-------|-----|---------|--------|-----------|------------------|-----------------|---------------|\n")
         for r_idx, d in enumerate(tabla_resumen, 1):
             ic = f"[{d['ci95_low']:.4f}, {d['ci95_high']:.4f}]"
             bold = "**" if d["algoritmo"] == algoritmo_referencia else ""
             f.write(f"| {r_idx} | {bold}`{d['algoritmo']}`{bold} | {d['mean_rank']:.2f} | "
                     f"`{d['mean']:.6f}` | `{d['std']:.6f}` | `{d['median']:.6f}` | {ic} | "
-                    f"`{d['shapiro_p']:.4e}` | `{d['wilcoxon_p']:.4e}` | **{d['significancia']}** |\n")
+                    f"`{d['shapiro_p']:.4e}` | `{d['wilcoxon_p']:.4e}` | "
+                    f"`{d['wilcoxon_p_holm']:.4e}` | **{d['significancia']}** |\n")
         f.write("\n\n*Leyenda:* `*** p < 0.001`, `** p < 0.01`, `* p < 0.05`, `ns: p ≥ 0.05`.\n")
     print(f"  [md]   {md_path}")
 

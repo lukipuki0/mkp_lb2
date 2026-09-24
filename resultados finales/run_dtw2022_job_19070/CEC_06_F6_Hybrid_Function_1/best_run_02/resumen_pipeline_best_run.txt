@@ -1,0 +1,13 @@
+Funcion            : CEC 6 (F6_Hybrid_Function_1) (Mejor Run #02)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 1800.000000
+Mejor valor global : 1846.429085
+Estado del mejor   : Peor que el óptimo
+Total switches     : 5
+
+1. GWO (poblacional) | mejor=4280552.242095 | 0.0s-1.1s | iters=123
+2. WOA (poblacional) | mejor=2046.216570 | 1.1s-4.1s | iters=300
+3. PSO (poblacional) | mejor=1850.256344 | 4.1s-7.2s | iters=300
+4. ACO (poblacional) | mejor=1850.256344 | 7.2s-7.8s | iters=99
+5. EHO (poblacional) | mejor=1846.429085 | 7.8s-11.1s | iters=300

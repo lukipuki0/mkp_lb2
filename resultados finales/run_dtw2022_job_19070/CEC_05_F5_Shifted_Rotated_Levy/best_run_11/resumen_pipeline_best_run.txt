@@ -1,0 +1,14 @@
+Funcion            : CEC 5 (F5_Shifted_Rotated_Levy) (Mejor Run #11)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 900.000000
+Mejor valor global : 900.000000
+Estado del mejor   : Óptimo alcanzado
+Total switches     : 6
+
+1. ACO (poblacional) | mejor=900.000030 | 0.0s-1.0s | iters=300
+2. PSO (poblacional) | mejor=900.000000 | 1.0s-1.9s | iters=269
+3. ACO (poblacional) | mejor=900.000000 | 1.9s-2.1s | iters=99
+4. GWO (poblacional) | mejor=900.000000 | 2.1s-2.3s | iters=99
+5. EHO (poblacional) | mejor=900.000000 | 2.3s-2.8s | iters=152
+6. ACO (poblacional) | mejor=900.000000 | 2.8s-3.0s | iters=99

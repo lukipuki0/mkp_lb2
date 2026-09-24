@@ -1,0 +1,16 @@
+Funcion            : CEC 12 (F12_Composition_Function_4) (Mejor Run #01)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 2700.000000
+Mejor valor global : 2860.680176
+Estado del mejor   : Peor que el óptimo
+Total switches     : 8
+
+1. WOA (poblacional) | mejor=2864.348354 | 0.0s-2.1s | iters=300
+2. EHO (poblacional) | mejor=2860.680176 | 2.1s-3.6s | iters=190
+3. GWO (poblacional) | mejor=2860.680176 | 3.6s-4.2s | iters=99
+4. PSO (poblacional) | mejor=2860.680176 | 4.2s-4.8s | iters=99
+5. ACO (poblacional) | mejor=2860.680176 | 4.8s-5.2s | iters=99
+6. PSO (poblacional) | mejor=2860.680176 | 5.2s-5.8s | iters=99
+7. ACO (poblacional) | mejor=2860.680176 | 5.8s-6.3s | iters=99
+8. GWO (poblacional) | mejor=2860.680176 | 6.3s-6.9s | iters=99

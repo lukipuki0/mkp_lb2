@@ -32,6 +32,7 @@ from hybrid_mkp.mkp_core.data_loader import cargar_instancias, seleccionar_insta
 from hybrid_mkp.mkp_core.problem import MKPInstance
 from hybrid_mkp.orchestrator import ejecutar_pipeline, ejecutar_mh_standalone, COLORES_MH
 from hybrid_mkp.analisis_estadistico import realizar_analisis_estadistico
+from hybrid_mkp.resumen_estadistico_global import generar_resumen_estadistico_global
 from hybrid_mkp.plots import (
     grafico_convergencia,
     grafico_dtw_delta,
@@ -57,7 +58,7 @@ STAG_BAND        = 0
 STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
 STAG_PATIENCE    = 25
-STAG_USE_DDTW    = False
+STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
@@ -492,21 +493,11 @@ def main() -> None:
             f.write(f"| {i} | `{r['nombre']}` | {r['n']} | {r['m']} | {r['media']:.1f} | {r['std']:.2f} | {r['mejor']:.1f} | {r['peor']:.1f} | {r['valor_optimo']:.1f} | {g_med_str} | {g_mej_str} | {r['switches_medio']:.1f} | {t_med_str} |\n")
     print(f"  [md] Resumen guardado en '{md_path}'")
 
-    # ── Análisis Estadístico Global ───────────────────────────────────────────
+    # ── Resumen estadístico global válido ────────────────────────────────────
+    # No se comparan objetivos crudos entre instancias: tienen escalas y BKS
+    # diferentes. Se agregan los Wilcoxon híbrido-vs-baselines de cada instancia.
     if len(resumen_global) > 1:
-        resultados_multi = {r["nombre"]: r["valores_runs"] for r in resumen_global}
-        referencia_global = resumen_global[0]["nombre"]
-        realizar_analisis_estadistico(
-            resultados_dict      = resultados_multi,
-            output_dir           = batch_dir,
-            algoritmo_referencia = referencia_global,
-            metrica_label        = "Fitness (Maximización MKP)",
-            titulo_benchmark     = f"Batch MKP HPC ({len(resumen_global)} instancias)",
-            minimizacion         = False,
-            boxplot_filename     = "boxplot_comparativo_instancias.png",
-            csv_filename         = "analisis_estadistico_global.csv",
-            md_filename          = "analisis_estadistico_global.md",
-        )
+        generar_resumen_estadistico_global(batch_dir, resumen_global)
 
     print(f"\n  TODAS LAS 9 INSTANCIAS FINALIZADAS EXITOSAMENTE.\n")
 

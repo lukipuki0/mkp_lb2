@@ -4,8 +4,8 @@ plots/
 Módulo de visualización del Pipeline Híbrido DTW para MKP.
 
 Exporta funciones para generar cada gráfico de forma independiente:
-  - grafico_convergencia   : Curva de fitness coloreada por MH (leyenda upper right)
-  - grafico_dtw_delta      : Curva del Delta DTW a lo largo del pipeline
+  - grafico_convergencia   : Curva de fitness coloreada por MH (leyenda abajo a la derecha)
+  - grafico_dtw_delta      : Curva del Delta DTW a lo largo del pipeline (leyenda abajo a la derecha)
   - grafico_switches       : Diagrama de Gantt con los turnos de cada MH
   - grafico_instantaneo    : Curva combinada mejor global + fitness instantáneo
   - grafico_solo_instantaneo : Curva individual de fitness instantáneo

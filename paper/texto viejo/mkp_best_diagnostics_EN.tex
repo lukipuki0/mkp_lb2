@@ -1,0 +1,96 @@
+% Diagnostic figures for the best DTW/DDTW configuration of each MKP instance.
+% This is an input fragment for paper/results.tex.  The figures use only
+% graphicx, which is already loaded by the main paper preamble.
+%
+% Selection criterion: lowest mean optimality gap among DTW--1K, DDTW--1K,
+% DTW--3K, and DDTW--3K.  The paired plots correspond to the best run stored
+% for the selected campaign.
+
+Figures~\ref{fig:mkp-best-cb1}--\ref{fig:mkp-best-cb9} show the convergence
+trajectory and the $\Delta$ monitor for the best-performing framework
+configuration selected independently for each MKP instance. The selection is
+based on the lowest mean optimality gap over 31 runs: DTW--3K is selected for
+\texttt{mknapcb1} and \texttt{mknapcb3}--\texttt{mknapcb8}, whereas DDTW--3K
+is selected for \texttt{mknapcb2} and \texttt{mknapcb9}. Each pair uses the
+best run reported by the corresponding campaign.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb1_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb1_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb1} under DTW--3K, best run 31.}
+\label{fig:mkp-best-cb1}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb2_ddtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb2_ddtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb2} under DDTW--3K, best run 31.}
+\label{fig:mkp-best-cb2}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb3_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb3_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb3} under DTW--3K, best run 26.}
+\label{fig:mkp-best-cb3}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb4_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb4_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb4} under DTW--3K, best run 31.}
+\label{fig:mkp-best-cb4}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb5_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb5_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb5} under DTW--3K, best run 26.}
+\label{fig:mkp-best-cb5}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb6_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb6_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb6} under DTW--3K, best run 22.}
+\label{fig:mkp-best-cb6}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb7_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb7_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb7} under DTW--3K, best run 02.}
+\label{fig:mkp-best-cb7}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb8_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb8_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb8} under DTW--3K, best run 28.}
+\label{fig:mkp-best-cb8}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb9_ddtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.49\linewidth]{imagenes_mkp_mejores/mknapcb9_ddtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb9} under DDTW--3K, best run 15.}
+\label{fig:mkp-best-cb9}
+\end{figure}

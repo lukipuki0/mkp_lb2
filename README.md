@@ -1,8 +1,12 @@
-# Optimization Metaheuristics & Cooperative WOA--ABC for MCDP
+# Continuous Metaheuristics & Adaptive WOA--ABC
 
-Este repositorio contiene un framework modular para la implementación, evaluación e hibridación de **metaheurísticas poblacionales y de trayectoria**, aplicadas al **Machine Cell Design Problem (MCDP)** y a otros dominios del proyecto.
+Este repositorio contiene un framework modular para la implementación y
+evaluación de metaheurísticas. Para la implementación activa de CEC2022 y
+HRES2 se usará exclusivamente la MH poblacional WOA--ABC y sus siete variantes
+adaptativas; las MH de trayectoria y los pipelines rotativos quedan fuera de
+este experimento.
 
-El proyecto incorpora un monitor de estancamiento dinámico basado en **Dynamic Time Warping (DTW)** y una mezcla cooperativa de **WOA + ABC** para MCDP.
+El proyecto incorpora un monitor de estancamiento dinámico basado en **Dynamic Time Warping (DTW)** y un plan de variantes adaptativas para WOA--ABC continuo.
 
 ---
 
@@ -14,11 +18,6 @@ mkp_lb2/
 │   ├── data_loader.py        # Cargador y parser de instancias OR-Library
 │   ├── problem.py            # Definición de la estructura del problema MKP
 │   └── repair.py             # Algoritmo de reparación greedy y factibilidad
-│
-├── mcdp_core/                # Modelo del Machine Cell Design Problem (MCDP)
-│   ├── data.py               # Carga de matrices y generación de instancias
-│   ├── environment.py        # Evaluación, factibilidad y vecinos MCDP
-│   └── results.py            # Persistencia de resultados MCDP
 │
 ├── lb2/                      # Framework de binarización compartida (LB2)
 │   ├── transfer.py           # Funciones de transferencia (V1-V4, S1-S4)
@@ -44,11 +43,13 @@ mkp_lb2/
 │   ├── benchmark_continuo.py # Ejecutor por lotes del pipeline continuo
 │   └── mh/                   # Adaptación de metaheurísticas al dominio continuo
 │
-├── mezclas_mh/               # 🔀 Mezclas e Hibridaciones de Metaheurísticas
-│   └── woa_abc/              # Única mezcla activa para MCDP
-│       ├── cooperativo_mcdp_dtw.py # WOA + ABC con comunicación y DTW
-│       ├── run_cooperative_mcdp.py # Ejecutor para MCDP
-│       └── README.md               # Documentación de la mezcla
+├── woa_abc/                  # Wrappers WOA + ABC para funciones continuas
+│   ├── adaptive.py           # Siete políticas/perfiles de parámetros DTW
+│   ├── cooperativo_cec_dtw.py # Motor WOA--ABC exclusivo CEC
+│   ├── cooperativo_hres2_dtw.py # Motor WOA--ABC exclusivo HRES2
+│   ├── run_cec_variants.py   # Ejecutor CEC2022
+│   ├── run_hres2_variants.py # Ejecutor HRES2
+│   └── resultados/            # Salidas CEC/HRES2
 │
 ├── hybrid_mkp/               # Orquestación de pipelines híbridos y rotación secuencial
 ├── plots/                    # Utilidades modulares de visualización de métricas
@@ -57,21 +58,11 @@ mkp_lb2/
 
 ---
 
-## 🔀 Mezcla cooperativa WOA--ABC para MCDP
+## Archivo MCDP
 
-La implementación activa es
-[`cooperativo_mcdp_dtw.py`](mezclas_mh/woa_abc/cooperativo_mcdp_dtw.py).
-WOA y ABC trabajan sobre una población común: WOA explora, ABC refina la misma
-población y ambas fases comparten inmediatamente el mejor global. Se incorpora
-momentum entre mejores consecutivos y DTW reajusta los parámetros cuando
-detecta estancamiento sostenido.
-
-Para el MCDP, la variante cooperativa usa directamente asignaciones de
-máquina a celda (no LB2, porque la variable tiene más de dos categorías):
-
-```bash
-python -m mezclas_mh.woa_abc.run_cooperative_mcdp --iterations 300
-```
+El código, datos, resultados y documentación MCDP se conservaron para una
+etapa posterior en [`planes/futuro_mcdp`](planes/futuro_mcdp/). No forma parte
+de la implementación continua activa.
 
 ---
 
@@ -87,33 +78,23 @@ Soporta la evaluación completa sobre las **12 funciones oficiales de CEC2022**:
 
 ## 🚀 Guía de Ejecución
 
-### 1. Ejecución del solver cooperativo MCDP
+### Variantes WOA--ABC sobre CEC2022
 
 ```bash
-python -m mezclas_mh.woa_abc.run_cooperative_mcdp --iterations 300
+python -m woa_abc.run_cec_variants --variants all --runs 31 --iterations 1000 --ddtw
 ```
 
-El ejecutor trabaja sobre una instancia MCDP y muestra el costo, factibilidad,
-comunicaciones entre WOA y ABC y activaciones del DTW. Se pueden ajustar sus
-parámetros, por ejemplo:
+### Variantes WOA--ABC sobre HRES2
 
 ```bash
-python -m mezclas_mh.woa_abc.run_cooperative_mcdp \
-  --instance 1 --cells 3 --capacity 6 --iterations 300 \
-  --pop-size 20 --seed 42 --ddtw
-```
-
-### 2. Ejecución del Benchmark Continuo General
-Para evaluar el pipeline con monitor DTW sobre las 12 funciones del CEC2022:
-
-```bash
-python -m continuous_benchmark.benchmark_continuo
+python -m woa_abc.run_hres2_variants --variants all --runs 31 --iterations 1000 --ddtw
 ```
 
 ---
 
 ## 📦 Estructura de Resultados
-Todos los scripts de benchmark generan automáticamente:
-- **Gráficos PNG**: Curvas de convergencia histórica y fitness instantáneo por iteración.
-- **Archivos CSV**: Series de tiempo de fitness y diferencias DTW.
-- **Informes TXT / Markdown**: Tablas comparativas con óptimos conocidos y brechas relativas (Gap %).
+
+Los nuevos ejecutores guardan configuraciones, resultados por seed, curvas de
+convergencia, estados DTW y perfiles de parámetros en
+`woa_abc/resultados/cec/` y `woa_abc/resultados/hres2/`. El análisis estadístico
+inferencial se añadirá en una etapa posterior.

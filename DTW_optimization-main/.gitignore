@@ -1,0 +1,31 @@
+# Archivos específicos ignorados
+dtw_dtwstagnation.py
+
+# ==========================================
+# Patrones comunes de Python (Ejemplos para que aprendas)
+# ==========================================
+
+# 1. Caché de Python (Directorios completos)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 2. Entornos virtuales (Ignora la carpeta entera si está en la raíz)
+/.venv/
+/venv/
+/env/
+
+# 3. Archivos de entorno (NUNCA subas tus secretos)
+.env
+.env.local
+
+# 4. Archivos generados por el SO
+.DS_Store
+Thumbs.db
+
+
+.atl/
+.ruff_cache/
+
+/errors
+/logs

@@ -4,8 +4,8 @@ continuous_benchmark/plots/
 Módulo de visualización del Pipeline Híbrido DTW — exclusivo para CEC2022.
 
 Exporta:
-  - grafico_convergencia : Curva de fitness coloreada por MH (leyenda upper right)
-  - grafico_dtw_delta    : Curva del Delta DTW a lo largo del pipeline
+  - grafico_convergencia : Curva de fitness coloreada por MH (leyenda abajo a la derecha)
+  - grafico_dtw_delta    : Curva del Delta DTW a lo largo del pipeline (leyenda abajo a la derecha)
   - grafico_switches     : Diagrama de Gantt con los turnos de cada MH
 """
 

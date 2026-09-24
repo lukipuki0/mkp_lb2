@@ -1,0 +1,49 @@
+================================================================================
+  Numerical Results — mknapcb3[0] — Exploration-only vs Variants
+  Wilcoxon signed-rank (two-sided) | Holm-Bonferroni alpha = 0.0500 (20 comparisons)
+================================================================================
+
+  [PSO]
+    Exploration-only:    117655.1  +/- 207.8
+    Version                    Mean        Std       DMed    p-value Holm Sig   Normal?
+    -------------------- ---------- ---------- ---------- ---------- --------   -------
+    Exploitation-only      116335.7      330.0   -1300.0     0.0000  YES       yes
+    Binary-Simple          117505.1      259.9    -234.0     0.0209  no        yes
+    Binary-Complex         117492.1      246.9    -164.0     0.0177  no        yes
+    Continuous-Simple      117555.0      200.4    -157.0     0.0394  no        yes
+    Continuous-Complex     117442.2      282.2    -237.0     0.0029  YES       yes
+    -> Best: Continuous-Simple  (delta = +-157.0)
+
+  [GA]
+    Exploration-only:    117667.0  +/- 297.6
+    Version                    Mean        Std       DMed    p-value Holm Sig   Normal?
+    -------------------- ---------- ---------- ---------- ---------- --------   -------
+    Exploitation-only      119941.0       60.6 +   2227.0     0.0000  YES       yes
+    Binary-Simple          119485.8      208.7 +   1887.0     0.0000  YES       yes
+    Binary-Complex         119605.3      216.2 +   1997.0     0.0000  YES       yes
+    Continuous-Simple      119485.8      208.7 +   1887.0     0.0000  YES       yes
+    Continuous-Complex     119491.3      261.3 +   1832.0     0.0000  YES       yes
+    -> Best: Exploitation-only  (delta = +2227.0)
+
+  [GWO]
+    Exploration-only:    117393.4  +/- 210.6
+    Version                    Mean        Std       DMed    p-value Holm Sig   Normal?
+    -------------------- ---------- ---------- ---------- ---------- --------   -------
+    Exploitation-only      117452.1      170.9 +     10.0     0.2811  no        yes
+    Binary-Simple          117353.6      202.1 +      9.0     0.6173  no        yes
+    Binary-Complex         117362.6      180.9 +     41.0     0.6522  no        yes
+    Continuous-Simple      117330.8      219.3     -14.0     0.3419  no        yes
+    Continuous-Complex     117341.5      244.2     -17.0     0.5370  no        yes
+    -> Best: Binary-Complex  (delta = +41.0)
+
+  [DE]
+    Exploration-only:    118196.2  +/- 303.6
+    Version                    Mean        Std       DMed    p-value Holm Sig   Normal?
+    -------------------- ---------- ---------- ---------- ---------- --------   -------
+    Exploitation-only      117721.6      418.1    -436.0     0.0001  YES       NO
+    Binary-Simple          118507.0      380.3 +    273.0     0.0020  YES       yes
+    Binary-Complex         118421.2      384.9 +    257.0     0.0198  no        yes
+    Continuous-Simple      118408.7      425.7 +    364.0     0.0110  no        NO
+    Continuous-Complex     118224.5      433.9 +    130.0     0.3082  no        NO
+    -> Best: Continuous-Simple  (delta = +364.0)
+

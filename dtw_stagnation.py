@@ -109,6 +109,9 @@ class StagnationConfig:
         Ajustar umbrales usando percentiles del historial.
     p_low / p_high : float
         Percentiles para los umbrales adaptativos.
+    improvement_tol : float
+        Tolerancia relativa. Una mejora menor que esta fracción del valor
+        anterior se considera insuficiente y cuenta como no mejora.
     """
 
     window:           int   = 40
@@ -120,8 +123,11 @@ class StagnationConfig:
     adapt_thresholds: bool  = True
     p_low:            float = 30.0
     p_high:           float = 70.0
+    improvement_tol:  float = 0.0
 
     def __post_init__(self) -> None:
+        if self.improvement_tol < 0.0:
+            raise ValueError("improvement_tol debe ser no negativa")
         if self.band <= 0:
             self.band = max(1, int(0.1 * self.window))
 
@@ -193,9 +199,14 @@ class StagnationMonitor:
             ]
 
         # ── Actualizar historial ──────────────────────────────────────────
-        if self.best_so_far and new_best <= self.best_so_far[-1]:
-            self.no_improve_len += 1
-            new_best = self.best_so_far[-1]
+        if self.best_so_far:
+            previous_best = self.best_so_far[-1]
+            tolerance = self.cfg.improvement_tol * max(1.0, abs(previous_best))
+            if new_best <= previous_best + tolerance:
+                self.no_improve_len += 1
+                new_best = previous_best
+            else:
+                self.no_improve_len = 0
         else:
             self.no_improve_len = 0
 

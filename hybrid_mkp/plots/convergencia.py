@@ -75,11 +75,14 @@ def grafico_convergencia(
             mpatches.Patch(color="red", label=f"Optimum ({valor_optimo:.0f})")
         )
 
-    ax.set_title("Hybrid DTW Pipeline - Fitness Convergence", fontsize=20, fontweight="bold")
+    ax.set_title("Hybrid DTW/DDTW Pipeline - Fitness Convergence",
+                 fontsize=20, fontweight="bold")
     ax.set_xlabel("Accumulated Iterations", fontsize=18)
     ax.set_ylabel("Best Fitness Value", fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
-    ax.legend(handles=legend_patches, loc="lower left", fontsize=15)
+    # Keep the legend inside the axes, anchored at the lower-right corner.
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=15,
+              borderaxespad=0.25, frameon=True, framealpha=0.88)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 

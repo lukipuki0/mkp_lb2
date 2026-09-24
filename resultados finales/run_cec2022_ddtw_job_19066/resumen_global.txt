@@ -1,0 +1,20 @@
+RESUMEN GLOBAL DEL BENCHMARK CONTINUO
+Fecha       : 20260906_185100
+Funciones   : 12
+Runs/func   : 31
+Iters/run   : 1000
+
+#   Funcion                                         Dim          Media          Std      Mediana        Mejor     Optimo
+---------------------------------------------------------------------------------------------------------------------------
+1   F1_Shifted_Rotated_Zakharov                      10       300.4688       2.6095     300.0000     300.0000   300.0000
+2   F2_Shifted_Rotated_Rosenbrock                    10       405.9358       3.7610     408.9161     400.0109   400.0000
+3   F3_Shifted_Rotated_Expanded_Schaffers_F7         10       603.6878       6.0505     601.0803     600.0176   600.0000
+4   F4_Shifted_Rotated_NonContinuous_Rastrigin       10       815.7419       4.9462     816.0000     806.0000   800.0000
+5   F5_Shifted_Rotated_Levy                          10       901.9720       5.9809     900.0000     900.0000   900.0000
+6   F6_Hybrid_Function_1                             10      3532.5297    1942.1640    2738.4861    1830.3996  1800.0000
+7   F7_Hybrid_Function_2                             10      2022.6984       9.8064    2021.9900    2001.4952  2000.0000
+8   F8_Hybrid_Function_3                             10      2221.1768       3.3478    2221.0948    2207.6249  2200.0000
+9   F9_Composition_Function_1                        10      2529.2844       0.0000    2529.2844    2529.2844  2300.0000
+10  F10_Composition_Function_2                       10      2522.8297      46.3550    2500.5288    2500.2813  2400.0000
+11  F11_Composition_Function_3                       10      2653.6901      91.1352    2600.0000    2600.0000  2600.0000
+12  F12_Composition_Function_4                       10      2863.7572       1.3575    2863.7148    2860.6802  2700.0000

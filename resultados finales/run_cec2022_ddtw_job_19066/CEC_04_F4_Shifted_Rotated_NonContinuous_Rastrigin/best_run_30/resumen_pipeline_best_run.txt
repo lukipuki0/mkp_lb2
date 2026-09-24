@@ -1,0 +1,14 @@
+Funcion            : CEC 4 (F4_Shifted_Rotated_NonContinuous_Rastrigin) (Mejor Run #30)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 800.000000
+Mejor valor global : 806.000000
+Estado del mejor   : Peor que el óptimo
+Total switches     : 6
+
+1. WOA (poblacional) | mejor=880.000000 | 0.0s-0.2s | iters=108
+2. GWO (poblacional) | mejor=824.698967 | 0.2s-0.4s | iters=108
+3. WOA (poblacional) | mejor=821.268584 | 0.4s-1.3s | iters=300
+4. EHO (poblacional) | mejor=821.000000 | 1.3s-1.6s | iters=132
+5. GWO (poblacional) | mejor=819.441902 | 1.6s-1.9s | iters=108
+6. WOA (poblacional) | mejor=806.000000 | 1.9s-2.5s | iters=251

@@ -1,0 +1,291 @@
+% -----------------------------------------------------------------------------
+% Final inferential analysis across MKP, CEC2022, and HRES2--H2.
+% This is an input fragment, not a standalone LaTeX document.
+% Required packages: amsmath, booktabs, graphicx, and array.
+%
+% Data sources:
+% - MKP: resultados finales/run_{dtw,ddtw}{,_3k}_mkp/
+% - CEC2022: resultados finales/run_dtw2022_job_19070/ and
+%            resultados finales/run_cec2022_ddtw_job_19066/
+% - HRES2--H2: resultados finales/run_{dtw,ddtw}_hres2/
+% -----------------------------------------------------------------------------
+
+\section{Cross-Domain Inferential Statistical Analysis}
+\label{sec:statistical-analysis-final}
+
+This section evaluates whether the proposed DTW- and DDTW-driven hybrid
+frameworks differ significantly from the standalone metaheuristics in the
+three experimental domains: the Multidimensional Knapsack Problem (MKP), the
+IEEE CEC2022 continuous benchmark, and the HRES2--H2 engineering case. Each
+method was evaluated over 31 stochastic runs. In MKP and CEC2022, corresponding
+run indices followed the same seed schedule and were treated as matched
+experimental blocks. In HRES2--H2, this pairing is documented only for the
+direct DTW--DDTW comparison; the standalone-method samples were therefore
+treated as independent.
+
+\subsection{Statistical protocol}
+
+Normality was assessed with the Shapiro--Wilk test at $\alpha=0.05$. Since
+normality was rejected in a substantial fraction of the framework
+distributions, inferential conclusions were based on non-parametric tests. For
+the matched MKP and CEC2022 observations, the Friedman test was used as the
+omnibus comparison and the two-sided Wilcoxon signed-rank test was used for
+pairwise contrasts. The HRES2--H2 hybrid--baseline comparisons used the
+two-sided Mann--Whitney $U$ test because the archived baseline samples are
+independent rather than matched. Family-wise error was controlled with Holm's
+step-down procedure: over the six MKP configuration contrasts, over the seven
+hybrid--baseline tests within each MKP instance, over the five
+hybrid--baseline tests within each CEC2022 function, over the 12 direct
+CEC2022 DTW--DDTW contrasts, and separately over the ten HRES2--H2 comparisons
+of each framework variant. A comparison was considered significant when
+$p_{\mathrm{Holm}}<0.05$.
+
+The direction of every pairwise result is reported from the perspective of
+the hybrid framework. Thus, W/T/L denotes a significant hybrid win, a
+non-significant tie, or a significant hybrid loss, respectively. Larger
+fitness is better in MKP, whereas smaller objective values are better in
+CEC2022 and HRES2--H2. Raw objective values from different MKP instances or
+CEC2022 functions were not pooled because they have different scales. Global
+conclusions instead use normalized gaps, within-problem ranks, and aggregated
+within-problem pairwise decisions.
+
+\begin{table}[htbp]
+\centering
+\caption{Statistical design and principal comparison against standalone
+metaheuristics in each domain.}
+\label{tab:final-stat-protocol}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+Domain & Performance metric & Standalone methods & Multiplicity family & Main outcome \\
+\midrule
+MKP & Normalized BKS gap & 7 methods & Wilcoxon--Holm: 7 per instance & Portfolio advantage, not universal dominance \\
+CEC2022 & Objective value/rank & 5 methods & Wilcoxon--Holm: 5 per function & Best aggregate rank in both campaigns \\
+HRES2--H2 & LCOE (CNY/kWh) & 10 methods & Mann--Whitney--Holm: 10 per variant & Higher baseline means and significant distributional differences \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Multidimensional Knapsack Problem}
+\label{sec:final-stat-mkp}
+
+The MKP analysis covered the first instance of each of the nine Chu--Beasley
+families and four framework configurations: DTW--1K, DDTW--1K, DTW--3K, and
+DDTW--3K. Shapiro--Wilk rejected normality in 14 of the 36
+instance--configuration distributions. Therefore, the comparison among the
+four configurations used the mean percentage gap to the best known solution
+(BKS), with lower values indicating better performance.
+
+The Friedman test detected a significant difference among the four
+configurations ($\chi_F^2=24.0667$, $p=2.419\times10^{-5}$). DTW--3K obtained
+the best mean rank (1.22), followed by DDTW--3K (1.78), DTW--1K (3.11), and
+DDTW--1K (3.89). All six paired configuration comparisons remained
+significant after Holm correction (Table~\ref{tab:final-mkp-config-tests}).
+Increasing the budget from 1K to 3K reduced the average gap from 2.237\% to
+1.805\% for DTW (19.3\% relative reduction) and from 2.391\% to 1.876\% for
+DDTW (21.5\% relative reduction).
+
+\begin{table}[htbp]
+\centering
+\caption{Paired Wilcoxon comparisons of the mean MKP gap across the nine
+instances. Holm adjustment was applied to the six contrasts.}
+\label{tab:final-mkp-config-tests}
+\begin{tabular}{lrr}
+\toprule
+Configuration contrast & Raw $p$ & $p_{\mathrm{Holm}}$ \\
+\midrule
+DTW--1K vs. DDTW--1K   & 0.027344 & 0.039063 \\
+DTW--1K vs. DTW--3K    & 0.003906 & 0.023438 \\
+DTW--1K vs. DDTW--3K   & 0.003906 & 0.023438 \\
+DDTW--1K vs. DTW--3K   & 0.003906 & 0.023438 \\
+DDTW--1K vs. DDTW--3K  & 0.003906 & 0.023438 \\
+DTW--3K vs. DDTW--3K   & 0.019531 & 0.039063 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Within each instance and campaign, the hybrid framework was compared with
+PSO, GWO, WOA, EHO, ACO, GA, and SA. All 36 per-instance Friedman tests were
+significant. Table~\ref{tab:final-mkp-wtl} aggregates the Holm-adjusted
+decisions without mixing raw fitness values across instances.
+
+\begin{table}[htbp]
+\centering
+\caption{MKP wins/ties/losses of each hybrid configuration against the seven
+standalone metaheuristics over nine instances. Each cell is W/T/L from the
+hybrid perspective.}
+\label{tab:final-mkp-wtl}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Configuration & PSO & GWO & WOA & EHO & ACO & GA & SA & Total \\
+\midrule
+DTW--1K  & 9/0/0 & 5/4/0 & 6/3/0 & 8/1/0 & 7/2/0 & 5/1/3 & 1/8/0 & \textbf{41/19/3} \\
+DDTW--1K & 9/0/0 & 5/4/0 & 5/4/0 & 9/0/0 & 7/2/0 & 4/2/3 & 1/4/4 & \textbf{40/16/7} \\
+DTW--3K  & 9/0/0 & 5/3/1 & 5/3/1 & 9/0/0 & 7/2/0 & 5/1/3 & 1/6/2 & \textbf{41/15/7} \\
+DDTW--3K & 9/0/0 & 5/3/1 & 5/3/1 & 9/0/0 & 7/2/0 & 4/1/4 & 1/6/2 & \textbf{40/15/8} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The hybrids were particularly consistent against PSO, EHO, and ACO. GA was
+the strongest competitor, producing significant advantages in three
+instances against DTW--1K, three against DDTW--1K, three against DTW--3K, and
+four against DDTW--3K. SA was frequently statistically tied with the hybrid
+and was significantly better in selected 1K and 3K campaigns. Consequently,
+the MKP evidence supports robust portfolio performance, while it does not
+support a claim of universal superiority over every standalone method.
+
+\subsection{IEEE CEC2022 continuous benchmark}
+\label{sec:final-stat-cec2022}
+
+The final CEC2022 analysis uses the completed DTW job 19070 and DDTW job
+19066. Each campaign compared its hybrid control with PSO, GWO, WOA, EHO, and
+ACO on functions F1--F12 at $D=10$. Shapiro--Wilk rejected normality for the
+hybrid in 10 of the 12 functions in each campaign. All 12 per-function
+Friedman tests were significant for both DTW and DDTW, demonstrating that the
+six algorithms did not have equivalent performance distributions on any
+function.
+
+Ranks were calculated within each function and then averaged across the 12
+functions. The hybrid obtained the best aggregate rank in both campaigns:
+2.323 for DTW and 2.358 for DDTW (Table~\ref{tab:final-cec-ranks}). This
+within-function aggregation avoids distortion from the different CEC2022
+objective scales and bias terms.
+
+\begin{table}[htbp]
+\centering
+\caption{Aggregate mean ranks across the 12 CEC2022 functions. Lower ranks
+indicate better performance.}
+\label{tab:final-cec-ranks}
+\begin{tabular}{lrr}
+\toprule
+Algorithm & DTW campaign & DDTW campaign \\
+\midrule
+Hybrid framework & \textbf{2.323} & \textbf{2.358} \\
+EHO              & 3.156 & 3.142 \\
+ACO              & 3.257 & 3.269 \\
+PSO              & 3.372 & 3.364 \\
+GWO              & 3.616 & 3.598 \\
+WOA              & 5.277 & 5.269 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Holm-adjusted pairwise outcomes are summarized in
+Table~\ref{tab:final-cec-wtl}. DTW achieved 38 significant wins, 16 ties, and
+6 losses in 60 comparisons, whereas DDTW achieved 37 wins, 19 ties, and 4
+losses. WOA showed the clearest framework advantage, with 11 wins and one tie
+for each alignment variant. ACO was the most competitive baseline, accounting
+for three DTW losses and two DDTW losses.
+
+\begin{table}[htbp]
+\centering
+\caption{CEC2022 Holm-adjusted Wilcoxon outcomes against the standalone
+metaheuristics. Counts are W/T/L from the hybrid perspective over 12
+functions.}
+\label{tab:final-cec-wtl}
+\begin{tabular}{lrr}
+\toprule
+Comparator & DTW & DDTW \\
+\midrule
+PSO & 7/3/2  & 6/5/1 \\
+GWO & 8/4/0  & 8/4/0 \\
+WOA & 11/1/0 & 11/1/0 \\
+EHO & 7/4/1  & 6/5/1 \\
+ACO & 5/4/3  & 6/4/2 \\
+\midrule
+Total & \textbf{38/16/6} & \textbf{37/19/4} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The direct paired DTW--DDTW comparison was also conducted independently for
+each function and adjusted across the 12 tests. None of the contrasts remained
+significant after Holm correction ($0/12$). DTW had the lower mean at full
+precision on seven functions and DDTW on five, but this descriptive difference
+does not establish statistical superiority of either alignment strategy.
+Therefore, the CEC2022 results support broad competitiveness against the
+standalone methods and a landscape-dependent balance between DTW and DDTW.
+
+\subsection{HRES2--H2 engineering case}
+\label{sec:final-stat-hres2}
+
+The engineering experiment compared each hybrid with PSO, GWO, WOA, EHO,
+ACO, ABC, ILS, SA, TS, and VNS using the levelized cost of electricity (LCOE)
+as the common minimization metric. Each objective evaluation simulated 8,760
+hourly dispatch steps over the same fixed synthetic weather profile. The
+Shapiro--Wilk test rejected normality for both hybrid LCOE distributions
+($p<10^{-11}$).
+
+The HRES2--H2 archive does not preserve the individual baseline observations
+or a common-seed correspondence between each baseline and the hybrid. Thus,
+the archived row-wise Friedman and Wilcoxon calculations are not used as
+inferential evidence here. Instead, Table~\ref{tab:final-hres-tests} reports
+the archived mean LCOE and the archived two-sided Mann--Whitney $p$-values
+after a reproducible Holm adjustment over the ten comparisons in each
+campaign. Every baseline had a higher mean LCOE than its hybrid control, and
+all 20 distributional contrasts remained significant after adjustment. This
+yields a 10/0/0 win/tie/loss record for each framework variant.
+
+\begin{table}[htbp]
+\centering
+\caption{HRES2--H2 comparison against standalone metaheuristics. The reported
+$p$-values are two-sided Mann--Whitney values adjusted by Holm over the ten
+independent-sample comparisons of each framework variant.}
+\label{tab:final-hres-tests}
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{2}{c}{DTW campaign} & \multicolumn{2}{c}{DDTW campaign} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Method & Mean LCOE & $p_{\mathrm{Holm}}^{\mathrm{MW}}$ & Mean LCOE & $p_{\mathrm{Holm}}^{\mathrm{MW}}$ \\
+\midrule
+Hybrid control & \textbf{0.267160} & -- & \textbf{0.267160} & -- \\
+GWO & 0.268066 & $6.384\times10^{-10}$ & 0.268395 & $2.272\times10^{-9}$ \\
+VNS & 0.267806 & $2.232\times10^{-10}$ & 0.267806 & $1.090\times10^{-9}$ \\
+TS  & 0.267188 & $1.242\times10^{-10}$ & 0.267184 & $6.880\times10^{-10}$ \\
+ILS & 0.267184 & $1.242\times10^{-10}$ & 0.267183 & $6.880\times10^{-10}$ \\
+ACO & 0.273288 & $7.639\times10^{-7}$  & 0.273617 & $1.316\times10^{-5}$ \\
+PSO & 0.277289 & $1.285\times10^{-2}$  & 0.280068 & $1.573\times10^{-3}$ \\
+WOA & 0.277227 & $2.373\times10^{-5}$  & 0.276477 & $1.797\times10^{-2}$ \\
+ABC & 0.272971 & $8.591\times10^{-11}$ & 0.270993 & $1.329\times10^{-10}$ \\
+EHO & 0.277728 & $4.333\times10^{-7}$  & 0.278524 & $1.431\times10^{-8}$ \\
+SA  & 0.286431 & $8.591\times10^{-11}$ & 0.290062 & $9.340\times10^{-11}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The archive stores per-run LCOE values to six decimal places. On these values,
+the paired same-seed Wilcoxon test did not detect a difference between DTW and
+DDTW ($p=0.593$). The mean difference was only $7.42\times10^{-7}$ CNY/kWh,
+below the reporting precision.
+Accordingly, the experiment provides no evidence of an LCOE difference between
+the variants; this non-significant result is not, by itself, a formal
+equivalence test. The conclusion is restricted to the fixed synthetic weather
+profile and to LCOE. Moreover, the standalone-method archive retains summary
+statistics and test outputs, but not the individual baseline LCOE observations
+or per-run LCOH, hydrogen-production, feasibility, and component-sizing
+records.
+
+\subsection{Cross-domain interpretation}
+\label{sec:final-stat-synthesis}
+
+The three domains provide complementary evidence. In MKP, the 3K budget
+significantly improves solution quality and DTW--3K has the best configuration
+rank, although GA and SA remain competitive on selected instances. In
+CEC2022, each hybrid has the best aggregate rank in its own campaign and wins
+most pairwise comparisons, but neither DTW nor DDTW is significantly superior
+to the other. In HRES2--H2, both hybrids have lower mean LCOE than all ten
+standalone methods, with significant independent-sample distributional
+differences after Holm correction, while the paired test detects no
+DTW--DDTW difference.
+Overall, the results support the robustness of the adaptive portfolio across
+discrete, continuous, and engineering optimization, without implying universal
+dominance on every individual problem or formal equivalence of DTW and DDTW.

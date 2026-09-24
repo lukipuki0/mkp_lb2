@@ -1,0 +1,15 @@
+Funcion            : CEC 9 (F9_Composition_Function_1) (Mejor Run #01)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 2300.000000
+Mejor valor global : 2529.284383
+Estado del mejor   : Peor que el óptimo
+Total switches     : 7
+
+1. WOA (poblacional) | mejor=2610.271424 | 0.0s-1.7s | iters=300
+2. EHO (poblacional) | mejor=2529.284383 | 1.7s-3.0s | iters=219
+3. GWO (poblacional) | mejor=2529.284383 | 3.0s-3.5s | iters=99
+4. PSO (poblacional) | mejor=2529.284383 | 3.5s-3.9s | iters=99
+5. ACO (poblacional) | mejor=2529.284383 | 3.9s-4.3s | iters=99
+6. PSO (poblacional) | mejor=2529.284383 | 4.3s-4.7s | iters=99
+7. ACO (poblacional) | mejor=2529.284383 | 4.7s-5.1s | iters=99

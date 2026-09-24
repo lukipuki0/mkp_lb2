@@ -1,0 +1,14 @@
+Funcion            : CEC 1 (F1_Shifted_Rotated_Zakharov) (Mejor Run #08)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 300.000000
+Mejor valor global : 300.000000
+Estado del mejor   : Óptimo alcanzado
+Total switches     : 6
+
+1. GWO (poblacional) | mejor=322.274681 | 0.0s-1.0s | iters=300
+2. EHO (poblacional) | mejor=300.000000 | 1.0s-2.1s | iters=300
+3. GWO (poblacional) | mejor=300.000000 | 2.1s-2.3s | iters=108
+4. PSO (poblacional) | mejor=300.000000 | 2.3s-2.5s | iters=108
+5. ACO (poblacional) | mejor=300.000000 | 2.5s-2.8s | iters=108
+6. EHO (poblacional) | mejor=300.000000 | 2.8s-3.7s | iters=258

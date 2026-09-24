@@ -1,0 +1,92 @@
+% -----------------------------------------------------------------------------
+% CEC 2022 results in the paper's results-section format.
+% This is an input fragment, not a standalone LaTeX document.
+% Sources: continuous_benchmark/resultados/run_dtw_job_19070/
+%          continuous_benchmark/resultados/run_ddtw_job_19066/
+% -----------------------------------------------------------------------------
+
+\subsection{Results in Continuous Optimization: IEEE CEC2022 Suite}
+\label{sec:results_cec2022}
+
+The continuous optimization benchmark was evaluated on the IEEE CEC2022
+real-parameter test suite, comprising functions F1--F12 at dimension $D=10$.
+Each function was evaluated using 31 independent runs and a computational
+budget of $T_{\max}=1{,}000$ iterations. The completed campaigns correspond
+to the DTW and DDTW variants stored in
+\texttt{run\_dtw\_job\_19070} and \texttt{run\_ddtw\_job\_19066},
+respectively. Since the benchmark is a minimization problem, lower objective
+values indicate better performance.
+
+To report the optimization optima requested for the two framework variants,
+Table~\ref{tab:cec2022_results} presents the best objective value observed
+among the 31 runs, rather than the arithmetic mean. The column $f^\star$
+contains the known CEC reference optimum, while the two gap columns quantify
+the relative distance between the best observed value and that reference:
+\[
+\mathrm{Gap}(\%) =
+100\,\frac{f_{\mathrm{best}}-f^\star}{|f^\star|}.
+\]
+Bold font identifies the lower best value when DTW and DDTW differ; a zero
+gap indicates that at least one run reached the reference optimum.
+
+\begin{table}[htbp]
+\centering
+\caption{Best objective values attained by the DTW and DDTW frameworks on the IEEE CEC2022 benchmark suite ($D=10$, $N=31$ runs).}
+\label{tab:cec2022_results}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Function} & \textbf{Optimum ($f^\star$)} & \textbf{DTW best} & \textbf{DDTW best} & \textbf{DTW gap (\%)} & \textbf{DDTW gap (\%)} \\
+\midrule
+\textbf{F1}  & \textbf{300.00}  & \textbf{300.000} & \textbf{300.000} & 0.000 & 0.000 \\
+\textbf{F2}  & \textbf{400.00}  & \textbf{400.011} & \textbf{400.011} & 0.003 & 0.003 \\
+\textbf{F3}  & \textbf{600.00}  & \textbf{600.011} & 600.018 & \textbf{0.002} & 0.003 \\
+\textbf{F4}  & \textbf{800.00}  & 808.000 & \textbf{806.000} & 1.000 & \textbf{0.750} \\
+\textbf{F5}  & \textbf{900.00}  & \textbf{900.000} & \textbf{900.000} & 0.000 & 0.000 \\
+\textbf{F6}  & \textbf{1800.00} & 1846.429 & \textbf{1830.400} & 2.579 & \textbf{1.689} \\
+\textbf{F7}  & \textbf{2000.00} & \textbf{2000.501} & 2001.495 & \textbf{0.025} & 0.075 \\
+\textbf{F8}  & \textbf{2200.00} & \textbf{2201.214} & 2207.625 & \textbf{0.055} & 0.347 \\
+\textbf{F9}  & \textbf{2300.00} & \textbf{2529.284} & \textbf{2529.284} & 9.969 & 9.969 \\
+\textbf{F10} & \textbf{2400.00} & \textbf{2500.258} & 2500.281 & \textbf{4.177} & 4.178 \\
+\textbf{F11} & \textbf{2600.00} & \textbf{2600.000} & \textbf{2600.000} & 0.000 & 0.000 \\
+\textbf{F12} & \textbf{2700.00} & \textbf{2860.680} & \textbf{2860.680} & 5.951 & 5.951 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+As reported in Table~\ref{tab:cec2022_results}, both framework variants
+reached the reference optimum in at least one run on F1, F5, and F11. DTW
+obtained the lower best value on F3, F7, F8, and F10, whereas DDTW obtained
+the lower best value on F4 and F6. The variants tied at the displayed
+precision on F1, F2, F5, F9, F11, and F12. Thus, the best-run comparison
+indicates a landscape-dependent balance between the two alignment variants
+rather than universal dominance by one of them.
+
+\begin{itemize}
+    \item On the unimodal function \textbf{F1}, both variants reached the
+    reference optimum of $300.00$. The same exact optimum was also reached on
+    \textbf{F5} and \textbf{F11}.
+    \item On the hybrid functions, DDTW produced the closest best run on
+    \textbf{F4} and \textbf{F6}, with gaps of $0.750\%$ and $1.689\%$,
+    respectively. DTW produced the closest best run on \textbf{F7} and
+    \textbf{F8}, with gaps of $0.025\%$ and $0.055\%$.
+    \item The composition functions \textbf{F9} and \textbf{F12} remained the
+    most difficult cases. Both variants reached $2529.284$ on F9, which is
+    $9.969\%$ above its reference optimum, and $2860.680$ on F12, with a
+    remaining gap of $5.951\%$.
+\end{itemize}
+
+These values describe the best outcome found in 31 stochastic repetitions and
+should not be interpreted as typical performance across all runs. The complete
+run distributions are therefore analyzed separately using per-function
+Friedman tests, Holm-adjusted Wilcoxon comparisons, and the direct paired
+DTW--DDTW test in Section~\ref{sec:cec2022-dtw-statistics}. That analysis
+found no statistically significant direct difference between the two alignment
+variants after Holm correction.
+
+The numerical values were obtained from
+\texttt{continuous\_benchmark/resultados/run\_dtw\_job\_19070/resumen\_global.csv}
+and
+\texttt{continuous\_benchmark/resultados/run\_ddtw\_job\_19066/resumen\_global.csv}.
+

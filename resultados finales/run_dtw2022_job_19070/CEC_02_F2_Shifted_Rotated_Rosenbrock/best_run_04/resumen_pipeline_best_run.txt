@@ -1,0 +1,12 @@
+Funcion            : CEC 2 (F2_Shifted_Rotated_Rosenbrock) (Mejor Run #04)
+Dimension          : 10
+Limites            : [-100.0, 100.0]
+Optimo conocido    : 400.000000
+Mejor valor global : 400.010867
+Estado del mejor   : Peor que el óptimo
+Total switches     : 4
+
+1. WOA (poblacional) | mejor=408.288517 | 0.0s-0.8s | iters=300
+2. EHO (poblacional) | mejor=400.012061 | 0.8s-1.8s | iters=300
+3. WOA (poblacional) | mejor=400.012004 | 1.8s-2.6s | iters=300
+4. PSO (poblacional) | mejor=400.010867 | 2.6s-3.4s | iters=300
