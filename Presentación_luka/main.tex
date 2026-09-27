@@ -97,7 +97,7 @@
   \leavevmode%
   \hbox{%
     \begin{beamercolorbox}[wd=.72\paperwidth,ht=2.4ex,dp=1.1ex,leftskip=0.35cm]{author in head/foot}%
-      \usebeamerfont{footline}Optimización cooperativa de HRES--H$_2$ \; · \; DTW/DDTW%
+      \usebeamerfont{footline}Series temporales en optimización \; · \; HRES--H$_2$%
     \end{beamercolorbox}%
     \begin{beamercolorbox}[wd=.28\paperwidth,ht=2.4ex,dp=1.1ex,rightskip=0.35cm]{author in head/foot}%
       \usebeamerfont{footline}\hfill\insertframenumber\,/\,\inserttotalframenumber%
@@ -113,7 +113,7 @@
 \newcommand{\gcell}{\cellcolor{primary!78}\color{white}\bfseries X}
 \newcommand{\hcell}{\cellcolor{accent!24}\color{accent!70!black}\bfseries $\star$}
 
-\title[Optimización cooperativa HRES-H2]{Desarrollo de arquitecturas híbridas para la optimización del HRES-H2 con tecnologías de hidrógeno verde}
+\title[Series temporales en HRES-H2]{Series temporales de convergencia para la optimización cooperativa de HRES--H$_2$}
 \author{Lucas Erazo}
 \institute{Escuela de Ingeniería Informática\\Pontificia Universidad Católica de Valparaíso\\[3pt]
 \small Profesor guía: Emanuel Vega \qquad Profesor correferente: Ricardo Soto}
@@ -223,7 +223,7 @@
 \end{frame}
 
 % -----------------------------------------------------------------------------
-\begin{frame}{Brecha de investigación}
+\begin{frame}{La información temporal que falta en la coordinación}
   \begin{columns}[T,onlytextwidth]
     \column{0.54\textwidth}
       La literatura ya utiliza:
@@ -239,19 +239,19 @@
 
     \column{0.42\textwidth}
       \vspace{0.15cm}
-      {\Large\color{PUCVRed}\bfseries Falta explotar explícitamente la evolución temporal del mejor fitness encontrado}
+      {\Large\color{PUCVRed}\bfseries La trayectoria reciente del mejor resultado aún puede guiar mejor el cambio de solucionador}
 
       \vspace{0.5cm}
-      La propuesta usa similitud de trayectorias para distinguir progreso sostenido de estancamiento persistente y gobernar el cambio de solucionador.
+      La propuesta convierte esa serie temporal en una señal de coordinación: distingue progreso sostenido de estancamiento persistente.
   \end{columns}
 \end{frame}
 
-\section{2. DTW/DDTW y arquitectura propuesta}
+\section{2. Series temporales y arquitectura propuesta}
 
 \begin{frame}[plain]
   \centering
   \vfill
-  {\usebeamerfont{title}\color{primary}2. DTW/DDTW y detección de estancamiento}\\[0.6em]
+  {\usebeamerfont{title}\color{primary}2. La convergencia como señal de coordinación}\\[0.6em]
   {\color{accent}\rule{4.2cm}{2.2pt}}
   \vfill
 \end{frame}
@@ -259,16 +259,17 @@
 % -----------------------------------------------------------------------------
 \begin{frame}{Objetivo y alcance}
   \begin{block}{Objetivo general}
-    Desarrollar y validar un marco cooperativo de metaheurísticas para dimensionar HRES--H$_2$, usando DTW/DDTW como detector adaptativo de estancamiento y como señal de coordinación.
+    Integrar la serie temporal de convergencia a la coordinación de metaheurísticas para dimensionar HRES--H$_2$. DTW/DDTW compara la trayectoria reciente con patrones de progreso y meseta.
   \end{block}
 
   \vspace{0.25cm}
   \begin{enumerate}
     \item Caracterizar el modelo, sus restricciones y no linealidades.
-    \item Diseñar el detector sobre ventanas móviles del mejor fitness.
+    \item Construir ventanas móviles de la trayectoria del mejor valor objetivo.
+    \item Comparar cada ventana con progreso y meseta mediante DTW/DDTW.
     \item Definir el intercambio de soluciones entre algoritmos heterogéneos.
     \item Orquestar la alternancia entre exploración y explotación.
-    \item Validar el marco y extenderlo mediante $\varepsilon$-restricción adaptativa.
+    \item Validar el marco y estudiar su extensión mediante $\varepsilon$-restricción adaptativa.
   \end{enumerate}
 \end{frame}
 
@@ -279,202 +280,74 @@
 \end{frame}
 
 % -----------------------------------------------------------------------------
-\begin{frame}{DTW y DDTW: misma lógica, distinta señal}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.46\textwidth}
-      \begin{tikzpicture}
-        \begin{axis}[
-          width=\linewidth,height=5.0cm,
-          axis lines=left,
-          xlabel={Iteración},ylabel={Mejor LCOE (esquema)},
-          xmin=0,xmax=10,ymin=0.12,ymax=1.02,
-          xtick=\empty,ytick=\empty,
-          legend style={draw=none,fill=none,font=\scriptsize,at={(0.52,-0.18)},anchor=north},
-          line width=1.2pt
-        ]
-          \addplot[color=GreenH,mark=*] coordinates {(0,1.0)(1,.84)(2,.72)(3,.61)(4,.50)(5,.40)(6,.34)(7,.27)(8,.22)(9,.18)(10,.15)};
-          \addlegendentry{progreso sostenido}
-          \addplot[color=PUCVRed,mark=square*] coordinates {(0,1.0)(1,.77)(2,.62)(3,.55)(4,.52)(5,.51)(6,.505)(7,.503)(8,.502)(9,.501)(10,.50)};
-          \addlegendentry{meseta persistente}
-        \end{axis}
-      \end{tikzpicture}
+\begin{frame}{La serie temporal revela el estancamiento}
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.92\textwidth,height=4.65cm,
+      axis lines=left,
+      xlabel={Iteración},ylabel={Mejor LCOE (esquema)},
+      xmin=0,xmax=12,ymin=0.24,ymax=1.04,
+      xtick=\empty,ytick=\empty,
+      clip=false,
+      every axis label/.style={font=\small},
+      line width=1.15pt
+    ]
+      % Trayectoria ilustrativa: descenso inicial y meseta posterior.
+      \addplot[color=primary,very thick] coordinates {
+        (0,1.00)(1,.88)(2,.77)(3,.69)(4,.62)(5,.57)
+        (6,.55)(7,.54)(8,.535)(9,.533)(10,.532)(11,.531)(12,.53)};
+      % Las referencias se comparan únicamente dentro de la ventana.
+      \addplot[color=best,thick,dashed] coordinates {(5,.57)(6,.51)(7,.45)(8,.39)(9,.33)};
+      \addplot[color=accent,thick,dashed] coordinates {(5,.57)(6,.57)(7,.57)(8,.57)(9,.57)};
+      \draw[color=warn,densely dotted,thick] (axis cs:5,.24) -- (axis cs:5,1.00);
+      \draw[color=warn,densely dotted,thick] (axis cs:9,.24) -- (axis cs:9,1.00);
+      \node[font=\scriptsize\bfseries,color=warn,anchor=south] at (axis cs:7,1.00)
+        {Ventana reciente $X$};
+      \node[font=\scriptsize,color=primary,anchor=south west] at (axis cs:1.1,.89)
+        {mejor LCOE observado};
+      \node[font=\scriptsize,color=best,anchor=north west] at (axis cs:7.2,.40)
+        {rampa ideal};
+      \node[font=\scriptsize,color=accent!75!black,anchor=south west] at (axis cs:7.2,.58)
+        {meseta ideal};
+    \end{axis}
+  \end{tikzpicture}
 
-    \column{0.50\textwidth}
-      \begin{block}{Dos referencias para la misma ventana $X$}
-        \footnotesize
-        $r$: rampa de progreso. \qquad $c$: señal constante o meseta.
-        \[
-          D_{\mathrm{prog}}=d(X,r),\qquad
-          D_{\mathrm{mes}}=d(X,c)
-        \]
-      \end{block}
-
-      \footnotesize
-      \begin{tabularx}{\linewidth}{>{\bfseries\color{PUCVBlueDark}}p{1.1cm} X}
-        \toprule
-        Variante & Señal que compara \\
-        \midrule
-        DTW & niveles de $X$, $r$ y $c$ \\
-        DDTW & primeras diferencias $\nabla X$, $\nabla r$ y $\nabla c$ \\
-        \bottomrule
-      \end{tabularx}
-
-      \vspace{0.18cm}
-      
-
-  \end{columns}
+  \vspace{0.08cm}
+  \begin{block}{La información que faltaba en la coordinación}
+    \small La forma de la ventana reciente permite comparar mejora sostenida con meseta
+    antes de decidir si continúa el solucionador activo.
+  \end{block}
+  {\tiny Esquema conceptual, no resultado experimental. Para minimizar LCOE se muestra una curva descendente;
+  el detector implementado recibe $-\mathrm{LCOE}$ como señal de maximización.}
 \end{frame}
 
 % -----------------------------------------------------------------------------
-\begin{frame}{Banda Sakoe--Chiba: limitar el alineamiento}
+\begin{frame}{DTW: comparar la ventana con dos patrones}
   \begin{columns}[T,onlytextwidth]
     \column{0.52\textwidth}
-      \centering
-      \begin{tikzpicture}[scale=0.61,transform shape]
-        % Región permitida: |i-j| <= 2 para el ejemplo de seis puntos.
-        \foreach \i in {0,...,5}{
-          \foreach \j in {0,...,5}{
-            \pgfmathtruncatemacro{\dif}{abs(\i-\j)}
-            \ifnum\dif<3
-              \fill[PUCVBlue!13] (\j,\i) rectangle ++(1,1);
-            \fi
-          }
-        }
-        \draw[step=1,gray!70] (0,0) grid (6,6);
-        \draw[->,thick] (0,0) -- (6.35,0) node[right,font=\scriptsize]{referencia $r$ o $c$};
-        \draw[->,thick] (0,0) -- (0,6.35) node[above,font=\scriptsize]{ventana $X$};
-        \draw[PUCVRed,very thick,->]
-          (0.5,0.5) -- (0.5,1.5) -- (0.5,2.5)
-          -- (1.5,3.5) -- (2.5,4.5) -- (3.5,5.5)
-          -- (4.5,5.5) -- (5.5,5.5);
-        \node[font=\scriptsize,PUCVBlueDark,align=center] at (3.0,6.70) {zona permitida\\$|i-j|\leq b$};
-        \node[font=\scriptsize,PUCVRed] at (3.15,4.05) {camino DTW};
-      \end{tikzpicture}
-
-      {\tiny Azul: celdas que el algoritmo puede visitar. Rojo: camino óptimo del ejemplo.}
+      \begin{enumerate}
+        \setlength{\itemsep}{0.30cm}
+        \item Tomamos los últimos $W$ valores del mejor resultado: la ventana $X$.
+        \item Calculamos su distancia a una rampa de progreso $r$ y a una meseta $c$.
+        \item La menor distancia indica qué patrón se parece más a la trayectoria reciente.
+      \end{enumerate}
 
     \column{0.44\textwidth}
-      \begin{block}{Banda permitida}
-        \scriptsize
-        Solo visita celdas con $|i-j|\leq b$; así evita alineamientos entre puntos muy lejanos.
+      \begin{block}{Por qué DTW}
+        \small Dos trayectorias pueden mejorar con ritmos distintos.
+        DTW alinea sus puntos antes de medir la diferencia.
       \end{block}
-
-      \begin{exampleblock}{Recurrencia DTW implementada}
-        \tiny
-        $C_{ij}=|X_i-Y_j|$, con
-        $D_{0,0}=0$ y $D_{i,0}=D_{0,j}=\infty$.
-        \[
-          \boxed{D_{ij}=C_{ij}+\min\!\left\{
-          D_{i-1,j},\;D_{i,j-1},\;D_{i-1,j-1}\right\}}
-        \]
-        Tres movimientos: avanza $X$, avanza $Y$ o avanzan ambas series.
-      \end{exampleblock}
-
-      \begin{alertblock}{Ejemplo e implementación}
-        \tiny
-        $W=6$, $b=2$: $(3,5)$ permitido; $(1,5)$ prohibido.\\[-1pt]
-      \end{alertblock}
-  \end{columns}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Ejemplo numérico: DTW con los tres movimientos}
-  \tiny
-  \begin{block}{Misma forma, distinto ritmo}
-    \centering
-    $X=[.50,.50,.50,.56,.60,.65]$ \;(\text{ventana observada})\qquad
-    $r=[.50,.55,.60,.64,.65,.65]$ \;(\text{progreso})\qquad b=2
-  \end{block}
-
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-      \begin{exampleblock}{Costos locales $C_{ij}=|X_i-r_j|$}
-        \centering
-        {\setlength{\tabcolsep}{1.8pt}\renewcommand{\arraystretch}{1.10}
-        \begin{tabular}{c|cccccc}
-          & $r_1=.50$ & $r_2=.55$ & $r_3=.60$ & $r_4=.64$ & $r_5=.65$ & $r_6=.65$\\ \hline
-          $X_1=.50$ & \cellcolor{best!22}0 & .05 & .10 & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
-          $X_2=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
-          $X_3=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & .15 & \cellcolor{gray!10}--\\
-          $X_4=.56$ & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & .04 & .08 & .09 & .09\\
-          $X_5=.60$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}0 & .04 & .05 & .05\\
-          $X_6=.65$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & \cellcolor{best!22}0 & \cellcolor{best!22}0
-        \end{tabular}}
-
-        {\scriptsize Verde: camino óptimo. Gris: celdas fuera de la banda $b=2$.}
-      \end{exampleblock}
-
-    \column{0.41\textwidth}
-      \begin{exampleblock}{Camino óptimo}
-        \tiny
-        \textbf{Vertical:}
-        $(1,1)\downarrow(2,1)\downarrow(3,1)$;\quad costo $=0$.\\[3pt]
-        \textbf{Diagonal:}
-        $(3,1)\searrow(4,2)\searrow(5,3)\searrow(6,4)$;\\[-1pt]
-        \hfill costo $=0.01+0+0.01=0.02$.\\[3pt]
-        \textbf{Horizontal:}
-        $(6,4)\rightarrow(6,5)\rightarrow(6,6)$;\quad costo $=0$.\\[5pt]
-        \centering
-        $\boxed{D_{\mathrm{prog}}=\operatorname{DTW}(X,r)=0.02}$
+      \vspace{0.18cm}
+      \begin{exampleblock}{DDTW}
+        \small Compara los cambios entre iteraciones en lugar de los niveles.
       \end{exampleblock}
   \end{columns}
 
-  \begin{alertblock}{Comparación con la meseta}
-    \centering
-    $c=[.50,.50,.50,.50,.50,.50]$,\quad
-    $D_{\mathrm{mes}}=\operatorname{DTW}(X,c)=0.31$,\quad
-    $\delta=0.02-0.31=-0.29$
-    $\Rightarrow$ \good{más cerca del progreso}.
-  \end{alertblock}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{El discriminante $\delta$: progreso frente a meseta}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-      \begin{block}{Diferencia implementada}
-        \small
-        \centering
-        $D_{\mathrm{prog}}=D_1$ \quad y \quad $D_{\mathrm{mes}}=D_2$
-        \vspace{0.08cm}
-
-        $\boxed{\delta=D_{\mathrm{prog}}-D_{\mathrm{mes}}=D_1-D_2}$
-      \end{block}
-
-      \begin{block}{Cómo interpretar el signo}
-        \footnotesize
-        \begin{itemize}
-          \item $\delta<0$: más cerca del \good{progreso}.
-          \item $\delta\approx0$: evidencia ambigua; observar.
-          \item $\delta>0$: más cerca de la \risk{meseta}.
-        \end{itemize}
-      \end{block}
-
-      {\scriptsize\textbf{Ejemplo:} $0.80-0.20=0.60$; la ventana se parece más a la meseta.}
-
-    \column{0.48\textwidth}
-      \begin{alertblock}{Condiciones de estancamiento}
-        \tiny
-        El cambio se considera solo si se cumplen las tres condiciones:
-        \begin{enumerate}
-          \item \textbf{Sin mejora:} $\mathrm{sin\_mejora}\geq15$.
-          \item \textbf{Cercanía a meseta:} $D_{\mathrm{mes}}\leq\theta_c$.
-          \item \textbf{Alejamiento del progreso:} $D_{\mathrm{prog}}\geq\theta_r$
-          o $\delta\geq\theta_\delta$.
-        \end{enumerate}
-        Además, deben confirmarse durante $3$ actualizaciones consecutivas.
-      \end{alertblock}
-
-      \begin{block}{Dónde cambia DDTW}
-        \scriptsize
-        DDTW usa las mismas dos distancias y el mismo $\delta$, pero sobre
-        $\nabla x_t=x_t-x_{t-1}$. DTW compara niveles; DDTW compara cambios.
-      \end{block}
-
-      {\tiny Benchmark HRES2--H$_2$: $W=40$; banda $\approx4$; \texttt{use\_ddtw=True}; $patience=3$.\\
-      Umbrales adaptativos P30/P70.}
-
-  \end{columns}
+  \vspace{0.30cm}
+  \centering
+  {\small $d(X,c)<d(X,r)$: la ventana se parece más a una meseta.}\\[0.12cm]
+  {\footnotesize Esa comparación aporta evidencia; el cambio de solucionador exige además falta de mejora sostenida.}
 \end{frame}
 
 % -----------------------------------------------------------------------------
@@ -943,12 +816,12 @@
     Selección por trayectoria & sí & sí & sí & características y regresión de desempeño \\
     DAC con aprendizaje & sí & sí & sí & estado aprendido y recompensa \\
     \rowcolor{PUCVLight}
-    \textbf{Propuesta DTW/DDTW} & \textbf{sí} & \textbf{sí} & \textbf{no} & \textbf{forma reciente del fitness de la mejor solución global} \\
+    \textbf{Propuesta temporal} & \textbf{sí} & \textbf{sí} & \textbf{no} & \textbf{serie reciente del mejor valor objetivo, comparada con rampa y meseta} \\
     \bottomrule
   \end{tabularx}
 
   \vspace{0.42cm}
-  \key{Diferenciación:} una señal interpretable, independiente del solucionador y sensible al orden temporal guía el intercambio entre metaheurísticas completas.
+  \key{Diferenciación:} la trayectoria de convergencia pasa de ser un resultado observado a una señal temporal que guía el intercambio entre metaheurísticas completas.
 
   \vfill
   \smallcite{mambrini2015design,jankovic2022trajectory,liu2025three,reijnen2025search}
@@ -1055,16 +928,169 @@
 % -----------------------------------------------------------------------------
 \begin{frame}{Contribuciones esperadas}
   \begin{enumerate}
-    \item Un detector de estancamiento que usa la forma temporal del fitness y funciona con metaheurísticas heterogéneas.
-    \item Un protocolo de transferencia que preserva la mejor solución global y adapta la inicialización al algoritmo receptor.
-    \item Un orquestador que alterna exploración y explotación según evidencia de la propia ejecución.
-    \item Una validación gradual que conecta benchmarks discretos y continuos con el dimensionamiento HRES--H$_2$.
+    \item Integrar la serie temporal del mejor valor objetivo a la decisión de coordinación entre metaheurísticas heterogéneas.
+    \item Comparar la ventana reciente con patrones de progreso y meseta mediante DTW/DDTW para detectar estancamiento.
+    \item Un protocolo de transferencia que preserva la mejor solución global al cambiar de solucionador.
+    \item Una validación gradual en benchmarks y en el dimensionamiento HRES--H$_2$.
     \item Una extensión para estudiar compromisos económicos y ambientales mediante $\varepsilon$-restricción adaptativa.
   \end{enumerate}
 \end{frame}
 
 % -----------------------------------------------------------------------------
 \appendix
+\section{Detalle técnico de DTW}
+% -----------------------------------------------------------------------------
+\begin{frame}{Banda Sakoe--Chiba: limitar el alineamiento}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.52\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.61,transform shape]
+        % Región permitida: |i-j| <= 2 para el ejemplo de seis puntos.
+        \foreach \i in {0,...,5}{
+          \foreach \j in {0,...,5}{
+            \pgfmathtruncatemacro{\dif}{abs(\i-\j)}
+            \ifnum\dif<3
+              \fill[PUCVBlue!13] (\j,\i) rectangle ++(1,1);
+            \fi
+          }
+        }
+        \draw[step=1,gray!70] (0,0) grid (6,6);
+        \draw[->,thick] (0,0) -- (6.35,0) node[right,font=\scriptsize]{referencia $r$ o $c$};
+        \draw[->,thick] (0,0) -- (0,6.35) node[above,font=\scriptsize]{ventana $X$};
+        \draw[PUCVRed,very thick,->]
+          (0.5,0.5) -- (0.5,1.5) -- (0.5,2.5)
+          -- (1.5,3.5) -- (2.5,4.5) -- (3.5,5.5)
+          -- (4.5,5.5) -- (5.5,5.5);
+        \node[font=\scriptsize,PUCVBlueDark,align=center] at (3.0,6.70) {zona permitida\\$|i-j|\leq b$};
+        \node[font=\scriptsize,PUCVRed] at (3.15,4.05) {camino DTW};
+      \end{tikzpicture}
+
+      {\tiny Azul: celdas que el algoritmo puede visitar. Rojo: camino óptimo del ejemplo.}
+
+    \column{0.44\textwidth}
+      \begin{block}{Banda permitida}
+        \scriptsize
+        Solo visita celdas con $|i-j|\leq b$; así evita alineamientos entre puntos muy lejanos.
+      \end{block}
+
+      \begin{exampleblock}{Recurrencia DTW implementada}
+        \tiny
+        $C_{ij}=|X_i-Y_j|$, con
+        $D_{0,0}=0$ y $D_{i,0}=D_{0,j}=\infty$.
+        \[
+          \boxed{D_{ij}=C_{ij}+\min\!\left\{
+          D_{i-1,j},\;D_{i,j-1},\;D_{i-1,j-1}\right\}}
+        \]
+        Tres movimientos: avanza $X$, avanza $Y$ o avanzan ambas series.
+      \end{exampleblock}
+
+      \begin{alertblock}{Ejemplo e implementación}
+        \tiny
+        $W=6$, $b=2$: $(3,5)$ permitido; $(1,5)$ prohibido.\\[-1pt]
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{Ejemplo numérico: DTW con los tres movimientos}
+  \tiny
+  \begin{block}{Misma forma, distinto ritmo: señal normalizada para maximización}
+    \centering
+    $X=[.50,.50,.50,.56,.60,.65]$ \;(\text{ventana observada})\qquad
+    $r=[.50,.55,.60,.64,.65,.65]$ \;(\text{progreso})\qquad b=2
+  \end{block}
+
+  \begin{columns}[T,onlytextwidth]
+    \column{0.56\textwidth}
+      \begin{exampleblock}{Costos locales $C_{ij}=|X_i-r_j|$}
+        \centering
+        {\setlength{\tabcolsep}{1.8pt}\renewcommand{\arraystretch}{1.10}
+        \begin{tabular}{c|cccccc}
+          & $r_1=.50$ & $r_2=.55$ & $r_3=.60$ & $r_4=.64$ & $r_5=.65$ & $r_6=.65$\\ \hline
+          $X_1=.50$ & \cellcolor{best!22}0 & .05 & .10 & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
+          $X_2=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
+          $X_3=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & .15 & \cellcolor{gray!10}--\\
+          $X_4=.56$ & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & .04 & .08 & .09 & .09\\
+          $X_5=.60$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}0 & .04 & .05 & .05\\
+          $X_6=.65$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & \cellcolor{best!22}0 & \cellcolor{best!22}0
+        \end{tabular}}
+
+        {\scriptsize Verde: camino óptimo. Gris: celdas fuera de la banda $b=2$.}
+      \end{exampleblock}
+
+    \column{0.41\textwidth}
+      \begin{exampleblock}{Camino óptimo}
+        \tiny
+        \textbf{Vertical:}
+        $(1,1)\downarrow(2,1)\downarrow(3,1)$;\quad costo $=0$.\\[3pt]
+        \textbf{Diagonal:}
+        $(3,1)\searrow(4,2)\searrow(5,3)\searrow(6,4)$;\\[-1pt]
+        \hfill costo $=0.01+0+0.01=0.02$.\\[3pt]
+        \textbf{Horizontal:}
+        $(6,4)\rightarrow(6,5)\rightarrow(6,6)$;\quad costo $=0$.\\[5pt]
+        \centering
+        $\boxed{D_{\mathrm{prog}}=\operatorname{DTW}(X,r)=0.02}$
+      \end{exampleblock}
+  \end{columns}
+
+  \begin{alertblock}{Comparación con la meseta}
+    \centering
+    $c=[.50,.50,.50,.50,.50,.50]$,\quad
+    $D_{\mathrm{mes}}=\operatorname{DTW}(X,c)=0.31$,\quad
+    $\delta=0.02-0.31=-0.29$
+    $\Rightarrow$ \good{más cerca del progreso}.
+  \end{alertblock}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{El discriminante $\delta$: progreso frente a meseta}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.48\textwidth}
+      \begin{block}{Diferencia implementada}
+        \small
+        \centering
+        $D_{\mathrm{prog}}=D_1$ \quad y \quad $D_{\mathrm{mes}}=D_2$
+        \vspace{0.08cm}
+
+        $\boxed{\delta=D_{\mathrm{prog}}-D_{\mathrm{mes}}=D_1-D_2}$
+      \end{block}
+
+      \begin{block}{Cómo interpretar el signo}
+        \footnotesize
+        \begin{itemize}
+          \item $\delta<0$: más cerca del \good{progreso}.
+          \item $\delta\approx0$: evidencia ambigua; observar.
+          \item $\delta>0$: más cerca de la \risk{meseta}.
+        \end{itemize}
+      \end{block}
+
+      {\scriptsize\textbf{Ejemplo:} $0.80-0.20=0.60$; la ventana se parece más a la meseta.}
+
+    \column{0.48\textwidth}
+      \begin{alertblock}{Condiciones de estancamiento}
+        \tiny
+        El cambio se considera solo si se cumplen las tres condiciones:
+        \begin{enumerate}
+          \item \textbf{Sin mejora:} $\mathrm{sin\_mejora}\geq15$.
+          \item \textbf{Cercanía a meseta:} $D_{\mathrm{mes}}\leq\theta_c$.
+          \item \textbf{Alejamiento del progreso:} $D_{\mathrm{prog}}\geq\theta_r$
+          o $\delta\geq\theta_\delta$.
+        \end{enumerate}
+        Además, deben confirmarse durante $3$ actualizaciones consecutivas.
+      \end{alertblock}
+
+      \begin{block}{Dónde cambia DDTW}
+        \scriptsize
+        DDTW usa las mismas dos distancias y el mismo $\delta$, pero sobre
+        $\nabla x_t=x_t-x_{t-1}$. DTW compara niveles; DDTW compara cambios.
+      \end{block}
+
+      {\tiny Benchmark HRES2--H$_2$: $W=40$; banda $\approx4$; \texttt{use\_ddtw=True}; $patience=3$.\\
+      Umbrales adaptativos P30/P70.}
+
+  \end{columns}
+\end{frame}
+
 \section{Referencias}
 \begin{frame}[allowframebreaks]{Referencias citadas}
   \tiny
