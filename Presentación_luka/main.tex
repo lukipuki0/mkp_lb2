@@ -239,7 +239,7 @@
 
     \column{0.42\textwidth}
       \vspace{0.15cm}
-      {\Large\color{PUCVRed}\bfseries Falta explotar de forma explícita la forma temporal del fitness incumbente}
+      {\Large\color{PUCVRed}\bfseries Falta explotar explícitamente la evolución temporal del mejor fitness encontrado}
 
       \vspace{0.5cm}
       La propuesta usa similitud de trayectorias para distinguir progreso sostenido de estancamiento persistente y gobernar el cambio de solucionador.
@@ -588,7 +588,7 @@
       & Mismo horizonte y AGSR; penalización de diseños inviables. \\
     Optimización
       & Grid search + descenso de gradiente; minimiza LCOE.
-      & DTW/DDTW: cambia solucionador, transfiere incumbente y reporta LCOH. \\
+      & DTW/DDTW: cambia solucionador, transfiere la mejor solución global y reporta LCOH. \\
     \bottomrule
   \end{tabularx}
 
@@ -836,7 +836,7 @@
 
   \vspace{0.35cm}
   \begin{block}{Interfaz cooperativa}
-    El HRES no recibe una metaheurística específica: recibe candidatos factibles, devuelve indicadores comparables y conserva el incumbente para la siguiente época.
+    El HRES no recibe una metaheurística específica: recibe candidatos factibles, devuelve indicadores comparables y conserva la mejor solución global para la siguiente época.
   \end{block}
 \end{frame}
 
@@ -918,7 +918,7 @@
   \includegraphics[width=0.98\textwidth,height=5.25cm,keepaspectratio]{fig/hres2_dtw_convergence.png}
 
   \vspace{0.08cm}
-  {\scriptsize Las líneas verticales indican cambios de solucionador; el incumbente se conserva y la trayectoria se estabiliza en $0.267159$ CNY/kWh.}
+  {\scriptsize Las líneas verticales indican cambios de solucionador; la mejor solución global se conserva y la trayectoria se estabiliza en $0.267159$ CNY/kWh.}
 \end{frame}
 
 % -----------------------------------------------------------------------------
@@ -943,7 +943,7 @@
     Selección por trayectoria & sí & sí & sí & características y regresión de desempeño \\
     DAC con aprendizaje & sí & sí & sí & estado aprendido y recompensa \\
     \rowcolor{PUCVLight}
-    \textbf{Propuesta DTW/DDTW} & \textbf{sí} & \textbf{sí} & \textbf{no} & \textbf{forma reciente del fitness incumbente} \\
+    \textbf{Propuesta DTW/DDTW} & \textbf{sí} & \textbf{sí} & \textbf{no} & \textbf{forma reciente del fitness de la mejor solución global} \\
     \bottomrule
   \end{tabularx}
 
@@ -1056,7 +1056,7 @@
 \begin{frame}{Contribuciones esperadas}
   \begin{enumerate}
     \item Un detector de estancamiento que usa la forma temporal del fitness y funciona con metaheurísticas heterogéneas.
-    \item Un protocolo de transferencia que preserva el incumbente y adapta la inicialización al algoritmo receptor.
+    \item Un protocolo de transferencia que preserva la mejor solución global y adapta la inicialización al algoritmo receptor.
     \item Un orquestador que alterna exploración y explotación según evidencia de la propia ejecución.
     \item Una validación gradual que conecta benchmarks discretos y continuos con el dimensionamiento HRES--H$_2$.
     \item Una extensión para estudiar compromisos económicos y ambientales mediante $\varepsilon$-restricción adaptativa.

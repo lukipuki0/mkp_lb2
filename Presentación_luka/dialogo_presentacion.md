@@ -102,7 +102,7 @@ Cuando aparezca LCOE, conviene decir explícitamente: “No es el costo de una h
 | Variable | Qué significa | Cómo explicarla oralmente |
 |---|---|---|
 | `f_t` | Mejor fitness acumulado en la iteración `t` | Es la trayectoria que el detector observa. En HRES, como se minimiza LCOE, el valor mejora cuando baja. |
-| `gbest` o incumbente | Mejor solución global encontrada | Es el vector de diseño y su valor objetivo que se conserva al cambiar de algoritmo. |
+| `gbest` o mejor solución global | Mejor solución global encontrada | Es el vector de diseño y su valor objetivo que se conserva al cambiar de algoritmo. |
 | `X` | Ventana reciente de la trayectoria | Contiene los últimos 40 valores del fitness. |
 | `W` o `window` | Tamaño de la ventana | En HRES2 vale 40. El detector espera tener 40 observaciones recientes. |
 | `Y` | Trayectoria de referencia | Puede ser una rampa de progreso o una constante de estancamiento. |
@@ -171,7 +171,7 @@ La transferencia conserva el mejor candidato factible, adapta la representación
 
 ### 8. Brecha de investigación — 35 segundos
 
-“La literatura ya utiliza mejora reciente, diversidad, características de población, historiales de operadores y trayectorias para seleccionar algoritmos o construir un warm start. La brecha que abordamos es usar explícitamente la forma temporal del fitness incumbente para distinguir progreso sostenido de estancamiento persistente.
+“La literatura ya utiliza mejora reciente, diversidad, características de población, historiales de operadores y trayectorias para seleccionar algoritmos o construir un warm start. La brecha que abordamos es usar explícitamente la forma temporal del fitness de la mejor solución global para distinguir progreso sostenido de estancamiento persistente.
 
 La contribución no es afirmar que DTW reemplace a todas las políticas adaptativas. Es proponer una señal que no necesita entrenamiento supervisado, que puede compararse entre algoritmos distintos y que toma en cuenta el orden temporal de las mejoras.”
 
@@ -187,7 +187,7 @@ Para lograrlo hay cinco tareas: caracterizar el modelo energético, diseñar el 
 
 ### 11. Diagrama de flujo de la propuesta — 30 segundos
 
-“El diagrama resume las tres capas. Abajo está el problema que entrega candidatos y métricas. En el centro está el motor DTW/DDTW, que recibe una ventana de fitness, la transforma según el modo de comparación y la contrasta con referencias de progreso y estancamiento. Arriba está la capa cooperativa, que selecciona solucionadores, ejecuta épocas y transfiere el incumbente cuando se confirma una alerta.
+“El diagrama resume las tres capas. Abajo está el problema que entrega candidatos y métricas. En el centro está el motor DTW/DDTW, que recibe una ventana de fitness, la transforma según el modo de comparación y la contrasta con referencias de progreso y estancamiento. Arriba está la capa cooperativa, que selecciona solucionadores, ejecuta épocas y transfiere la mejor solución global cuando se confirma una alerta.
 
 La idea importante es que el detector no optimiza directamente el sistema energético: observa la búsqueda y decide cuándo conviene cambiar su mecanismo.”
 
@@ -245,7 +245,7 @@ La hipótesis es que un algoritmo puede ser adecuado para una etapa y otro para 
 
 ### 17. Comunicación entre solucionadores — 30 segundos
 
-“Cuando aparece una alerta, el algoritmo activo entrega su mejor solución factible. El orquestador la conserva como incumbente y la adapta al receptor. Si el receptor necesita una población, esa solución se combina con perturbaciones factibles y candidatos adicionales para recuperar diversidad.
+“Cuando aparece una alerta, el algoritmo activo entrega su mejor solución factible. El orquestador la conserva como mejor solución global y la adapta al receptor. Si el receptor necesita una población, esa solución se combina con perturbaciones factibles y candidatos adicionales para recuperar diversidad.
 
 Esto es warm start: no se reinicia desde cero, pero tampoco se copia ciegamente un estado incompatible. La transferencia sigue el sentido poblacional, trayectoria, poblacional, y la señal DTW/DDTW es la condición de transición.”
 
@@ -259,7 +259,7 @@ Esto es warm start: no se reinicia desde cero, pero tampoco se copia ciegamente 
 
 El WPEB de referencia fija la capacidad total eólica más fotovoltaica en 200 MW, simula 8.760 horas, minimiza LCOE y limita el excedente vendido a la red mediante AGSR menor o igual a 20 por ciento. Sus variables se expresan como razones de capacidad continua y el método de búsqueda combina grid search con descenso de gradiente. El caso reportado es W190--P10--E95--B30, con LCOE de 0.2692 CNY por kWh.
 
-Nuestra implementación conserva la física principal y el horizonte horario, pero cambia el dominio de decisión. El viento es continuo; el electrolizador se expresa en módulos enteros de 5 MW; la batería tiene potencia y duración discretas. Además, el simulador queda dentro de un framework DTW/DDTW que cambia solucionadores y transfiere el incumbente. Así podemos medir la diferencia entre optimizar capacidades con una búsqueda estática y optimizarlas con cooperación adaptativa.”
+Nuestra implementación conserva la física principal y el horizonte horario, pero cambia el dominio de decisión. El viento es continuo; el electrolizador se expresa en módulos enteros de 5 MW; la batería tiene potencia y duración discretas. Además, el simulador queda dentro de un framework DTW/DDTW que cambia solucionadores y transfiere la mejor solución global. Así podemos medir la diferencia entre optimizar capacidades con una búsqueda estática y optimizarlas con cooperación adaptativa.”
 
 ### 20. HRES2--H$_2$: qué se dimensiona — 50 segundos
 
@@ -303,7 +303,7 @@ La restricción es AGSR=E_grid,sales,annual/E_ren,annual<=0.20. E_ren,annual es 
 
 “La integración es un bucle cerrado. El solucionador propone un vector de capacidades. El simulador ejecuta las 8.760 horas. Luego devuelve LCOE, producción de H$_2$, AGSR, energía exportada y factibilidad. Con esa trayectoria de fitness, el detector actualiza DTW o DDTW.
 
-Si la solución mejora, se conserva como incumbente. Si la búsqueda se estanca durante la condición de paciencia, el orquestador cambia de solucionador e inicia una nueva época con warm start. Así, el HRES actúa como evaluador físico y económico, mientras el marco decide cómo continuar la búsqueda.”
+Si la solución mejora, se conserva como mejor solución global. Si la búsqueda se estanca durante la condición de paciencia, el orquestador cambia de solucionador e inicia una nueva época con warm start. Así, el HRES actúa como evaluador físico y económico, mientras el marco decide cómo continuar la búsqueda.”
 
 ### 26. Protocolo experimental — 45 segundos
 
@@ -327,7 +327,7 @@ También se ve la factibilidad: los híbridos llegan al 100 por ciento, mientras
 
 ### 29. Convergencia del pipeline DTW — 50 segundos
 
-“En la curva DTW se observa una caída rápida al principio: el pipeline encuentra mejoras importantes durante las primeras épocas. Luego aparecen plateaus. Las líneas verticales marcan los cambios de solucionador; no representan reinicios completos, sino transferencias del incumbente.
+“En la curva DTW se observa una caída rápida al principio: el pipeline encuentra mejoras importantes durante las primeras épocas. Luego aparecen plateaus. Las líneas verticales marcan los cambios de solucionador; no representan reinicios completos, sino transferencias de la mejor solución global.
 
 La lectura importante es que el cambio de algoritmo ocurre sobre evidencia de la trayectoria. Cuando el fitness deja de mejorar, otro mecanismo puede intentar salir de la meseta. Después de las primeras mejoras, la curva se estabiliza cerca de 0.2672 y termina en el mejor valor observado, 0.267159 CNY por kWh.”
 
@@ -341,7 +341,7 @@ En este caso no vemos una mejora estadísticamente significativa respecto de DTW
 
 “Los enfoques existentes pueden migrar soluciones, seleccionar por características de trayectoria o usar aprendizaje y recompensa. La propuesta se diferencia en tres aspectos.
 
-Primero, la señal es temporal: importa el orden y la forma de las mejoras. Segundo, es independiente del solucionador: la misma lógica puede observar PSO, SA, GWO u otro algoritmo porque solo necesita la trayectoria del incumbente. Tercero, no requiere un modelo aprendido para activar el cambio; usa plantillas, distancias y persistencia, por lo que la decisión se puede inspeccionar después.
+Primero, la señal es temporal: importa el orden y la forma de las mejoras. Segundo, es independiente del solucionador: la misma lógica puede observar PSO, SA, GWO u otro algoritmo porque solo necesita la trayectoria de la mejor solución global. Tercero, no requiere un modelo aprendido para activar el cambio; usa plantillas, distancias y persistencia, por lo que la decisión se puede inspeccionar después.
 
 Esto no significa que sea universal. Hay que calibrar ventana, percentiles y paciencia, y evaluar diferentes perfiles meteorológicos. La contribución es una arquitectura interpretable y comprobable.”
 
@@ -355,7 +355,7 @@ La condición metodológica se mantiene durante todo el plan: presupuestos equiv
 
 ### 33. Contribuciones esperadas — 45 segundos
 
-“Las contribuciones esperadas son cinco. Primero, un detector de estancamiento que usa la forma temporal del fitness y funciona con metaheurísticas heterogéneas. Segundo, un protocolo de transferencia que conserva el incumbente y adapta la inicialización al receptor. Tercero, un orquestador que alterna exploración y explotación con evidencia de la ejecución. Cuarto, una validación que conecta el marco de optimización con el dimensionamiento HRES2--H$_2$. Quinto, una extensión futura para estudiar compromisos económicos y ambientales mediante $ε$-restricción adaptativa.
+“Las contribuciones esperadas son cinco. Primero, un detector de estancamiento que usa la forma temporal del fitness y funciona con metaheurísticas heterogéneas. Segundo, un protocolo de transferencia que conserva la mejor solución global y adapta la inicialización al receptor. Tercero, un orquestador que alterna exploración y explotación con evidencia de la ejecución. Cuarto, una validación que conecta el marco de optimización con el dimensionamiento HRES2--H$_2$. Quinto, una extensión futura para estudiar compromisos económicos y ambientales mediante $ε$-restricción adaptativa.
 
 La frase de cierre puede ser: “En síntesis, DTW/DDTW no reemplaza al optimizador energético; observa su comportamiento y decide cuándo conviene cambiar el mecanismo de búsqueda, mientras el modelo HRES2--H$_2$ verifica cada decisión contra un año completo de operación.”
 

@@ -21,7 +21,7 @@ se guarda la trayectoria del mejor valor
         ↓
 DTW/DDTW decide si la búsqueda sigue progresando
         ↓
-si hay estancamiento, se cambia de solucionador y se transfiere el incumbente
+si hay estancamiento, se cambia de solucionador y se transfiere la mejor solución global
 ```
 
 Hay dos partes diferentes que no conviene mezclar:
@@ -514,13 +514,13 @@ Una época es un bloque de iteraciones de un solucionador. Si el solucionador te
 La transferencia funciona así:
 
 1. se toma la mejor solución factible del solucionador saliente;
-2. se compara con el incumbente global;
+2. se compara con la mejor solución global;
 3. se conserva la mejor de las dos;
 4. el receptor recibe ese vector como warm start;
-5. si necesita una población, se crea una nueva población aleatoria y se inyecta el incumbente; los modos opcionales `mutated` y `mixed` agregan perturbaciones alrededor de él;
+5. si necesita una población, se crea una nueva población aleatoria y se inyecta la mejor solución global; los modos opcionales `mutated` y `mixed` agregan perturbaciones alrededor de ella;
 6. empieza una nueva época.
 
-El incumbente no se pierde al cambiar de metaheurística. La memoria compartida es únicamente esa mejor solución global; no se conserva el estado interno del algoritmo saliente.
+La mejor solución global no se pierde al cambiar de metaheurística. La memoria compartida es únicamente esa solución; no se conserva el estado interno del algoritmo saliente.
 
 ### ¿Qué significa exactamente *warm start* aquí?
 
@@ -528,12 +528,12 @@ El incumbente no se pierde al cambiar de metaheurística. La memoria compartida 
 
 **x = [viento, módulos de electrolizador, potencia BESS, índice de duración]**
 
-Por ejemplo, si el incumbente es aproximadamente **[174.47, 14, 50, 2]**, el receptor hereda 174.47 MW eólicos, 14 módulos, 50 MW de batería y el índice 2, que el decodificador convierte en una duración de 4 horas. El receptor puede modificar ese punto y buscar una mejora, pero ya conoce una región prometedora del espacio.
+Por ejemplo, si la mejor solución global es aproximadamente **[174.47, 14, 50, 2]**, el receptor hereda 174.47 MW eólicos, 14 módulos, 50 MW de batería y el índice 2, que el decodificador convierte en una duración de 4 horas. El receptor puede modificar ese punto y buscar una mejora, pero ya conoce una región prometedora del espacio.
 
 La forma concreta depende del tipo de metaheurística:
 
-- **SA, ILS, TS y VNS:** el incumbente se usa como solución actual desde la primera iteración y se generan vecinos a su alrededor.
-- **PSO, GWO, WOA, EHO, ACO y ABC:** se crea una población nueva, se recorta el vector a los límites y se inyecta el incumbente. Con el modo predeterminado (`random`) reemplaza al individuo de peor calidad; con `mutated` o `mixed` también se crean candidatos perturbados alrededor de él.
+- **SA, ILS, TS y VNS:** la mejor solución global se usa como solución actual desde la primera iteración y se generan vecinos a su alrededor.
+- **PSO, GWO, WOA, EHO, ACO y ABC:** se crea una población nueva, se recorta el vector a los límites y se inyecta la mejor solución global. Con el modo predeterminado (`random`) reemplaza al individuo de peor calidad; con `mutated` o `mixed` también se crean candidatos perturbados alrededor de ella.
 
 Por eso *warm start* no es lo mismo que copiar toda la población anterior, conservar todas las velocidades o continuar exactamente el estado interno del algoritmo. Se conserva la mejor solución global y se entrega una inicialización informada al receptor. Lo contrario es un **cold start**: comenzar completamente desde puntos aleatorios y descartar lo aprendido por el solucionador anterior.
 
@@ -603,7 +603,7 @@ Los métodos independientes pueden obtener ocasionalmente un buen mínimo, pero 
 
 ### Gráficos de convergencia
 
-La curva muestra el mejor LCOE acumulado. Como el problema minimiza, la curva baja cuando aparece una mejora. Las líneas verticales indican cambios de solucionador. Una línea horizontal larga es un plateau: el incumbente no está mejorando.
+La curva muestra el mejor LCOE acumulado. Como el problema minimiza, la curva baja cuando aparece una mejora. Las líneas verticales indican cambios de solucionador. Una línea horizontal larga es un plateau: la mejor solución global no está mejorando.
 
 La interpretación correcta es “el monitor detectó una fase poco productiva y permitió probar otro mecanismo”, no “cada línea vertical significa que se encontró un nuevo óptimo”. Algunas rotaciones pueden no mejorar inmediatamente; su valor está en evitar que toda la búsqueda quede atrapada en el mismo comportamiento.
 
@@ -651,5 +651,5 @@ El caso usa un único perfil meteorológico anual sintético y un modelo HRES si
 4. La metaheurística intenta minimizar LCOE respetando AGSR.
 5. DTW compara la forma de la trayectoria reciente con progreso y meseta.
 6. DDTW hace esa comparación sobre las pendientes.
-7. Una alerta persistente cambia el solucionador, pero conserva el incumbente.
+7. Una alerta persistente cambia el solucionador, pero conserva la mejor solución global.
 8. En los resultados actuales, DTW y DDTW alcanzan la misma configuración HRES2--H₂ y resultados prácticamente iguales.
