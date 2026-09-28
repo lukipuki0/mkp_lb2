@@ -34,6 +34,7 @@ class SAParams:
     # Stagnation
     use_stagnation: bool  = True
     stag_cfg:       StagnationConfig | None = None
+    max_levels:     int | None = None  # Optional temperature-level cap for smoke runs.
 
 
 @dataclass
@@ -81,6 +82,12 @@ def ejecutar_epoch(
 ) -> SAEpochResult:
     """Ejecuta un epoch completo de SA con detección de estancamiento (abort)."""
 
+    if params.max_levels is not None and (
+        isinstance(params.max_levels, bool) or not isinstance(params.max_levels, int)
+        or params.max_levels < 1
+    ):
+        raise ValueError("max_levels must be a positive integer or None")
+
     # Solución inicial: semilla del orquestador o aleatoria
     if sol_inicial is not None:
         sol_actual = list(sol_inicial)
@@ -109,7 +116,9 @@ def ejecutar_epoch(
 
     status = {}  # estado inicial del monitor (evita NameError si monitor es None)
 
-    while T > params.T_final:
+    while T > params.T_final and (
+        params.max_levels is None or len(historial) < params.max_levels
+    ):
         # ── Ciclo de evaluaciones a temperatura T ─────────────────────────
         for _ in range(params.iter_por_T):
             vecino, val_vecino = fn_vecindad(sol_actual, inst, params.num_flip)

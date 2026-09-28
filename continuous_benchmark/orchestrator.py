@@ -96,6 +96,8 @@ def ejecutar_pipeline(
     on_epoch_callback  = None,
     pool_poblacional   : list[str] | None = None,
     ejecutar_mh_fn     = None,   # funcion personalizada: (mh_nombre, func, sol_global, stag_cfg, mode, epoch, verbose) -> resultado
+    pool_trayectoria   : list[str] | None = None,
+    max_epoch_iters    : int | None = None,
 ) -> PipelineResult:
 
     if max_iters is None and tiempo_max is None:
@@ -106,6 +108,21 @@ def ejecutar_pipeline(
 
     if pool_poblacional is None:
         pool_poblacional = list(POOL_POBLACIONAL)
+    if not isinstance(pool_poblacional, (list, tuple)) or not pool_poblacional:
+        raise ValueError("pool_poblacional must be a nonempty list or tuple")
+    if pool_trayectoria is not None and not isinstance(pool_trayectoria, (list, tuple)):
+        raise ValueError("pool_trayectoria must be a list, tuple, or None")
+    pool_trayectoria = list(pool_trayectoria or [])
+    if pool_trayectoria and ejecutar_mh_fn is None:
+        raise ValueError("A trajectory pool requires a custom solver executor")
+    if any(not isinstance(name, str) or not name.strip() for name in
+           list(pool_poblacional) + pool_trayectoria):
+        raise ValueError("Solver pools must contain nonempty solver names")
+    if max_epoch_iters is not None and (
+        isinstance(max_epoch_iters, bool) or not isinstance(max_epoch_iters, int)
+        or max_epoch_iters < 1
+    ):
+        raise ValueError("max_epoch_iters must be a positive integer or None")
 
     _mh_fn = ejecutar_mh_fn if ejecutar_mh_fn is not None else _ejecutar_mh
 
@@ -120,6 +137,7 @@ def ejecutar_pipeline(
     epoch_ctr   = 0
     t_inicio    = time.time()
     mh_anterior : str | None = None
+    turno = "poblacional"
 
     if verbose:
         print("\n" + "=" * 62)
@@ -138,18 +156,21 @@ def ejecutar_pipeline(
 
         t_mh_inicio = time.time() - t_inicio
 
-        # Rotar entre las MHs poblacionales evitando repetir consecutivamente la misma
-        candidatos = [m for m in pool_poblacional if m != mh_anterior] or pool_poblacional
+        # Preserve population-only defaults; HRES explicitly requests alternation.
+        pool = pool_poblacional if turno == "poblacional" else pool_trayectoria
+        candidatos = [m for m in pool if m != mh_anterior] or pool
         mh = random.choice(candidatos)
         mh_anterior = mh
-        tipo = "poblacional"
+        tipo = turno
+        if pool_trayectoria:
+            turno = "trayectoria" if turno == "poblacional" else "poblacional"
 
 
         if verbose:
             elapsed = time.time() - t_inicio
             print(f"\n  [{elapsed:06.1f}s] > {mh:4s} | global = {valor_global:.6f}")
 
-        resultado = _mh_fn(
+        execution_kwargs = dict(
             mh_nombre          = mh,
             func               = func,
             solucion_global    = solucion_global,
@@ -158,6 +179,14 @@ def ejecutar_pipeline(
             epoch_idx          = epoch_ctr,
             verbose            = verbose,
         )
+        if max_epoch_iters is not None:
+            epoch_limit = max_epoch_iters
+            if max_iters is not None:
+                epoch_limit = min(epoch_limit, max_iters - len(historial_global))
+            execution_kwargs["max_epoch_iters"] = epoch_limit
+        resultado = _mh_fn(**execution_kwargs)
+        if not resultado.historial:
+            raise RuntimeError(f"Solver {mh} returned an empty epoch history")
         epoch_ctr += 1
 
         if resultado.mejor_valor < valor_global:
@@ -234,47 +263,49 @@ def _ejecutar_mh(
     pop_injection_mode : str,
     epoch_idx          : int,
     verbose            : bool,
+    max_epoch_iters    : int | None = None,
 ):
     """Ejecuta una MH poblacional. Para trayectoria, usar HRES2-H2/orchestrator.py."""
+    iterations = 300 if max_epoch_iters is None else min(300, max_epoch_iters)
     if mh_nombre == "GA":
-        params = GAParams(pop_size=50, generations=300, epochs=1,
+        params = GAParams(pop_size=50, generations=iterations, epochs=1,
                           injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _ga_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "PSO":
-        params = PSOParams(pop_size=30, iterations=300, epochs=1,
+        params = PSOParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _pso_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "GWO":
-        params = GWOParams(pop_size=30, iterations=300, epochs=1,
+        params = GWOParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _gwo_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "WOA":
-        params = WOAParams(pop_size=30, iterations=300, epochs=1,
+        params = WOAParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _woa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "EHO":
-        params = EHOParams(pop_size=30, iterations=300, epochs=1,
+        params = EHOParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _eho_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "ACO":
-        params = ACOParams(pop_size=30, iterations=300, epochs=1,
+        params = ACOParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _aco_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre == "ABC":
-        params = ABCParams(pop_size=30, iterations=300, epochs=1,
+        params = ABCParams(pop_size=30, iterations=iterations, epochs=1,
                            injection_mode=pop_injection_mode, use_stagnation=True, stag_cfg=stag_cfg)
         return _abc_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=solucion_global)
 
     elif mh_nombre in {"WOA-ABC", "WOA_ABC", "WOAABC"}:
         params = CooperativeCECParams(
             pop_size=30,
-            iterations=300,
+            iterations=iterations,
             epochs=1,
             use_dtw=True,
             stag_cfg=stag_cfg,

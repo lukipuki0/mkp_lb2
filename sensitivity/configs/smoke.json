@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "name": "rotational_smoke",
+  "notes": "Tiny pipeline functionality check only, not paper baselines or sensitivity evidence. Explicit max_epoch_iters=4 changes the epoch budget semantics only for this smoke protocol.",
+  "seeds": [
+    43
+  ],
+  "modes": [
+    "dtw",
+    "ddtw"
+  ],
+  "max_epoch_iters": 4,
+  "domains": [
+    {
+      "domain": "mkp",
+      "budget": 4,
+      "baseline": {
+        "window": 3,
+        "band_ratio": 0.1,
+        "min_slope": 0.1,
+        "plateau_max": 1,
+        "patience": 1,
+        "adapt_thresholds": true,
+        "p_low": 30,
+        "p_high": 70,
+        "improvement_tol": 0
+      },
+      "cases": [
+        {
+          "id": "mkp_cb1_i0",
+          "index": 0,
+          "reference_value": 24381,
+          "reference_source": "hybrid_mkp/parallel_mkp_first_inst.py BKS_FAMILIA[1], case 0; best-known reference, not proven optimum",
+          "file": "instancias/mknapcb1.txt"
+        }
+      ],
+      "factors": {}
+    },
+    {
+      "domain": "cec",
+      "budget": 4,
+      "baseline": {
+        "window": 3,
+        "band_ratio": 0.1,
+        "min_slope": 0.1,
+        "plateau_max": 1,
+        "patience": 1,
+        "adapt_thresholds": true,
+        "p_low": 30,
+        "p_high": 70,
+        "improvement_tol": 0
+      },
+      "cases": [
+        {
+          "id": "cec_f1_d10",
+          "dimension": 10,
+          "function": 1
+        }
+      ],
+      "factors": {}
+    },
+    {
+      "domain": "hres",
+      "budget": 4,
+      "baseline": {
+        "window": 3,
+        "band_ratio": 0.1,
+        "min_slope": 0,
+        "plateau_max": 1,
+        "patience": 1,
+        "adapt_thresholds": true,
+        "p_low": 30,
+        "p_high": 70,
+        "improvement_tol": 0
+      },
+      "cases": [
+        {
+          "id": "hres_sizing"
+        }
+      ],
+      "factors": {}
+    }
+  ]
+}

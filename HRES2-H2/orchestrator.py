@@ -81,24 +81,26 @@ def _ejecutar_mh_hres2(
     pop_injection_mode : str,
     epoch_idx          : int,
     verbose            : bool,
+    max_epoch_iters    : int | None = None,
 ):
     """Ejecuta una MH: delega a poblacional o trayectoria HRES2."""
     sol = solucion_global
+    iterations = 300 if max_epoch_iters is None else min(300, max_epoch_iters)
 
     if mh_nombre == "ILS":
-        params = ILSParams(iterations=300, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
+        params = ILSParams(iterations=iterations, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
         return _ils_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=sol)
 
     elif mh_nombre == "SA":
-        params = SAParams(iterations=300, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
+        params = SAParams(iterations=iterations, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
         return _sa_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=sol)
 
     elif mh_nombre == "TS":
-        params = TSParams(iterations=300, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
+        params = TSParams(iterations=iterations, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
         return _ts_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=sol)
 
     elif mh_nombre == "VNS":
-        params = VNSParams(iterations=300, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
+        params = VNSParams(iterations=iterations, epochs=1, use_stagnation=True, stag_cfg=stag_cfg)
         return _vns_epoch(func, params, epoch_idx=epoch_idx, verbose=verbose, sol_inyectada=sol)
 
     else:
@@ -106,6 +108,7 @@ def _ejecutar_mh_hres2(
             mh_nombre=mh_nombre, func=func, solucion_global=solucion_global,
             stag_cfg=stag_cfg, pop_injection_mode=pop_injection_mode,
             epoch_idx=epoch_idx, verbose=verbose,
+            max_epoch_iters=max_epoch_iters,
         )
 
 
@@ -118,6 +121,7 @@ def ejecutar_pipeline_hres2(
     on_epoch_callback  = None,
     pool_poblacional   : list[str] | None = None,
     pool_trayectoria   : list[str] | None = None,
+    max_epoch_iters    : int | None = None,
 ) -> PipelineResult:
     """Pipeline HRES2-H2 con MHs poblacionales y de trayectoria."""
     return ejecutar_pipeline(
@@ -127,9 +131,10 @@ def ejecutar_pipeline_hres2(
         stag_cfg           = stag_cfg,
         verbose            = verbose,
         on_epoch_callback  = on_epoch_callback,
-        pool_poblacional   = pool_poblacional or list(POOL_POBLACIONAL_HRES2),
-        pool_trayectoria   = pool_trayectoria or list(POOL_TRAYECTORIA_HRES2),
+        pool_poblacional   = list(POOL_POBLACIONAL_HRES2) if pool_poblacional is None else pool_poblacional,
+        pool_trayectoria   = list(POOL_TRAYECTORIA_HRES2) if pool_trayectoria is None else pool_trayectoria,
         ejecutar_mh_fn     = _ejecutar_mh_hres2,
+        max_epoch_iters    = max_epoch_iters,
     )
 
 

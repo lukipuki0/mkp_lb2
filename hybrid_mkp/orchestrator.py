@@ -100,6 +100,7 @@ def ejecutar_pipeline(
     stag_cfg           : StagnationConfig | None = None,
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
+    max_epoch_iters    : int | None = None,
 ) -> PipelineResult:
     """Ejecuta el pipeline híbrido rotando MH hasta alcanzar max_iters o agotar tiempo_max.
 
@@ -121,6 +122,12 @@ def ejecutar_pipeline(
 
     if stag_cfg is None:
         stag_cfg = StagnationConfig()
+
+    if max_epoch_iters is not None and (
+        isinstance(max_epoch_iters, bool) or not isinstance(max_epoch_iters, int)
+        or max_epoch_iters < 1
+    ):
+        raise ValueError("max_epoch_iters must be a positive integer or None")
 
     # Estado global
     solucion_global  : list[int] | None = None
@@ -166,6 +173,9 @@ def ejecutar_pipeline(
             print(f"\n  [{elapsed:06.1f}s] > {mh:4s} | global = {valor_global:.1f}")
 
         # Ejecutar la MH con stag_strategy="abort" (termina al estancarse)
+        epoch_limit = max_epoch_iters
+        if epoch_limit is not None and max_iters is not None:
+            epoch_limit = min(epoch_limit, max_iters - len(historial_global))
         resultado = _ejecutar_mh(
             mh_nombre          = mh,
             inst               = inst,
@@ -174,7 +184,10 @@ def ejecutar_pipeline(
             pop_injection_mode = pop_injection_mode,
             epoch_idx          = epoch_ctr,
             verbose            = verbose,
+            max_epoch_iters    = epoch_limit,
         )
+        if not resultado.historial:
+            raise RuntimeError(f"Solver {mh} returned an empty epoch history")
         epoch_ctr += 1
 
         # Actualizar mejor global si mejoró
@@ -251,6 +264,7 @@ def _ejecutar_mh(
     pop_injection_mode : str,
     epoch_idx          : int,
     verbose            : bool,
+    max_epoch_iters    : int | None = None,
 ):
     """Ejecuta una MH específica con abort activado."""
 
@@ -260,10 +274,15 @@ def _ejecutar_mh(
     else:
         mh_stag_cfg = stag_cfg
 
+    # Caps are opt-in for local smoke runs; None preserves all legacy budgets.
+    population_iters = 300 if max_epoch_iters is None else min(300, max_epoch_iters)
+    trajectory_iters = 2_000 if max_epoch_iters is None else min(2_000, max_epoch_iters)
+    ga_iters = 500 if max_epoch_iters is None else min(500, max_epoch_iters)
+
     if mh_nombre == "GA":
         # Opción 4: Homologación de pop_size=30 para GA (mismo estándar que standalone)
         params = GAParams(
-            pop_size=30, generations=500, epochs=1,
+            pop_size=30, generations=ga_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -272,7 +291,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "PSO":
         params = PSOParams(
-            pop_size=30, iterations=300, epochs=1,
+            pop_size=30, iterations=population_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -281,7 +300,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "GWO":
         params = GWOParams(
-            pop_size=30, iterations=300, epochs=1,
+            pop_size=30, iterations=population_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -290,7 +309,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "EHO":
         params = EHOParams(
-            pop_size=30, iterations=300, epochs=1,
+            pop_size=30, iterations=population_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -299,7 +318,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "WOA":
         params = WOAParams(
-            pop_size=30, iterations=300, epochs=1,
+            pop_size=30, iterations=population_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -308,7 +327,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "ACO":
         params = ACOParams(
-            pop_size=30, iterations=300, epochs=1,
+            pop_size=30, iterations=population_iters, epochs=1,
             injection_mode=pop_injection_mode,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
@@ -320,13 +339,14 @@ def _ejecutar_mh(
         params = SAParams(
             T_inicial=5_000.0, T_final=1.0, alpha=0.97, iter_por_T=50,
             epochs=1, use_stagnation=True, stag_cfg=mh_stag_cfg,
+            max_levels=max_epoch_iters,
         )
         return _sa_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
                          sol_inicial=solucion_global)
 
     elif mh_nombre == "TS":
         params = TSParams(
-            epochs=1, iterations=2_000,
+            epochs=1, iterations=trajectory_iters,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
         return _ts_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
@@ -334,7 +354,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "ILS":
         params = ILSParams(
-            epochs=1, iterations=2_000, perturb_size=5, ls_max_iters=50,
+            epochs=1, iterations=trajectory_iters, perturb_size=5, ls_max_iters=50,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
         return _ils_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
@@ -342,7 +362,7 @@ def _ejecutar_mh(
 
     elif mh_nombre == "VNS":
         params = VNSParams(
-            epochs=1, iterations=2_000, k_max=5, ls_max_iters=50,
+            epochs=1, iterations=trajectory_iters, k_max=5, ls_max_iters=50,
             use_stagnation=True, stag_cfg=mh_stag_cfg,
         )
         return _vns_epoch(inst, params, epoch_idx=epoch_idx, verbose=verbose,
