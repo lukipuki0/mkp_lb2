@@ -28,7 +28,6 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 
-
 \journal{Expert Systems with Applications}
 
 %% For ESWA journal you need to use APA style
@@ -48,7 +47,7 @@
 \vspace{1.5cm}
 
 % Author names and affiliations
-Lucas Erazo$^{a,b}$ (lucas.erazo@pucv.cl), Ricardo Soto$^a$ (ricado.soto@pucv.cl), Pamela Hermosilla$^a$ (pamela.hermosilla@pucv.cl), Broderik Crawford$^a$ (), José Lemus$^b$ (), El-Ghazali Talbi$^b$ (), and Emanuel Vega$^a,$* (emanuel.vega@pucv.cl) \\
+Lucas Erazo$^{a,b}$ (lucas.erazo@pucv.cl), Ricardo Soto$^a$ (ricado.soto@pucv.cl), Pamela Hermosilla$^a$ (pamela.hermosilla@pucv.cl), Broderik Crawford$^a$ (), José Lemus$^b$ (), El-Ghazali Talbi$^b$ (el-ghazali.talbi@univ-lille.fr), and Emanuel Vega$^a,$* (emanuel.vega@pucv.cl) \\
 
 \hspace{10pt}
 
@@ -111,9 +110,9 @@ Multidimensional Knapsack Problem (MKP), the continuous IEEE CEC2022 suite
 that trajectory-driven switching achieves superior cross-domain performance:
 yielding up to a 21.5\% gap reduction in MKP, the top aggregate Friedman
 ranks in CEC2022, and 100\% feasibility with minimal LCOE in HRES2--H2,
-significantly outperforming standalone baselines
+showing significant improvements over several standalone baselines
 ($p_{\mathrm{Holm}} < 0.05$). These findings confirm that elastic trajectory
-alignment provides an effective, less sensitive to changes in objective scale mechanism for coordinating
+alignment provides an effective mechanism that is less sensitive to changes in objective scale for coordinating
 collaborative metaheuristics.
 \end{abstract}
 
@@ -133,7 +132,7 @@ Population-based and trajectory-based metaheuristics are widely used to address 
 
 Existing adaptive approaches use, among other signals, successful parameter histories \cite{song2019review}, estimates of the evolutionary state, diversity measures, stagnation counters, or learning-based feedback. Hybrid metaheuristics additionally combine population-based exploration with trajectory-based intensification \cite{talbi2016combining,karimimamaghan2022machine}, but their coordination raises a central control question: when should the active solver terminate its current search phase and transfer control to another solver? \cite{talbi2021machine_tax} Fixed iteration budgets and manually selected stagnation thresholds provide simple control rules, but their behavior can depend strongly on the objective scale, landscape structure, and algorithm being monitored \cite{elhashash2025hybrid,pei2024learning}. The temporal evolution of the incumbent fitness therefore provides a useful, solver-independent signal for distinguishing ongoing progress from a persistent plateau. Nevertheless, explicit shape-based analysis of this trajectory remains insufficiently explored as a mechanism for coordinating heterogeneous metaheuristics.
 
-Accordingly, this work proposes a trajectory-driven adaptive configuration-control framework in which Dynamic Time Warping (DTW) \cite{berndt1994using} and Derivative Dynamic Time Warping (DDTW) \cite{keogh2001derivative} are employed to analyze patterns in the recent best-so-far fitness trajectory. Rather than independently adapting individual control parameters, each solver operates between exploration- and exploitation-oriented search phases. Information derived from the DTW/DDTW-based trajectory analysis is then used to regulate the transition between these phases: upon detecting a persistent plateau, the orchestrator terminates the current solver epoch and transfers the best feasible solution to the next solver in a rotational pool. The pool comprises population-based solvers (PSO, GWO, WOA, EHO, ACO, and GA) and trajectory-based solvers (SA, TS, ILS, and VNS), whose complementary search behaviors are alternated by the adaptive controller. In this way, DTW/DDTW acts as a search-monitoring mechanism within a broader adaptive controller, allowing solver transitions to respond to patterns observed in the evolving fitness trajectory.
+Accordingly, this work proposes a trajectory-driven adaptive configuration-control framework in which Dynamic Time Warping (DTW) \cite{berndt1994using} and Derivative Dynamic Time Warping (DDTW) \cite{keogh2001derivative} are employed to analyze patterns in the recent best-so-far fitness trajectory. Rather than independently adapting individual control parameters, the controller coordinates exploration and exploitation oriented search behavior through the solver pools enabled for each problem domain. Information derived from the DTW/DDTW-based trajectory analysis is then used to regulate the transition between these phases: upon detecting a persistent plateau, the orchestrator terminates the current solver epoch and transfers the best feasible solution to the next solver in a rotational pool. The complete portfolio comprises population-based solvers (PSO, GWO, WOA, EHO, ACO, and GA) and trajectory-based solvers (SA, TS, ILS, and VNS). The controller selects from the solver pools enabled for the corresponding problem domain. In this way, DTW/DDTW acts as a search-monitoring mechanism within a broader adaptive controller, allowing solver transitions to respond to patterns observed in the evolving fitness trajectory.
 
 The proposed framework is comprehensively evaluated across three optimization domains of increasing complexity:
 \begin{enumerate}
@@ -146,10 +145,7 @@ The main contributions of this work are:
     \item A model-free stagnation detection engine in which DTW and DDTW
           align the recent best-so-far fitness trajectory against synthetic
           progress and stagnation baselines under Sakoe--Chiba band
-          constraints. Stagnation is identified through run-relative
-          empirical percentiles and a confirmation patience filter, providing
-          a solver-independent switching signal that requires no training
-          phase.
+          constraints.
     \item A collaborative rotational architecture that alternates
           population-based exploration ($\mathcal{P}_{pop}$) and
           trajectory-based exploitation ($\mathcal{P}_{traj}$) pools upon
@@ -161,10 +157,11 @@ The main contributions of this work are:
           across discrete combinatorial (MKP), continuous global (IEEE
           CEC2022, $D=10$), and real-world engineering (HRES2--H2 microgrid)
           optimization problems.
-    \item A rigorous non-parametric inferential protocol based on
-          Wilcoxon, Mann--Whitney, and Friedman tests with Holm correction
-          over 31 independent runs, confirming statistically significant
-          advantages over standalone metaheuristics in all three domains.
+    \item A non-parametric inferential protocol based on Wilcoxon,
+      Mann--Whitney, and Friedman tests with Holm correction over
+      31 stochastic runs, quantifying wins, ties, and losses against
+      standalone metaheuristics across the three domains.
+          
 \end{enumerate}
 
 
@@ -207,12 +204,7 @@ The problem of dynamically selecting among alternative search mechanisms is
 closely related to selection hyper-heuristics and adaptive operator
 selection. Selection hyper-heuristics provide high-level mechanisms for
 choosing among available heuristics during the search
-\cite{drake2020recent}, while adaptive operator selection focuses on
-determining which search operator should be applied as optimization evolves.
-A recent survey by Pei et al. classifies adaptive operator-selection
-approaches according to whether their decisions are stateless or explicitly
-conditioned on information describing the current search state
-\cite{pei2025adaptive}. Search feedback used in these mechanisms includes fitness
+\cite{drake2020recent}, while adaptive operator selection focuses on determining which search operator should be applied as optimization evolves. In this context, adaptive operator selection approaches are broadly categorized based on whether selection decisions are stateless or explicitly conditioned on information describing the current search state \cite{pei2025adaptive}. Search feedback used in these mechanisms includes fitness
 improvement, historical operator performance, population information, and
 other state descriptors, frequently aggregated over sliding windows or
 historical records.
@@ -540,7 +532,7 @@ f_{penalized}(\mathbf{x}) = 100.0 + 10.0 \cdot AGSR
 
 
 
-The overall architecture and closed-loop operational workflow of the proposed collaborative optimization framework are presented in Figure~\ref{fig:framework_flowchart}. The framework integrates three interconnected functional layers: (i) a multi-domain problem layer covering discrete combinatorial optimization (MKP), continuous global benchmarks (IEEE CEC2022), and real-world engineering simulations (HRES2-H2 microgrid); (ii) an elastic DTW/DDTW stagnation monitoring engine that tracks sliding fitness trajectories ($\mathbf{X} \in \mathbb{R}^W$) against synthetic progress ($\mathbf{R}$) and stagnation ($\mathbf{C}$) baselines to compute distance metrics ($D_1, D_2, \Delta$) and confirm search stagnation via adaptive percentile thresholds and a patience streak filter ($S_t \ge P$); and (iii) a collaborative metaheuristic execution layer that selects solvers from the configured population($\mathcal{P}_{pop}$) and trajectory ($\mathcal{P}_{traj}$) pools according to the problem domain, seamlessly transferring search memory through an elitist solution injection protocol upon each validated solver switch.
+The overall architecture and closed-loop operational workflow of the proposed collaborative optimization framework are presented in Figure~\ref{fig:framework_flowchart}. The framework integrates three interconnected functional layers: (i) a multi-domain problem layer covering discrete combinatorial optimization (MKP), continuous global benchmarks (IEEE CEC2022), and real-world engineering simulations (HRES2-H2 microgrid); (ii) an elastic DTW/DDTW stagnation monitoring engine that tracks sliding fitness trajectories ($\mathbf{X} \in \mathbb{R}^W$) against synthetic progress ($\mathbf{R}$) and stagnation ($\mathbf{C}$) baselines to compute distance metrics ($D_1, D_2, \Delta$) and confirm search stagnation via adaptive percentile thresholds and a patience streak filter ($S_t \ge P$); and (iii) a collaborative metaheuristic execution layer that selects solvers from the configured population ($\mathcal{P}_{pop}$) and trajectory ($\mathcal{P}_{traj}$) pools according to the problem domain, seamlessly transferring search memory through an elitist solution injection protocol upon each validated solver switch.
 
 
 \begin{figure}[htbp]
@@ -553,22 +545,22 @@ The overall architecture and closed-loop operational workflow of the proposed co
 \subsection{Overall Architecture of the DTW-Driven Adaptive Rotational Hybrid Framework}
 \label{sec:overall_architecture}
 
-To systematically resolve the critical challenges of premature convergence, progressive diversity loss, and limited cross-domain adaptability commonly encountered in standalone metaheuristic algorithms, this work proposes an Adaptive Rotational Hybrid Metaheuristic Framework governed by a Dynamic Time Warping (DTW) and Derivative Dynamic Time Warping (DDTW) Stagnation Monitor. Conventional hybrid schemes frequently switch between exploration and exploitation phases using rigid, heuristic criteria such as fixed iteration intervals or static stagnation counters which inevitably lead to either premature switching \cite{talbi2016combining}, (interrupting productive search trajectories) or delayed switching (wasting computational evaluations on stalled regions)\cite{akbulut2026artificial}. In contrast, the proposed framework employs temporal elastic alignment over the recent objective-function trajectory as a mathematically rigorous and dynamic indicator of search productivity  \cite{karimimamaghan2022machine}.
+To systematically resolve the critical challenges of premature convergence, progressive diversity loss, and limited cross-domain adaptability commonly encountered in standalone metaheuristic algorithms, this work proposes an Adaptive Rotational Hybrid Metaheuristic Framework governed by a Dynamic Time Warping (DTW) and Derivative Dynamic Time Warping (DDTW) Stagnation Monitor. Conventional hybrid schemes frequently switch between exploration and exploitation phases using rigid, heuristic criteria such as fixed iteration intervals or static stagnation counters which may lead either to premature switching (interrupting productive search trajectories) \cite{talbi2016combining} or to delayed switching (wasting computational evaluations on stalled regions) \cite{akbulut2026artificial}. In contrast, the proposed framework employs temporal elastic alignment over the recent objective-function trajectory as a mathematically rigorous and dynamic indicator of search productivity  \cite{karimimamaghan2022machine}.
 
 The theoretical foundation of the framework is rooted in the principle of algorithmic complementarity dictated by the No Free Lunch (NFL) theorem \cite{wolpert1997no}. Because no single search operator uniformly dominates across diverse landscape topologies, the proposed architecture organizes ten metaheuristic algorithms into two disjoint and specialized operational pools:
 \begin{enumerate}
     \item \textbf{Population Pool ($\mathcal{P}_{pop}$):} Comprises population-based swarm and nature-inspired metaheuristics designed for global exploration and structural diversification across the search domain.
-    \item \textbf{Trajectory Pool ($\mathcal{P}_{traj}$):} Comprises trajectory-based and local-search metaheuristics designed for fine grained exploitation and rapid intensification around promising regions.
+    \item \textbf{Trajectory Pool ($\mathcal{P}_{traj}$):} Comprises trajectory-based and local-search metaheuristics designed for fine-grained exploitation and rapid intensification around promising regions.
 \end{enumerate}
 
-The execution workflow is structured into dynamic Epochs ($e = 1, 2, \dots, E$). In each epoch, an active solver $M^{(e)}$ randomly selected from the designated pool executes problem-specific optimization iterations on the objective function $f(\mathbf{x})$. Unlike static schedules, an epoch ends when its configured iteration limit is reached or earlier when the DTW/DDTW Stagnation Monitor verifies that the recent convergence curve has entered an unpromising stagnation plateau. Upon triggering, the orchestrator freezes the active algorithm, extracts the global elite solution $\mathbf{x}_{best}^*$, alternates the pool type ($\mathcal{P}_{pop} \leftrightarrow \mathcal{P}_{traj}$), and executes the Seed Memory Injection Protocol to seamlessly initialize the successor solver without discarding accumulated evolutionary progress.
+The execution workflow is structured into dynamic Epochs ($e = 1, 2, \dots, E$). In each epoch, an active solver $M^{(e)}$ randomly selected from the designated pool executes problem-specific optimization iterations on the objective function $f(\mathbf{x})$. Unlike static schedules, an epoch ends when its configured iteration limit is reached or earlier when the DTW/DDTW Stagnation Monitor verifies that the recent convergence curve has entered an unpromising stagnation plateau. Upon triggering, the orchestrator freezes the active algorithm, extracts the global elite solution $\mathbf{x}_{best}^*$, alternates between the configured pools when both pools are enabled, and executes the Seed Memory Injection Protocol to seamlessly initialize the successor solver without discarding accumulated evolutionary progress.
 
 
 
 \subsection{Mathematical Formulation of the DTW/DDTW Stagnation Detection Engine}
 \label{sec:dtw_formulation}
 
-The stagnation detection engine operates on the sliding temporal sequence of best-so-far objective values recorded by the active solver across the most recent $W$ iterations:
+To use a common progress convention across domains, let $q_t=f_t$ for maximization problems and $q_t=-f_t$ for minimization problems. In the following formulation, $x_t$ denotes this monitored score. The stagnation detection engine operates on the sliding temporal sequence of best-so-far monitored scores recorded by the active solver across the most recent $W$ iterations:
 \begin{equation}
 \mathbf{X} = \left[ x_{t-W+1}, x_{t-W+2}, \dots, x_t \right] \in \mathbb{R}^W, \quad t \ge W
 \label{eq:sliding_window}
@@ -639,7 +631,7 @@ Under active convergence, $\mathbf{X}$ aligns closely with $\mathbf{R}$, yieldin
 \subsection{Adaptive Thresholding via Moving Historical Percentiles}
 \label{sec:adaptive_thresholding}
 
-Static thresholding is inherently brittle when dealing with multi-domain benchmarks comprising disparate fitness landscapes (e.g., MKP with fitness in the order of $10^4$, CEC2022 in the order of $10^2$, and HRES2-H2 in sub-unit ranges). To improve portability across different objective scales, the framework maintains three cumulative memory buffers:, the framework maintains three cumulative memory buffers: $\mathcal{H}_{D_1}$, $\mathcal{H}_{D_2}$, and $\mathcal{H}_{\Delta}$, which store historical values of $D_1$, $D_2$, and $\Delta$ recorded during the current epoch.
+Static thresholding is inherently brittle when dealing with multi-domain benchmarks comprising disparate fitness landscapes (e.g., MKP with fitness in the order of $10^4$, CEC2022 in the order of $10^2$, and HRES2-H2 in sub-unit ranges). To improve portability across different objective scales, the framework maintains three cumulative memory buffers: $\mathcal{H}_{D_1}$, $\mathcal{H}_{D_2}$, and $\mathcal{H}_{\Delta}$, which store historical values of $D_1$, $D_2$, and $\Delta$ recorded during the current epoch.
 
 Once a minimum buffer warm-up size is attained ($|\mathcal{H}| \ge 10$), the dynamic classification thresholds are updated at each iteration using empirical percentile functions:
 \begin{align}
@@ -672,14 +664,7 @@ The orchestrator triggers an algorithmic rotation event when $S_t$ reaches the c
 When the DTW monitor initiates solver rotation at epoch $e$, the orchestrator coordinates knowledge transfer via the following protocol:
 \begin{enumerate}
     \item \textbf{Elite Extraction:} The global best solution $\mathbf{x}_{best}^* \in \mathbb{R}^D$ and its fitness $f(\mathbf{x}_{best}^*)$ are retrieved from global shared memory.
-    \item \textbf{Injection into Population Solvers ($M \in \mathcal{P}_{pop}$):} The successor population of size $N_{pop}$ is initialized through a three-tier hybrid strategy:
-    \begin{align}
-    \mathbf{x}_1^{(0)} &= \mathbf{x}_{best}^* \label{eq:elite_inj} \\
-    \mathbf{x}_i^{(0)} &= \mathbf{x}_{best}^* + \mathcal{N}\left(\mathbf{0}, \sigma^2 \mathbf{I}\right) \odot (\mathbf{U} - \mathbf{L}), \quad \forall i \in \left\{2, \dots, \left\lfloor \frac{N_{pop}}{2} \right\rfloor \right\} \label{eq:gauss_inj} \\
-    \mathbf{x}_j^{(0)} &\sim \mathcal{U}(\mathbf{L}, \mathbf{U}), \quad \forall j \in \left\{\left\lfloor \frac{N_{pop}}{2} \right\rfloor + 1, \dots, N_{pop}\right\} \label{eq:unif_inj}
-    \end{align}
-    where $\sigma = 0.05$, and $[\mathbf{L}, \mathbf{U}]$ denotes the problem bounding box. This guarantees strong local exploitation around $\mathbf{x}_{best}^*$ while maintaining background exploratory dispersion.
-    \item \textbf{Injection into Trajectory Solvers ($M \in \mathcal{P}_{traj}$):} The initial trajectory coordinate is assigned deterministically as $\mathbf{x}_0 = \mathbf{x}_{best}^*$, focusing immediate local intensification on the highest-quality basin.
+    \item \textbf{Injection into Population Solvers ($M \in \mathcal{P}_{pop}$):} At a solver switch, the incumbent elite solution is transferred to the successor solver. The remaining candidates are initialized according to the domain-specific injection policy configured for the corresponding benchmark.
 \end{enumerate}
 
 
@@ -773,11 +758,16 @@ Upper Percentile / Progress ($P_{high}$) & $70.0\%$ & $70.0\%$ \\ \hline
 \subsubsection{DTW/DDTW Orchestrator Workflow}
 \label{sec:orchestrator_workflow}
 
-Algorithm~\ref{alg:orchestrator_workflow} summarizes the DTW/DDTW-based
-metaheuristic switching flow.
+Algorithm~\ref{alg:orchestrator_workflow} summarizes the operational flow of
+the proposed orchestrator. At every epoch, one metaheuristic is selected from
+the active pool and receives the incumbent elite solution. During its
+execution, the DTW/DDTW monitor evaluates the recent best-so-far trajectory.
+When the stagnation condition persists for the configured patience period, the
+current epoch is terminated, the elite solution is retained, and control is
+transferred to a new metaheuristic.
 
 \begin{algorithm}[H]
-\caption{DTW/DDTW-driven orchestrator for adaptive metaheuristic switching}
+\caption{DTW/DDTW orchestrator for adaptive metaheuristic switching}
 \label{alg:orchestrator_workflow}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} Objective function $f$, computational budget
@@ -785,7 +775,6 @@ $T_{\max}$, solver pools $\mathcal{P}_{pop}$ and $\mathcal{P}_{traj}$,
 alignment mode $v\in\{\mathrm{DTW},\mathrm{DDTW}\}$ with distance operator
 $d_v$, window size $W$, plateau tolerance $K_{\max}$, and patience $P$.
 \STATE \textbf{Output:} Best solution $\mathbf{x}_{best}^{*}$ and solver-switch log.
-\STATE
 \STATE \textbf{Initialization:} Set $t=0$, $e=1$,
 $\mathbf{x}_{best}^{*}=\varnothing$, and select the initial active pool
 $\mathcal{P}$.
@@ -832,7 +821,6 @@ $\mathcal{P}$.
 \RETURN $\mathbf{x}_{best}^{*}$ and the solver-switch log.
 \end{algorithmic}
 \end{algorithm}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Results}
 \label{sec:results_and_discussion}
@@ -928,13 +916,103 @@ mknapcb9 & 115,868 & 113,115.9 & 378.8 & 113,978.0 & \textbf{2.38} & \textbf{1.6
 \end{tabular}
 \end{table}
 
-Across all four experimental configurations, the extended budget ($T_{max} = 3{,}000$) consistently reduced the mean optimality gap compared to the standard budget ($T_{max} = 1{,}000$), with the DTW variant at $3{,}000$ iterations achieving the lowest mean gap in 7 out of 9 instances. Notably, the DDTW variant achieved the closest approach to the Best Known Solution on instance mknapcb4 ($n=100, m=10$), reaching a fitness of $23{,}055$ against a BKS of $23{,}064$ (gap of $0.04\%$). The number of solver switches approximately tripled from $\sim 8$ (at $1{,}000$ iterations) to $\sim 27$ (at $3{,}000$ iterations), confirming that the adaptive monitor continues to detect productive stagnation events throughout extended search horizons without premature saturation.
+Across all four experimental configurations, the extended budget ($T_{max} = 3{,}000$) consistently reduced the mean optimality gap compared to the standard budget ($T_{max} = 1{,}000$), with the DTW variant at $3{,}000$ iterations achieving the lowest mean gap in 7 out of 9 instances. Notably, the DDTW variant achieved the closest approach to the Best Known Solution on instance mknapcb4 ($n=100, m=10$), reaching a fitness of $23{,}055$ against a BKS of $23{,}064$ (gap of $0.04\%$). The number of solver switches approximately tripled from $\sim 8$ (at $1{,}000$ iterations) to $\sim 27$ (at $3{,}000$ iterations), showing that the adaptive monitor continued to trigger solver switches during the extended search horizon; the switch counts alone do not establish that every switch was productive or prevented premature saturation.
 
 
 
 
 
 %%ACA GRAFICOS RETRO
+
+Figures~\ref{fig:mkp-best-cb1}--\ref{fig:mkp-best-cb9} show the convergence
+trajectory and the $\Delta$ monitor for the best-performing framework
+configuration selected independently for each MKP instance. The selection is
+based on the lowest mean optimality gap over 31 runs: DTW--3K is selected for
+mknapcb1 and mknapcb3--mknapcb, whereas DDTW--3K
+is selected for mknapcb2 and mknapcb9. Each pair uses the
+best run reported by the corresponding campaign.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb1_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb1_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb1} under DTW--3K, best run 31.}
+\label{fig:mkp-best-cb1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb2_ddtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb2_ddtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb2} under DDTW--3K, best run 31.}
+\label{fig:mkp-best-cb2}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb3_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb3_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb3} under DTW--3K, best run 26.}
+\label{fig:mkp-best-cb3}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_mkp_mejores/mknapcb4_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_mkp_mejores/mknapcb4_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb4} under DTW--3K, best run 31.}
+\label{fig:mkp-best-cb4}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb5_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb5_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb5} under DTW--3K, best run 26.}
+\label{fig:mkp-best-cb5}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb6_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb6_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb6} under DTW--3K, best run 22.}
+\label{fig:mkp-best-cb6}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb7_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb7_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb7} under DTW--3K, best run 02.}
+\label{fig:mkp-best-cb7}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb8_dtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb8_dtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb8} under DTW--3K, best run 28.}
+\label{fig:mkp-best-cb8}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb9_ddtw_3k_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{figures/imagenes_mkp_mejores/mknapcb9_ddtw_3k_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{mknapcb9} under DDTW--3K, best run 15.}
+\label{fig:mkp-best-cb9}
+\end{figure}
+
 \subsection{Results in Continuous Optimization: IEEE CEC2022 Suite}
 \label{sec:results_cec2022}
 
@@ -991,11 +1069,133 @@ rather than universal dominance by one of them.
 
 %%ACA VAN LOS GRAFICOS DE LAS CEC
 
+% Diagnostic figures for the best DTW/DDTW configuration of each CEC2022
+% function. This is an input fragment for paper/results.tex and requires only
+% graphicx, already loaded by the main paper preamble.
+%
+% Selection criterion: lowest mean objective over the 31-run DTW and DDTW
+% campaigns. The paired plots correspond to the best run of that campaign.
+
+Figures~\ref{fig:cec-best-f1}--\ref{fig:cec-best-f12} show the convergence
+trajectory and the $\Delta$ monitor for the better alignment variant selected
+independently for each CEC2022 function. Since CEC2022 is a minimization
+benchmark, the selection uses the lower mean objective over the 31 runs. DTW
+is selected for F1, F3, F5--F8, and F11; DDTW is selected for F2, F4, F9,
+F10, and F12. Each pair uses the best run reported by the selected
+campaign.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f1_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f1_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F1} (Shifted Rotated Zakharov) under DTW, best run 09.}
+\label{fig:cec-best-f1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f2_ddtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f2_ddtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F2} (Shifted Rotated Rosenbrock) under DDTW, best run 04.}
+\label{fig:cec-best-f2}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f3_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f3_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F3} (Shifted Rotated Expanded Schaffers F7) under DTW, best run 14.}
+\label{fig:cec-best-f3}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f4_ddtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f4_ddtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F4} (Shifted Rotated Non-Continuous Rastrigin) under DDTW, best run 30.}
+\label{fig:cec-best-f4}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f5_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f5_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F5} (Shifted Rotated Levy) under DTW, best run 11.}
+\label{fig:cec-best-f5}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f6_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f6_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F6} (Hybrid Function 1) under DTW, best run 02.}
+\label{fig:cec-best-f6}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f7_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f7_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F7} (Hybrid Function 2) under DTW, best run 12.}
+\label{fig:cec-best-f7}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f8_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f8_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F8} (Hybrid Function 3) under DTW, best run 26.}
+\label{fig:cec-best-f8}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f9_ddtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f9_ddtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F9} (Composition Function 1) under DDTW, best run 01.}
+\label{fig:cec-best-f9}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f10_ddtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f10_ddtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F10} (Composition Function 2) under DDTW, best run 29.}
+\label{fig:cec-best-f10}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f11_dtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f11_dtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F11} (Composition Function 3) under DTW, best run 13.}
+\label{fig:cec-best-f11}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f12_ddtw_convergencia.png}\hfill
+\includegraphics[width=0.7\linewidth]{imagenes_cec_mejores/cec_f12_ddtw_dtw_delta.png}
+\caption{Convergence trajectory (left) and $\Delta$ monitor (right) for
+\texttt{F12} (Composition Function 4) under DDTW, best run 01.}
+\label{fig:cec-best-f12}
+\end{figure}
 
 \subsection{Results in Engineering Case Study: Sizing the HRES2-H2 System}
 \label{sec:results_hres2}
 
-The techno-economic sizing optimization of the grid-connected HRES2-H2 microgrid involves simulating 8,760 hourly dispatch steps using one fixed synthetic annual weather profile with hourly variation over a 31-run Monte Carlo evaluation budget. Both framework variants (DTW and DDTW) are evaluated against all baseline algorithms from the population pool ($\mathcal{P}_{pop}$) and trajectory pool ($\mathcal{P}_{traj}$). To provide a clear and structured comparative analysis, the experimental outcomes are presented in two dedicated tables: Table~\ref{tab:hres2_metrics} details the techno-economic performance and feasibility metrics, while Table~\ref{tab:hres2_components} outlines the optimal physical component sizing and annual green hydrogen production.
+The techno-economic sizing optimization of the grid-connected HRES2-H2 microgrid involves simulating 8,760 hourly dispatch steps using one fixed synthetic annual weather profile with hourly variation over a 31-run Monte Carlo evaluation budget. Both framework variants (DTW and DDTW) are evaluated against all baseline algorithms from the population pool ($\mathcal{P}_{pop}$) and trajectory pool ($\mathcal{P}_{traj}$). To provide a clear and structured comparative analysis, the experimental outcomes are presented in two dedicated tables: Table~\ref{tab:hres2_metrics} details the techno-economic performance and feasibility metrics, while Table~\ref{tab:hres2_components} outlines the best-found physical component sizing and annual green hydrogen production.
 
 
 
@@ -1027,7 +1227,7 @@ SA & 0.286431 & 0.281339 & 0.013206 & 18.9100 & 19.35\% & 87.1\% \\
 
 \begin{table}[htbp]
 \centering
-\caption{Optimal physical system component sizing and annual green hydrogen production for the HRES2-H2 microgrid.}
+\caption{Best-found physical system component sizing and annual green hydrogen production for the HRES2-H2 microgrid.}
 \label{tab:hres2_components}
 \resizebox{\textwidth}{!}{
 \begin{tabular}{lccccc}
@@ -1145,7 +1345,7 @@ independent rather than matched. Family-wise error was controlled with Holm's
 step-down procedure: over the six MKP configuration contrasts, over the seven
 hybrid--baseline tests within each MKP instance, over the five
 hybrid--baseline tests within each CEC2022 function, over the 12 direct
-CEC2022 DTW--DDTW contrasts, and separately over the ten HRES2--H2 comparisons
+CEC2022 DTW--DDTW contrasts, and separately over the nine HRES2--H2 comparisons
 of each framework variant. A comparison was considered significant when
 $p_{\mathrm{Holm}}<0.05$.
 
@@ -1317,15 +1517,15 @@ or a common-seed correspondence between each baseline and the hybrid. Thus,
 the archived row-wise Friedman and Wilcoxon calculations are not used as
 inferential evidence here. Instead, Table~\ref{tab:final-hres-tests} reports
 the archived mean LCOE and the archived two-sided Mann--Whitney $p$-values
-after a reproducible Holm adjustment over the ten comparisons in each
+after a reproducible Holm adjustment over the nine comparisons in each
 campaign. Every baseline had a higher mean LCOE than its hybrid control, and
-all 20 distributional contrasts remained significant after adjustment. This
-yields a 10/0/0 win/tie/loss record for each framework variant.
+all 18 distributional contrasts remained significant after adjustment. This
+yields a 9/0/0 win/tie/loss record for each framework variant.
 
 \begin{table}[htbp]
 \centering
 \caption{HRES2--H2 comparison against standalone metaheuristics. The reported
-$p$-values are two-sided Mann--Whitney values adjusted by Holm over the ten
+$p$-values are two-sided Mann--Whitney values adjusted by Holm over the nine
 independent-sample comparisons of each framework variant.}
 \label{tab:final-hres-tests}
 \scriptsize
@@ -1518,7 +1718,7 @@ constraint was active at, or very near, its 20\% upper bound. This boundary
 solution indicates that the optimizer exploited the allowable grid support to
 minimize cost under the stated formulation.
 
-Against the ten standalone methods, all baseline mean LCOE values were higher,
+Against the nine standalone methods, all baseline mean LCOE values were higher,
 and all Mann--Whitney comparisons in Table~\ref{tab:final-hres-tests} remained significant after Holm correction,
 yielding W/T/L $=10/0/0$ for each framework variant. The magnitude of the
 improvement was nevertheless heterogeneous. The relative reduction in mean
@@ -1603,7 +1803,7 @@ component-level attribution.
 
 This work proposed a trajectory-driven collaborative metaheuristic framework in which Dynamic Time Warping (DTW) and Derivative Dynamic Time Warping (DDTW) are used to monitor the temporal pattern of the recent best-so-far fitness trajectory. Rather than relying on fixed iteration budgets, scalar stagnation counters, or learned decision policies, the framework detects persistent search plateaus by aligning a sliding fitness window against synthetic progress and stagnation baselines under Sakoe--Chiba band constraints. Stagnation decisions are governed by run-relative empirical percentiles and a confirmation patience filter, triggering solver rotation between complementary population-based and trajectory-based pools with elitist memory injection.
 
-The framework was evaluated over 31 independent runs across three structurally distinct optimization domains. In the discrete Multidimensional Knapsack Problem (MKP), the extended-budget configuration (DTW--3K) achieved the best mean rank (1.22) and reduced the average optimality gap by up to 21.5\%, accumulating 41 significant wins across 63 baseline comparisons. In the continuous IEEE CEC2022 benchmark ($D=10$), both DTW and DDTW attained the top aggregate Friedman ranks (2.323 and 2.358, respectively), with combined win/tie/loss records of 38/16/6 and 37/19/4 against five standalone population-based methods. In the HRES2--H2 green hydrogen microgrid sizing problem, both variants converged to the same optimal configuration with 100\% constraint feasibility, minimal mean LCOE (0.267160 CNY/kWh), and negligible run-to-run variance ($\sigma \approx 10^{-6}$), significantly outperforming all ten standalone baselines after Holm correction ($p_{\mathrm{Holm}} < 0.05$). No significant difference was detected between DTW and DDTW in any domain after multiplicity adjustment.
+The framework was evaluated over 31 independent runs across three structurally distinct optimization domains. In the discrete Multidimensional Knapsack Problem (MKP), the extended-budget configuration (DTW--3K) achieved the best mean rank (1.22) and reduced the average optimality gap by up to 21.5\%, accumulating 41 significant wins across 63 baseline comparisons. In the continuous IEEE CEC2022 benchmark ($D=10$), both DTW and DDTW attained the top aggregate Friedman ranks (2.323 and 2.358, respectively), with combined win/tie/loss records of 38/16/6 and 37/19/4 against five standalone population-based methods. In the HRES2--H2 green hydrogen microgrid sizing problem, both variants converged to the same optimal configuration with 100\% constraint feasibility, minimal mean LCOE (0.267160 CNY/kWh), and negligible run-to-run variance ($\sigma \approx 10^{-6}$), significantly outperforming all nine standalone baselines after Holm correction ($p_{\mathrm{Holm}} < 0.05$). No significant difference was detected between DTW and DDTW in any domain after multiplicity adjustment.
 
 These results support two main conclusions. First, explicit trajectory-pattern analysis via elastic alignment provides a viable, model-free, and less sensitive to changes in objective scale feedback signal for governing solver switching in collaborative metaheuristic frameworks. The same monitor parameterization operated across fitness scales spanning several orders of magnitude without manual recalibration. Second, trajectory-driven portfolio rotation reduces the dependence on selecting a single optimal solver: the framework achieved competitive or superior performance across heterogeneous landscapes without requiring any individual constituent algorithm to dominate universally.
 
@@ -1615,7 +1815,7 @@ Several promising directions emerge from this work:
     \item \textbf{Extended HRES2--H2 microgrid model.} The present engineering case study considers a simplified WPEB system without explicit hydrogen storage tanks or fuel-cell re-electrification. Future versions should incorporate a full hydrogen storage and fuel-cell subsystem, multi-year stochastic meteorological scenarios, degradation models for PV panels and electrolyzers, and time-varying electricity tariffs. A systematic evaluation of the applicability, flexibility, and limitations of the proposed framework under increasingly realistic HRES--H$_2$ configurations would help identify the critical problem characteristics and constraints that most influence algorithmic performance and solution quality.
     \item \textbf{Multi-objective optimization.} Extending the trajectory-driven coordination to multi-objective domains (e.g., using Pareto-front convergence indicators as the monitored signal) would test the generality of elastic alignment beyond single-objective fitness curves.
     \item \textbf{Sustainability-driven objectives with adaptive $\varepsilon$-constraint.} A natural extension of the HRES--H$_2$ case study is the integration of sustainability metrics such as CO$_2$ emissions minimization and renewable energy fraction maximization into the optimization framework. Adaptive $\varepsilon$-constraint strategies could serve as lightweight alternatives to fully multi-objective formulations, enabling scalable trade-off management between economic and environmental objectives with limited computational overhead.
-    \item \textbf{Lightweight ANN-based dynamic parameter adaptation.} The current DTW/DDTW monitor governs solver switching but does not modify the internal configuration of the active algorithm. Incorporating resource-constrained neural network components (e.g., small MLPs or single-layer autoencoders) to dynamically adapt key algorithmic parameters---including population size, termination criteria, and solution generation strategies---based on trajectory-derived features would enable a learned, yet computationally efficient, adaptive layer complementary to the model-free elastic alignment signal.
+    \item \textbf{Lightweight ANN-based dynamic parameter adaptation.} The current DTW/DDTW monitor governs solver switching but does not modify the internal configuration of the active algorithm. Incorporating resource-constrained neural network components (e.g., small MLPs or single-layer autoencoders) to dynamically adapt key algorithmic parameters including population size, termination criteria, and solution generation strategies based on trajectory-derived features would enable a learned, yet computationally efficient, adaptive layer complementary to the model-free elastic alignment signal.
 \end{itemize}
 
 \section*{CRediT authorship contribution statement}

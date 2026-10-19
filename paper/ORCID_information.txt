@@ -1,0 +1,14 @@
+ORCID Information
+
+Manuscript: Time-Series-Driven Coordination of Collaborative Metaheuristics via Dynamic Time Warping
+Journal: Expert Systems with Applications
+
+Lucas Erazo — https://orcid.org/0009-0001-3259-454X
+Ricardo Soto — https://orcid.org/0000-0002-5755-6929
+Pamela Hermosilla — https://orcid.org/0000-0001-5775-6536
+Broderick Crawford — https://orcid.org/0000-0001-5500-0188
+José Lemus — https://orcid.org/0000-0001-5379-0315
+El-Ghazali Talbi — https://orcid.org/0000-0003-4549-1010
+Emanuel Vega — https://orcid.org/0000-0002-0079-3974
+
+Corresponding author: Emanuel Vega
