@@ -835,7 +835,7 @@ def _load_local_instance(path: Path, index: int) -> tuple[MKPInstance, dict]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="binary_woa_abc",
+        prog="woa_abc",
         description=(
             "Run the shared-population binary WOA-ABC hybrid on one local "
             "OR-Library MKP instance. This command does not download data."

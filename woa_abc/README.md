@@ -2,6 +2,8 @@
 
 Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts. A stagnation detector can restart only the `a` and `rho` clock. It does not abort the run, reset the population, or choose another algorithm.
 
+The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
+
 This document describes the implementation. It does not claim that the hybrid improves on any published method.
 
 ## Population
@@ -66,7 +68,7 @@ The run stops at the cycle horizon or at the evaluation ceiling, whichever comes
 ## API
 
 ```python
-from binary_woa_abc import HybridConfig, solve
+from woa_abc import HybridConfig, solve
 from dtw_stagnation import StagnationConfig
 from mkp_core.problem import MKPInstance
 
@@ -88,7 +90,7 @@ result = solve(instance, config, seed=1)
 The command reads one local OR-Library file. It rejects URLs and other non-files before importing the parser, and it does not download data.
 
 ```text
-python -m binary_woa_abc --instance instancias/mknapcb1.txt --instance-index 0 --seed 1 --population-size 4 --iterations 6 --max-evaluations 200
+python -m woa_abc --instance instancias/mknapcb1.txt --instance-index 0 --seed 1 --population-size 4 --iterations 6 --max-evaluations 200
 ```
 
 `--instance-index` is zero-based. `--scout-limit` is optional. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps `rho` at 1. JSON is printed to stdout and includes the search result, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`).
@@ -101,4 +103,27 @@ The focused check for this solver is:
 python -m unittest discover -s tests -p "test_binary_woa_abc.py" -v
 ```
 
-The older full suite is not the check for this work. `tests/test_woa_abc_variants.py` imports `woa_abc` modules that are no longer in this tree.
+The older full suite is not the check for this work. `tests/test_woa_abc_variants.py` imports removed legacy modules and is not the check for this package.
+
+## Single-run results
+
+One local command writes a fresh results folder for one functional check. It does not compare algorithms, and it does not download data.
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000
+```
+
+Defaults are seed 43, population 30, 1000 hybrid cycles, and index 0. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A stored reference of 0 stays unknown.
+
+The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/`. The timestamp directory must not already exist. The completed seed-43 run is `woa_abc/resultados/run_ddtw_20261019_071137/`. It was relocated here and was not rerun.
+
+| File | What it is |
+|------|------------|
+| `manifest.json` | Effective solver config, input path/hash/index, timing, actual counts, output completeness |
+| `runs/run_01.json` | Full solver result, written before plots |
+| `runs_resultados.csv` | One row. `n_switches` is 0 |
+| `resumen_pipeline.txt` | Single-run note. No superiority claim |
+| `boxplot_runs.png` | Labelled n = 1. Not inferential evidence |
+| `best_run_01/` | History, detail, convergence, delta, and `parameter_recovery.png` |
+
+A hybrid cycle is not a legacy single-metaheuristic iteration. `n_recoveries` counts `a`/`rho` restarts, not algorithm switches. If plotting fails, the raw JSON stays and the process exits nonzero without a second solve.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import json
 import random
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -15,8 +16,8 @@ from unittest.mock import patch
 
 import numpy as np
 
-import binary_woa_abc as hybrid
-from binary_woa_abc import (
+import woa_abc.solver as hybrid
+from woa_abc.solver import (
     PHASE_EMPLOYED,
     PHASE_INITIALIZATION,
     PHASE_ONLOOKERS,
@@ -802,6 +803,16 @@ class TestRecovery(unittest.TestCase):
             HybridConfig(population_size=2, iterations=2, use_stagnation=False, stag_cfg=stag_cfg)
 
 
+class TestPackageBoundary(unittest.TestCase):
+    def test_package_import_does_not_load_matplotlib_or_benchmark(self) -> None:
+        import woa_abc
+
+        self.assertIs(woa_abc.solve, solve)
+        self.assertNotIn("woa_abc.benchmark", sys.modules)
+        self.assertNotIn("matplotlib", sys.modules)
+        self.assertNotIn("matplotlib.pyplot", sys.modules)
+
+
 class TestCommandLine(unittest.TestCase):
     def test_help_lists_local_controls(self) -> None:
         stdout = StringIO()
@@ -810,6 +821,7 @@ class TestCommandLine(unittest.TestCase):
 
         self.assertEqual(code, 0)
         text = stdout.getvalue()
+        self.assertIn("usage: woa_abc", text)
         for flag in (
             "--instance",
             "--instance-index",
