@@ -26,9 +26,25 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg", force=True)
-import matplotlib.pyplot as plt
 
 from . import solver as hybrid
+from .mkp_plots import (
+    BOX_NOTE,
+    BOX_TITLE,
+    CONVERGENCE_SIZE,
+    DELTA_SIZE,
+    DPI,
+    EMPTY_DELTA_LABEL,
+    PARAMETER_SIZE,
+    draw_boxplot,
+    draw_convergence,
+    draw_delta,
+    draw_parameters,
+    plot_boxplot,
+    plot_convergence,
+    plot_delta,
+    plot_parameters,
+)
 from .solver import HybridConfig, solve
 from dtw_stagnation import StagnationConfig
 
@@ -55,22 +71,6 @@ DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parent / "resultados"
 MH_LABEL = "WOA-ABC"
 MH_KIND = "poblacional"
 N_SWITCHES = 0
-DPI = 150
-CONVERGENCE_SIZE = (14, 6)
-DELTA_SIZE = (14, 5)
-PARAMETER_SIZE = (14, 6)
-BOX_SIZE = (6, 5)
-SERIES_COLOR = "#1565C0"
-RECOVERY_COLOR = "#FF5722"
-FIRE_COLOR = "#FF9800"
-
-EMPTY_DELTA_LABEL = (
-    "Empty diagnostic: no finite DDTW deltas.\n"
-    "Not evidence of improvement.\n"
-    "Diagnostico vacio: no indica mejora ni estancamiento."
-)
-BOX_TITLE = "1 run (n = 1) — not inferential evidence"
-BOX_NOTE = "Un solo run. Sin afirmacion de superioridad."
 SUMMARY_BANNER = "Validación funcional de un solo run. No se afirma superioridad."
 
 ESTADO_WARMUP = "Llenando ventana"
@@ -149,6 +149,8 @@ class ExportRequest:
     scout_limit: int | None = None
     output_root: Path = field(default_factory=lambda: DEFAULT_OUTPUT_ROOT)
     timestamp: str | None = None
+    variant: str = "v0"
+    destination: Path | None = None
 
 
 @dataclass
@@ -199,6 +201,7 @@ def build_hybrid_config(request: ExportRequest) -> HybridConfig:
         scout_limit=request.scout_limit,
         use_stagnation=True,
         stag_cfg=inherited_stagnation_config(),
+        variant=request.variant,
     )
 
 
@@ -444,204 +447,6 @@ def detail_text(rows: list[HistoryRow], display_name: str) -> str:
     return "\n".join(preamble + body) + "\n"
 
 
-def _style_axes(ax, title: str, ylabel: str) -> None:
-    ax.set_title(title, fontsize=20, fontweight="bold")
-    ax.set_xlabel("Hybrid cycles", fontsize=18)
-    ax.set_ylabel(ylabel, fontsize=18)
-    ax.tick_params(axis="both", which="major", labelsize=15)
-    ax.grid(True, alpha=0.3)
-    ax.legend(
-        loc="lower right",
-        fontsize=15,
-        borderaxespad=0.25,
-        frameon=True,
-        framealpha=0.88,
-    )
-
-
-def _new_figure(size: tuple[float, float]):
-    fig, ax = plt.subplots(figsize=size, constrained_layout=False)
-    fig.set_layout_engine("none")
-    fig.subplots_adjust(bottom=0.14, left=0.08, right=0.98, top=0.88)
-    return fig, ax
-
-
-def _save(fig, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=DPI)
-    plt.close(fig)
-
-
-def _mark_recoveries(ax, rows: list[HistoryRow], y_of) -> None:
-    xs = []
-    ys = []
-    for row in rows:
-        if not row.recovery_applied:
-            continue
-        y_value = y_of(row)
-        if y_value is None:
-            continue
-        xs.append(row.cycle)
-        ys.append(y_value)
-    if xs:
-        ax.scatter(
-            xs,
-            ys,
-            marker="^",
-            s=90,
-            color=RECOVERY_COLOR,
-            zorder=5,
-            label="parameter recovery",
-        )
-
-
-def _finite_delta(row: HistoryRow) -> float | None:
-    if row.diagnostic is None:
-        return None
-    value = row.diagnostic.get("delta")
-    if value is None:
-        return None
-    number = float(value)
-    if not math.isfinite(number):
-        return None
-    return number
-
-
-def draw_convergence(ax, rows: list[HistoryRow], reference: float) -> None:
-    ax.plot(
-        [row.cycle for row in rows],
-        [row.best for row in rows],
-        color=SERIES_COLOR,
-        linewidth=3.0,
-        alpha=0.85,
-        label="WOA-ABC",
-    )
-    _mark_recoveries(ax, rows, lambda row: row.best)
-    if reference > 0.0:
-        ax.axhline(
-            reference,
-            color="red",
-            linestyle="--",
-            linewidth=2.0,
-            label=f"Optimum ({reference:.0f})",
-        )
-    _style_axes(ax, "WOA-ABC Fitness Convergence", "Best Fitness Value")
-
-
-def draw_delta(ax, rows: list[HistoryRow]) -> None:
-    points = [(row.cycle, _finite_delta(row)) for row in rows]
-    points = [(cycle, delta) for cycle, delta in points if delta is not None]
-    if not points:
-        ax.set_xlim(0, 1)
-        ax.set_ylim(-1, 1)
-        ax.text(
-            0.5,
-            0.5,
-            EMPTY_DELTA_LABEL,
-            ha="center",
-            va="center",
-            transform=ax.transAxes,
-            fontsize=14,
-        )
-        ax.set_title("DDTW Delta per Hybrid Cycle — empty diagnostic", fontsize=20, fontweight="bold")
-        ax.set_xlabel("Hybrid cycles", fontsize=18)
-        ax.set_ylabel("DTW Delta", fontsize=18)
-        ax.tick_params(axis="both", which="major", labelsize=15)
-        ax.grid(True, alpha=0.3)
-        return
-    ax.plot(
-        [cycle for cycle, _delta in points],
-        [delta for _cycle, delta in points],
-        color=SERIES_COLOR,
-        linewidth=2.5,
-        alpha=0.85,
-        label="WOA-ABC",
-    )
-    _mark_recoveries(ax, rows, _finite_delta)
-    ax.axhline(0.0, color="#90CAF9", linewidth=1.0, label="delta 0")
-    _style_axes(
-        ax,
-        "DDTW Delta per Hybrid Cycle  [+ = stagnation | - = active improvement]",
-        "DTW Delta",
-    )
-
-
-def draw_parameters(ax, rows: list[HistoryRow]) -> None:
-    cycles = [row.cycle for row in rows]
-    ax.plot(cycles, [row.a for row in rows], color=SERIES_COLOR, linewidth=2.5, label="a")
-    ax.plot(cycles, [row.rho for row in rows], color="#2E7D32", linewidth=2.5, label="rho")
-    _mark_recoveries(ax, rows, lambda row: row.a)
-    fire_x = []
-    fire_y = []
-    for row in rows:
-        fired = bool(row.diagnostic and row.diagnostic.get("fire"))
-        if fired and not row.recovery_applied:
-            fire_x.append(row.cycle)
-            fire_y.append(row.a)
-    if fire_x:
-        ax.scatter(
-            fire_x,
-            fire_y,
-            marker="x",
-            s=80,
-            color=FIRE_COLOR,
-            zorder=5,
-            label="fire without recovery",
-        )
-    _style_axes(ax, "WOA-ABC a/rho clock and recovery markers", "Parameter value")
-
-
-def draw_boxplot(fig, ax, value: float, name: str, reference: float) -> None:
-    ax.boxplot(
-        [value],
-        patch_artist=True,
-        medianprops=dict(color=RECOVERY_COLOR, linewidth=2.5),
-        boxprops=dict(facecolor=SERIES_COLOR, alpha=0.7),
-        flierprops=dict(marker="o", color=FIRE_COLOR, markersize=5),
-        whiskerprops=dict(color="#90CAF9", linewidth=1.5),
-        capprops=dict(color="#90CAF9", linewidth=2),
-    )
-    if reference > 0.0:
-        ax.axhline(
-            reference,
-            color="#4CAF50",
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Known Optimum = {reference:.1f}",
-        )
-        ax.legend(fontsize=8, loc="lower right")
-    ax.set_title(f"{BOX_TITLE}\n{name}", fontsize=11, fontweight="bold")
-    ax.set_xlabel("WOA-ABC (single run)", fontsize=10)
-    ax.set_ylabel("Final Best Value (Maximization)", fontsize=10)
-    ax.grid(axis="y", alpha=0.3)
-    fig.subplots_adjust(bottom=0.22)
-    fig.text(0.5, 0.02, BOX_NOTE, ha="center", fontsize=9)
-
-
-def plot_convergence(rows: list[HistoryRow], reference: float, path: Path) -> None:
-    fig, ax = _new_figure(CONVERGENCE_SIZE)
-    draw_convergence(ax, rows, reference)
-    _save(fig, path)
-
-
-def plot_delta(rows: list[HistoryRow], path: Path) -> None:
-    fig, ax = _new_figure(DELTA_SIZE)
-    draw_delta(ax, rows)
-    _save(fig, path)
-
-
-def plot_parameters(rows: list[HistoryRow], path: Path) -> None:
-    fig, ax = _new_figure(PARAMETER_SIZE)
-    draw_parameters(ax, rows)
-    _save(fig, path)
-
-
-def plot_boxplot(value: float, name: str, reference: float, path: Path) -> None:
-    fig, ax = _new_figure(BOX_SIZE)
-    draw_boxplot(fig, ax, value, name, reference)
-    _save(fig, path)
-
-
 def write_plots(output_dir: Path, rows: list[HistoryRow], reference: float, name: str, best_value: float) -> None:
     best = output_dir / "best_run_01"
     plot_convergence(rows, reference, best / "fitness_convergence.png")
@@ -771,6 +576,21 @@ def allocate_run_dir(request: ExportRequest, instance_path: Path) -> Path:
     return target
 
 
+def allocate_explicit_destination(destination: Path) -> Path:
+    """Create one caller-chosen results directory after validation.
+
+    The campaign uses this so a variant folder is not nested again under
+    ``run_ddtw_<timestamp>/<file>/inst_<index>``. An existing path is refused.
+    """
+
+    _reject_url(str(destination), "destination")
+    target = Path(destination)
+    if target.exists():
+        raise ExportError(f"refusing to overwrite existing path: {target}")
+    target.mkdir(parents=True, exist_ok=False)
+    return target
+
+
 def _display_name(instance_path: Path, index: int) -> str:
     return f"{instance_path.stem}/inst_{index:02d}"
 
@@ -802,13 +622,19 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
     """Solve once, write raw JSON, then summaries and plots. Do not rerun."""
 
     runner = solve if solver is None else solver
+    hybrid._validate_variant(request.variant)
     _reject_url(str(request.instance), "instance")
     _reject_url(str(request.output_root), "output root")
+    if request.destination is not None:
+        _reject_url(str(request.destination), "destination")
     hybrid._validate_seed(request.seed)
     config = build_hybrid_config(request)
     instance_path = hybrid._local_instance_file(str(request.instance))
     instance, info = hybrid._load_local_instance(instance_path, request.instance_index)
-    output = allocate_run_dir(request, instance_path)
+    if request.destination is None:
+        output = allocate_run_dir(request, instance_path)
+    else:
+        output = allocate_explicit_destination(Path(request.destination))
     display = _display_name(instance_path, request.instance_index)
     started_at = datetime.now().isoformat(timespec="seconds")
     started = time.perf_counter()
@@ -887,11 +713,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS, help="Hybrid-cycle horizon T.")
     parser.add_argument("--max-evaluations", type=int, default=None)
     parser.add_argument("--scout-limit", type=int, default=None)
+    parser.add_argument(
+        "--variant",
+        default="v0",
+        metavar="{v0,v1,v2,v3,v4}",
+        help=(
+            "One additive variant for this single run. v0 is the unchanged "
+            "baseline. v1 uses scout limit 100 unless --scout-limit is set. "
+            "v2, v3, and v4 change only post-fire amplitudes, the remaining-cycle "
+            "recovery horizon, or the ABC coordinate mutation. Default: v0."
+        ),
+    )
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     return parser
 
 
 def _request_from_args(args: argparse.Namespace) -> ExportRequest:
+    hybrid._validate_variant(args.variant)
     _reject_url(str(args.instance), "instance")
     _reject_url(str(args.output_root), "output root")
     return ExportRequest(
@@ -903,6 +741,7 @@ def _request_from_args(args: argparse.Namespace) -> ExportRequest:
         max_evaluations=args.max_evaluations,
         scout_limit=args.scout_limit,
         output_root=Path(args.output_root),
+        variant=args.variant,
     )
 
 

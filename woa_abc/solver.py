@@ -40,6 +40,9 @@ PHASES = (
 TERMINATION_ITERATIONS = "iterations"
 TERMINATION_EVALUATION_BUDGET = "evaluation_budget"
 
+VARIANTS = ("v0", "v1", "v2", "v3", "v4")
+VARIANT_ERROR = "variant must be one of v0, v1, v2, v3, v4"
+
 # One initialization, plus a cycle that proposes three LB2 pairs and one scout
 # for every source. This is an upper bound, not a hidden extra search.
 _EVALUATIONS_PER_SOURCE_PER_CYCLE = 7
@@ -79,6 +82,7 @@ class HybridConfig:
     scout_limit: int | None = None
     use_stagnation: bool = True
     stag_cfg: StagnationConfig | None = None
+    variant: str = "v0"
 
     def __post_init__(self) -> None:
         _validate_config(self)
@@ -119,6 +123,7 @@ class _RunState:
     scout_limit: int
     schedule_index: int = 0
     recovery_active: bool = False
+    recovery_span: int | None = None
     evaluations: int = 0
     best_value: float = float("-inf")
     best_solution: list[int] = field(default_factory=list)
@@ -167,6 +172,7 @@ def _validate_config(config: HybridConfig) -> None:
         _require_int("scout_limit", config.scout_limit, 1)
     if not isinstance(config.use_stagnation, bool):
         raise ValueError("use_stagnation must be a bool")
+    _validate_variant(config.variant)
     if config.stag_cfg is not None:
         _validate_stagnation(config.stag_cfg)
 
@@ -270,8 +276,16 @@ def _resolved_max_evaluations(config: HybridConfig) -> int:
     return config.max_evaluations
 
 
+def _validate_variant(value: object) -> str:
+    if not isinstance(value, str) or value not in VARIANTS:
+        raise ValueError(VARIANT_ERROR)
+    return value
+
+
 def _resolved_scout_limit(config: HybridConfig, n_items: int) -> int:
     if config.scout_limit is None:
+        if config.variant == "v1":
+            return 100
         return config.population_size * n_items
     return config.scout_limit
 
@@ -280,13 +294,32 @@ def _control_parameters(
     schedule_index: int,
     iterations: int,
     recovery_active: bool,
+    variant: str = "v0",
+    recovery_span: int | None = None,
 ) -> tuple[float, float]:
     """Return ``(a, rho)`` for the current clock.
 
     Before any recovery, rho stays 1. After a hook reset, the next cycle is
-    called with schedule index 0 and ``recovery_active`` so rho restarts at 2.
+    called with schedule index 0 and ``recovery_active`` so rho restarts at 2
+    on v0. v2 changes only the post-fire amplitudes. v3 changes only the
+    post-fire horizon. v1 and v4 keep this baseline clock.
     """
 
+    if recovery_active and variant == "v2":
+        span = iterations - 1
+        return (
+            max(0.0, 1.0 - 2.0 * schedule_index / span),
+            max(1.0, 1.5 - schedule_index / span),
+        )
+    if recovery_active and variant == "v3":
+        if recovery_span is None:
+            raise RuntimeError("v3 recovery is missing its remaining-cycle span")
+        if recovery_span == 0:
+            return 0.0, 1.0
+        return (
+            max(0.0, 2.0 - 2.0 * schedule_index / recovery_span),
+            max(1.0, 2.0 - schedule_index / recovery_span),
+        )
     span = iterations - 1
     a = max(0.0, 2.0 - 2.0 * schedule_index / span)
     if recovery_active:
@@ -473,7 +506,15 @@ def _abc_step(state: _RunState, index: int, rho: float, phase: str) -> None:
     peer_index = _distinct_index(state.rng, index, state.config.population_size)
     phi = float(state.rng.uniform(-rho, rho))
     current = state.positions[index]
-    neighbor = current + phi * (current - state.positions[peer_index])
+    peer = state.positions[peer_index]
+    if state.config.variant == "v4":
+        coordinate = int(state.rng.integers(0, state.inst.n))
+        neighbor = np.array(current, dtype=float, copy=True)
+        neighbor[coordinate] = current[coordinate] + phi * (
+            current[coordinate] - peer[coordinate]
+        )
+    else:
+        neighbor = current + phi * (current - peer)
     clipped = _clip_coordinates(neighbor, state.config.v_max)
     chosen_solution, chosen_value = _lb2_pair(state, clipped, state.bits[index], phase)
     _commit_abc(state, index, clipped, chosen_solution, chosen_value)
@@ -569,6 +610,8 @@ def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord:
         state.schedule_index,
         state.config.iterations,
         state.recovery_active,
+        state.config.variant,
+        state.recovery_span,
     )
     # a2 intentionally uses cycle_index. Recovery must not restart this draw.
     a2 = _a2(cycle_index, state.config.iterations)
@@ -685,6 +728,8 @@ def _run_metadata(
         "use_stagnation": config.use_stagnation,
         "stagnation": _stagnation_metadata(monitor),
     }
+    if config.variant != "v0":
+        metadata["config"]["variant"] = config.variant
     return metadata
 
 
@@ -749,6 +794,9 @@ def solve(
         if recovery_applied:
             state.schedule_index = 0
             state.recovery_active = True
+            if config.variant == "v3":
+                remaining_cycles = config.iterations - (cycle_index + 1)
+                state.recovery_span = remaining_cycles - 1
         else:
             state.schedule_index += 1
 
@@ -855,6 +903,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-slope", type=float, default=0.0)
     parser.add_argument("--plateau-max", type=int, default=15)
     parser.add_argument("--patience", type=int, default=8)
+    parser.add_argument(
+        "--variant",
+        default="v0",
+        metavar="{v0,v1,v2,v3,v4}",
+        help=(
+            "One additive variant. v0 is the unchanged baseline. "
+            "v1 resolves an omitted scout limit to 100. "
+            "v2 restarts post-fire a at 1 and rho at 1.5 on the original horizon. "
+            "v3 restarts post-fire a/rho over the cycles still left. "
+            "v4 perturbs one ABC coordinate before the unchanged LB2 repair. "
+            "Default: v0."
+        ),
+    )
     return parser
 
 
@@ -874,6 +935,7 @@ def _validate_cli_monitor(args: argparse.Namespace) -> None:
 
 
 def _config_from_args(args: argparse.Namespace) -> HybridConfig:
+    _validate_variant(args.variant)
     _validate_cli_monitor(args)
     stag_cfg = None
     if not args.no_stagnation:
@@ -892,6 +954,7 @@ def _config_from_args(args: argparse.Namespace) -> HybridConfig:
         scout_limit=args.scout_limit,
         use_stagnation=not args.no_stagnation,
         stag_cfg=stag_cfg,
+        variant=args.variant,
     )
 
 
@@ -905,6 +968,7 @@ def main(argv: list[str] | None = None) -> int:
         code = exc.code
         return 0 if code is None else int(code)
     try:
+        _validate_variant(args.variant)
         path = _local_instance_file(args.instance)
         config = _config_from_args(args)
         instance, info = _load_local_instance(path, args.instance_index)

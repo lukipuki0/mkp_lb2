@@ -586,8 +586,8 @@ class PlotTests(unittest.TestCase):
         self.assertEqual(ax.xaxis.label.get_text(), "Hybrid cycles")
         self.assertEqual(ax.legend_.get_texts()[0].get_fontsize(), 15)
         labels = [text.get_text() for text in ax.get_legend().get_texts()]
-        self.assertIn("WOA-ABC", labels)
-        self.assertIn("parameter recovery", labels)
+        self.assertIn("WOA\u2013ABC", labels)
+        self.assertNotIn("parameter recovery", labels)
         self.assertNotIn("Optimum (0)", labels)
         matplotlib.pyplot.close(fig)
 
@@ -625,6 +625,53 @@ class PlotTests(unittest.TestCase):
         matplotlib.pyplot.close(fig)
         self.assertIn("n = 1", BOX_TITLE)
         self.assertIn("Empty diagnostic", EMPTY_DELTA_LABEL)
+
+    def test_mkp_style_uses_one_segment_and_keeps_recovery_on_parameters(self) -> None:
+        rows = self._rows()
+        expected = [row.cycle for row in rows if row.recovery_applied]
+        self.assertTrue(expected)
+
+        def boundaries(ax):
+            return [line for line in ax.lines
+                    if line.get_linestyle() == "--"
+                    and list(line.get_xdata())[:1] == list(line.get_xdata())[1:]]
+
+        for draw in (lambda ax: draw_convergence(ax, rows, 0.0),
+                     lambda ax: draw_delta(ax, rows)):
+            with self.subTest(draw=draw):
+                fig, ax = matplotlib.pyplot.subplots()
+                try:
+                    draw(ax)
+                    starts = boundaries(ax)
+                    self.assertEqual([line.get_xdata()[0] for line in starts], [0])
+                    for line in starts:
+                        self.assertEqual(line.get_linewidth(), 1.5)
+                        self.assertEqual(line.get_alpha(), 0.5)
+                        self.assertNotEqual(line.get_color(), "#FF5722")
+                    labels = [text.get_text() for text in ax.legend_.get_texts()]
+                    self.assertIn("WOA\u2013ABC", labels)
+                    self.assertNotIn("parameter recovery", labels)
+                    handle = ax.legend_.legend_handles[labels.index("WOA\u2013ABC")]
+                    self.assertIsInstance(handle, matplotlib.patches.Patch)
+                    self.assertEqual(ax.get_xlabel(), "Hybrid cycles")
+                    self.assertFalse(any("switch" in label.lower() for label in labels))
+                finally:
+                    matplotlib.pyplot.close(fig)
+        fig, ax = matplotlib.pyplot.subplots()
+        try:
+            draw_parameters(ax, rows)
+            self.assertEqual([line.get_xdata()[0] for line in boundaries(ax)], expected)
+            self.assertIn("parameter recovery", ax.get_legend_handles_labels()[1])
+            self.assertNotIn("switch", " ".join(ax.get_legend_handles_labels()[1]).lower())
+        finally:
+            matplotlib.pyplot.close(fig)
+        fig, ax = matplotlib.pyplot.subplots()
+        try:
+            draw_convergence(ax, rows * 50, 0.0)
+            self.assertEqual(len(boundaries(ax)), 1)
+            self.assertNotIn("parameter recovery", ax.get_legend_handles_labels()[1])
+        finally:
+            matplotlib.pyplot.close(fig)
 
     def test_saved_png_signature_and_dimensions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

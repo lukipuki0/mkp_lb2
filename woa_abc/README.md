@@ -2,7 +2,7 @@
 
 Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts. A stagnation detector can restart only the `a` and `rho` clock. It does not abort the run, reset the population, or choose another algorithm.
 
-The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
+The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the 135-selection campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
 
 This document describes the implementation. It does not claim that the hybrid improves on any published method.
 
@@ -85,6 +85,36 @@ result = solve(instance, config, seed=1)
 
 `result.metadata` repeats the seed, the resolved budget and scout limit, the LB2 constants, and the effective detector settings. `result.history` has one record per entered cycle, including a partial final cycle.
 
+## Variants
+
+The default is `v0`. It is the baseline above, and its JSON does not gain a variant field. Pass one of `v1`–`v4` to change exactly one control. Variants do not combine.
+
+| Variant | Only change | Unchanged |
+|---------|-------------|-----------|
+| `v0` | None | Full baseline |
+| `v1` | Omitted scout limit resolves to 100 | Explicit `--scout-limit`; budget; clocks |
+| `v2` | After an applied recovery, `a` starts at 1 and `rho` at 1.5 | Slopes, `T`, and every cycle before the first applied recovery |
+| `v3` | After an applied recovery, `a`/`rho` decay over the cycles still left | `a2`, pre-fire clock, and a fire with no next LB2 pair |
+| `v4` | Employed bees and onlookers perturb one random coordinate | `rho`, full-vector LB2/repair, and ABC acceptance |
+
+`v2` keeps the original horizon `T`. Before the first applied recovery it matches `v0`: `a = max(0, 2 - 2s/(T-1))` and `rho = 1`. After each applied recovery, `s` restarts at 0 and:
+
+- `a = max(0, 1 - 2s/(T-1))`
+- `rho = max(1, 1.5 - s/(T-1))`
+
+The per-cycle slopes stay `2/(T-1)` for `a` and `1/(T-1)` for `rho` until the clamps at 0 and 1.
+
+`v3` also matches `v0` before the first applied recovery. `R` is the number of configured cycles still left, including the next cycle. `a2` still follows the ordinary cycle index and the original `T`. It is not the value `a = 2`. If `R = 1`, that only remaining cycle uses `a = 0` and `rho = 1`; the solver does not divide by zero. If `R > 1`, `s` restarts at 0 and:
+
+- `a = max(0, 2 - 2s/(R-1))`
+- `rho = max(1, 2 - s/(R-1))`
+
+The first recovered cycle is therefore `a = 2`, `rho = 2`, and an uninterrupted schedule ends at `a = 0`, `rho = 1` on the final configured cycle. Another applied fire recomputes `R` and restarts `s`. A fire is not marked applied when no later cycle can run one LB2 pair.
+
+`v4` draws one coordinate uniformly and adds the existing `phi` step on that coordinate only. The other coordinates are copied before the unchanged clip, LB2, and repair. LB2 still sees every coordinate, so repair may change more than one bit. ABC still accepts only a strict fitness gain.
+
+For `v1`–`v4`, `metadata.config.variant` names the variant. The single-run manifest copies that effective config. `v0` omits the key so older baseline JSON stays comparable.
+
 ## CLI
 
 The command reads one local OR-Library file. It rejects URLs and other non-files before importing the parser, and it does not download data.
@@ -93,7 +123,7 @@ The command reads one local OR-Library file. It rejects URLs and other non-files
 python -m woa_abc --instance instancias/mknapcb1.txt --instance-index 0 --seed 1 --population-size 4 --iterations 6 --max-evaluations 200
 ```
 
-`--instance-index` is zero-based. `--scout-limit` is optional. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps `rho` at 1. JSON is printed to stdout and includes the search result, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`).
+`--instance-index` is zero-based. `--scout-limit` is optional. `--variant` is `v0` when omitted. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps `rho` at 1. JSON is printed to stdout and includes the search result, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`).
 
 ## Checks
 
@@ -113,9 +143,17 @@ One local command writes a fresh results folder for one functional check. It doe
 PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000
 ```
 
-Defaults are seed 43, population 30, 1000 hybrid cycles, and index 0. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A stored reference of 0 stays unknown.
+Defaults are seed 43, population 30, 1000 hybrid cycles, index 0, and variant `v0`. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A stored reference of 0 stays unknown.
 
-The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/`. The timestamp directory must not already exist. The completed seed-43 run is `woa_abc/resultados/run_ddtw_20261019_071137/`. It was relocated here and was not rerun.
+One checked run per variant uses the same instance, seed, population, horizon, and evaluation cap. Run them separately. This command still writes one folder and does not grow a multi-run option.
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000 --max-evaluations 180030 --variant v1
+```
+
+Repeat with `--variant v2`, `--variant v3`, and `--variant v4`. Omit `--variant` for the untouched `v0` baseline. Do not pass `--scout-limit` when the check is the `v1` default of 100.
+
+The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/`. The variant is not part of that path. Read `manifest.json` field `effective_config.variant` and `runs/run_01.json` fields `metadata.config.variant`, `scout_limit`, `evaluations`, `evaluations_by_phase`, `metadata.config.max_evaluations`, `best_value`, `best_solution`, `gap`, and `termination_reason`. `v0` omits `variant`. The timestamp directory must not already exist. The completed seed-43 run is `woa_abc/resultados/run_ddtw_20261019_071137/`. It was relocated here and was not rerun.
 
 | File | What it is |
 |------|------------|
@@ -125,5 +163,58 @@ The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/
 | `resumen_pipeline.txt` | Single-run note. No superiority claim |
 | `boxplot_runs.png` | Labelled n = 1. Not inferential evidence |
 | `best_run_01/` | History, detail, convergence, delta, and `parameter_recovery.png` |
+
+New exports copy the MKP drawing code into `woa_abc/mkp_plots.py`. They do not import `hybrid_mkp`, because that package loads the orchestrator.
+
+| Plot | Copied from | Intentional change |
+|------|-------------|--------------------|
+| `fitness_convergence.png` | `hybrid_mkp/plots/convergencia.py` `grafico_convergencia` | Title names WOA–ABC. Axis is hybrid cycles. One algorithm segment covers the run. |
+| `dtw_delta.png` | `hybrid_mkp/plots/dtw_delta.py` `grafico_dtw_delta` | Axis is hybrid cycles. The title is two lines so it stays inside the figure. A run with no finite delta still saves an honest empty diagnostic. |
+| `parameter_recovery.png` | No MKP equivalent. The Gantt chart is timed algorithm switches and is not used. | `a` and `rho` stay here, with recovery markers. Fonts and legend follow the copied axes. |
+| `boxplot_runs.png` | `hybrid_mkp/batch_benchmark.py` `grafico_boxplot_runs` | Label is WOA–ABC and the sample count is n = 1. The footnote says this is not inferential and claims no superiority. |
+
+Convergence and delta no longer draw orange recovery markers. Those markers looked like algorithm switches. Recoveries remain on `parameter_recovery.png`.
+
+This applies only to exporter processes started after this change. Existing images are not rewritten, and an already running campaign keeps the plotting code it loaded at startup.
+
+## Campaign of 135 runs
+
+One command runs indices 0, 1, and 2 of `mknapcb1.txt` through `mknapcb9.txt` for variants `v0` through `v4`. That is 135 sequential runs, one run per selection, in three groups of 45. It does not download data, repeat a selection 31 times, and it claims no superiority from n=1.
+
+```text
+python -m woa_abc.campaign --instances-dir instancias
+```
+
+## Quick path
+
+```text
+python -B -m woa_abc.campaign --instances-dir instancias
+```
+
+Defaults are seed 43, population 30, 1000 hybrid cycles, and an explicit evaluation cap of 180030. Output is a new `woa_abc/resultados/campaign_<timestamp>/` directory. Old result folders are left in place.
+
+## Details
+
+| Topic | Decision |
+|-------|----------|
+| Files | `mknapcb1.txt` … `mknapcb9.txt`, indices 0, 1, and 2 only |
+| Variants | `v0`–`v4`, one export each. `v0` still omits the variant key in solver JSON |
+| Groups | Loaded `n`, checked against the file: 1, 4, 7 → 100; 2, 5, 8 → 250; 3, 6, 9 → 500 |
+| Budget | The cap is the explicit 180030 default. A variant may finish before 1000 cycles |
+| Reference | Use that index's stored value. 0 stays unknown. Do not copy index 0 onto index 1 or 2 |
+| Collision | Refuse an existing campaign directory or destination. Do not overwrite it |
+| Failure | Stop, keep the raw artifacts, do not rerun, and do not mark the campaign completed. No superiority claim is added |
+
+Each variant folder holds the single-run artifacts directly: `manifest.json`, `runs/run_01.json`, `runs_resultados.csv`, `resumen_pipeline.txt`, `boxplot_runs.png`, and `best_run_01/`. The campaign also writes `experiment.json`, `campaign_results.csv`, and `campaign_summary.json` at the top, plus `group_summary.csv` inside `100/`, `250/`, and `500/`.
+
+## Checklist
+
+- [ ] 135 start lines and 135 completion lines, or a failed stop with the raw JSON still present
+- [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after 135 completions
+- [ ] A stored reference of 0 is still unknown in that run's manifest
+
+## Next step
+
+Inspect `campaign_summary.json` before comparing variants. One run is a functional record, not a ranking.
 
 A hybrid cycle is not a legacy single-metaheuristic iteration. `n_recoveries` counts `a`/`rho` restarts, not algorithm switches. If plotting fails, the raw JSON stays and the process exits nonzero without a second solve.
