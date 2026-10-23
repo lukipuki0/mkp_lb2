@@ -82,3 +82,7 @@ python -B -m unittest discover -s adaptive_mh_selection/tests -v
 Los tests nuevos verifican imports sin el paquete cooperativo, ejecución de los siete solvers continuos, rechazo de los nombres retirados y preservación de WOA/ABC independientes. No se usan skips para esconder la dependencia eliminada.
 
 Para CEC, HRES2, sensibilidad y adaptación de parámetros, consultar las guías de cada subproyecto y revisar sus presupuestos antes de lanzar los scripts HPC. Las comparaciones científicas requieren múltiples semillas, protocolos congelados y controles de costo equivalentes.
+
+## Documentación histórica del pipeline original
+
+El [README remoto anterior](docs/README_origin_9a11921.md) se conserva como referencia histórica. Para el estudio adaptativo y su configuración vigente, usar las instrucciones de este documento y la guía de `adaptive_mh_selection/`.
