@@ -1,100 +1,84 @@
-# Continuous Metaheuristics & Adaptive WOA--ABC
+# Metaheurísticas colaborativas y control DTW
 
-Este repositorio contiene un framework modular para la implementación y
-evaluación de metaheurísticas. Para la implementación activa de CEC2022 y
-HRES2 se usará exclusivamente la MH poblacional WOA--ABC y sus siete variantes
-adaptativas; las MH de trayectoria y los pipelines rotativos quedan fuera de
-este experimento.
+Repositorio de investigación para optimización **MKP**, funciones continuas **CEC2022** y dimensionamiento energético **HRES2–H2**. Incluye pipelines que alternan metaheurísticas mediante detección de estancamiento DTW/DDTW y un estudio independiente de adaptación de parámetros.
 
-El proyecto incorpora un monitor de estancamiento dinámico basado en **Dynamic Time Warping (DTW)** y un plan de variantes adaptativas para WOA--ABC continuo.
+## Empezar por MKP: selección adaptativa
 
----
-
-## 🏛️ Arquitectura del Proyecto
-
-```
-mkp_lb2/
-├── mkp_core/                 # Módulo base del problema discreto MKP
-│   ├── data_loader.py        # Cargador y parser de instancias OR-Library
-│   ├── problem.py            # Definición de la estructura del problema MKP
-│   └── repair.py             # Algoritmo de reparación greedy y factibilidad
-│
-├── lb2/                      # Framework de binarización compartida (LB2)
-│   ├── transfer.py           # Funciones de transferencia (V1-V4, S1-S4)
-│   └── binarization.py       # Mapeo continuo-discreto vectorizado (L1/L2)
-│
-├── dtw_stagnation.py         # Monitor de estancamiento dinámico por DTW
-│
-├── mh/                       # Metaheurísticas individuales (Dominio Discreto MKP)
-│   ├── pso.py                # Particle Swarm Optimization
-│   ├── gwo.py                # Grey Wolf Optimizer
-│   ├── ga.py                 # Algoritmo Genético
-│   ├── sa.py                 # Recocido Simulado
-│   ├── ts.py                 # Búsqueda Tabú
-│   ├── aco.py                # Ant Colony Optimization
-│   ├── ils.py                # Iterated Local Search
-│   ├── eho.py                # Elk Herd Optimizer
-│   ├── vns.py                # Variable Neighborhood Search
-│   ├── woa.py                # Whale Optimization Algorithm
-│   └── abc.py                # Artificial Bee Colony
-│
-├── continuous_benchmark/     # Benchmark de Optimización Continua (CEC2022)
-│   ├── funciones_cec2022.py  # 12 Funciones CEC2022 (Unimodales, Multimodales, Híbridas, Composición)
-│   ├── benchmark_continuo.py # Ejecutor por lotes del pipeline continuo
-│   └── mh/                   # Adaptación de metaheurísticas al dominio continuo
-│
-├── woa_abc/                  # Wrappers WOA + ABC para funciones continuas
-│   ├── adaptive.py           # Siete políticas/perfiles de parámetros DTW
-│   ├── cooperativo_cec_dtw.py # Motor WOA--ABC exclusivo CEC
-│   ├── cooperativo_hres2_dtw.py # Motor WOA--ABC exclusivo HRES2
-│   ├── run_cec_variants.py   # Ejecutor CEC2022
-│   ├── run_hres2_variants.py # Ejecutor HRES2
-│   └── resultados/            # Salidas CEC/HRES2
-│
-├── hybrid_mkp/               # Orquestación de pipelines híbridos y rotación secuencial
-├── plots/                    # Utilidades modulares de visualización de métricas
-└── resultados/               # Carpeta de salida con gráficos, CSVs e informes TXT/MD
-```
-
----
-
-## Archivo MCDP
-
-El código, datos, resultados y documentación MCDP se conservaron para una
-etapa posterior en [`planes/futuro_mcdp`](planes/futuro_mcdp/). No forma parte
-de la implementación continua activa.
-
----
-
-## 📊 Benchmark Continuo (CEC2022)
-
-Soporta la evaluación completa sobre las **12 funciones oficiales de CEC2022**:
-- **F1**: Zakharov (Unimodal) - Bias: 300
-- **F2-F5**: Rosenbrock, Schaffer F6, Rastrigin, Levy (Multimodales Básicas)
-- **F6-F8**: Funciones Híbridas 1, 2 y 3 (Subfunciones agrupadas)
-- **F9-F12**: Funciones de Composición 1, 2, 3 y 4 (Mezclas gaussianas)
-
----
-
-## 🚀 Guía de Ejecución
-
-### Variantes WOA--ABC sobre CEC2022
+La implementación `adaptive_mh_selection/` usa el mismo orquestador por **iteraciones** de `hybrid_mkp/`, con su inicialización, alternancia y cambio de MH al terminar cada época. Solo cambia la selección de la siguiente MH: uniforme o según su mejora reciente por iteración.
 
 ```bash
-python -m woa_abc.run_cec_variants --variants all --runs 31 --iterations 1000 --ddtw
+# Desde la raíz: validar sin ejecutar ni crear resultados.
+python -B -m adaptive_mh_selection.run --dry-run
+
+# Primera familia OR-Library, primera instancia (índice 0), una corrida adaptativa.
+python -B -m adaptive_mh_selection.run --instance instancias/mknapcb1.txt --index 0 --seed 42 --runs 1 --selectors adaptive --modes dtw --iterations 1000
+
+# Comparación funcional uniforme/adaptativa con ambos detectores.
+python -B -m adaptive_mh_selection.run --index 0 --seed 42 --runs 1 --selectors uniform adaptive --modes dtw ddtw --iterations 1000
 ```
 
-### Variantes WOA--ABC sobre HRES2
+Los resultados se guardan en una carpeta nueva dentro de `resultados/adaptive_mh_selection/`, con reportes y gráficos originales de `hybrid_mkp`: convergencia, delta DTW, Gantt y fitness instantáneo. No se usan presupuestos por evaluaciones. Se retiró `instantaneous_convergence.png` y se agregó una figura temporal de cuatro paneles con las MH y métricas registradas, sin imputar datos faltantes; ver la guía del paquete. Igual que en el pipeline original, la última época puede sobrepasar las iteraciones solicitadas; el reporte registra el total real. Las corridas anteriores por evaluaciones quedan como históricas, no se renombran como iteraciones.
+
+Configuración, métricas, limitaciones y análisis: **[adaptive_mh_selection/README.md](adaptive_mh_selection/README.md)**.
+
+## Campaña de 27 casos para análisis estadístico posterior
+
+El ejecutor agrupado prepara las nueve familias, índices 0/1/2, con 31 semillas por caso: **837 corridas** para `adaptive_dtw`. Las agrupa por **100, 250 y 500 ítems**, conserva las 31 mediciones numéricas y guarda solución, historiales y gráficos completos **solo del mejor run** de cada caso.
 
 ```bash
-python -m woa_abc.run_hres2_variants --variants all --runs 31 --iterations 1000 --ddtw
+# Validar el protocolo completo sin ejecutar ni crear resultados.
+python -B -m adaptive_mh_selection.campaign --dry-run
+
+# Ejecución manual completa; revisar costo y protocolo antes de lanzarla.
+python -B -m adaptive_mh_selection.campaign --iterations 1000 --runs 31 --seed 42
 ```
 
----
+Estructura, política de retención, estado y límites: [guía de la campaña](adaptive_mh_selection/README.md#campaña-agrupada-27-casos-y-31-corridas-por-caso). Los fallos y sus semillas se registran; no se sustituyen por ceros ni se esconden para completar artificialmente 31 observaciones. El modo individual `run` sigue disponible para depuración, pero la campaña best-only se ejecuta con `campaign`.
 
-## 📦 Estructura de Resultados
+## Estructura y experimentos
 
-Los nuevos ejecutores guardan configuraciones, resultados por seed, curvas de
-convergencia, estados DTW y perfiles de parámetros en
-`woa_abc/resultados/cec/` y `woa_abc/resultados/hres2/`. El análisis estadístico
-inferencial se añadirá en una etapa posterior.
+| Carpeta / archivo | Responsabilidad |
+|---|---|
+| `adaptive_mh_selection/` | Selección adaptativa y uniforme sobre el pipeline MKP original por iteraciones. |
+| `hybrid_mkp/` | Pipeline MKP colaborativo original, solvers, reparación y gráficos. |
+| `mkp_core/`, `lb2/`, `mh/` | Modelo MKP, binarización LB2 y metaheurísticas discretas. |
+| `dtw_stagnation.py` | Monitor compartido de estancamiento DTW/DDTW. |
+| `continuous_benchmark/` | Funciones oficiales CEC2022, MH continuas, pipeline y estadísticas. |
+| `HRES2-H2/` | Modelo energético y pipeline con MH poblacionales y de trayectoria. |
+| `DTW_optimization-main/` | Estudio independiente de adaptación de parámetros con PSO, GA, GWO y DE binarios. |
+| `sensitivity/` | Protocolos y campañas de sensibilidad de los pipelines rotativos. |
+| `instancias/` | Instancias MKP OR-Library locales. |
+| `resultados/`, `resultados finales/` | Salidas locales y resultados históricos; no mezclar campañas de protocolos diferentes. |
+| `paper/`, `informes/`, `planes/` | Artículo, explicaciones, propuestas y material histórico. |
+
+**Dos mecanismos distintos:** el pipeline colaborativo cambia de algoritmo; el estudio `DTW_optimization-main/` cambia parámetros de un mismo algoritmo. `ALGORITMO_CENTRAL.md` es documentación de otra etapa y no debe tomarse como inventario exhaustivo del código actual.
+
+### Algoritmos individuales conservados
+
+- MKP colaborativo: pool poblacional GA, PSO, GWO, WOA, EHO y ACO; pool de trayectoria SA, TS, ILS y VNS.
+- Solvers continuos disponibles: GA, PSO, GWO, WOA, EHO, ACO y ABC.
+- El pool continuo por defecto conserva WOA, PSO, EHO, GWO y ACO. HRES2 configura su propio pool y alternancia.
+
+## Retiro de WOA–ABC
+
+Se retiró la integración activa del híbrido **WOA–ABC** que dependía de un paquete ausente y bloqueaba los imports de CEC/HRES. También se retiraron el puente continuo, los dos lanzadores específicos y las pruebas exclusivas de esa función inexistente; se agregaron regresiones de los solvers independientes vigentes. Los nombres cooperativos ya no son opciones válidas del dispatcher continuo.
+
+**WOA y ABC individuales se conservan.** Los resultados y documentos históricos no se borraron para hacer pasar tests.
+
+El material MCDP en [planes/futuro_mcdp/](planes/futuro_mcdp/) es un archivo inactivo, no un paquete instalable ni un punto de entrada del flujo actual. Sus ejemplos cooperativos son históricos y requieren una integración explícita antes de ejecutarse.
+
+## Dependencias y comprobaciones
+
+Usar Python 3.11+ y un entorno configurado con NumPy, SciPy, Matplotlib y Requests. Las instancias y los datos oficiales de CEC deben existir localmente. No se descargan sustitutos de esos datos para simular una corrida oficial.
+
+```bash
+# Suite de los pipelines, análisis y herramientas existentes.
+python -B -m unittest discover -s tests -v
+
+# Suite de selección adaptativa MKP.
+python -B -m unittest discover -s adaptive_mh_selection/tests -v
+```
+
+Los tests nuevos verifican imports sin el paquete cooperativo, ejecución de los siete solvers continuos, rechazo de los nombres retirados y preservación de WOA/ABC independientes. No se usan skips para esconder la dependencia eliminada.
+
+Para CEC, HRES2, sensibilidad y adaptación de parámetros, consultar las guías de cada subproyecto y revisar sus presupuestos antes de lanzar los scripts HPC. Las comparaciones científicas requieren múltiples semillas, protocolos congelados y controles de costo equivalentes.
