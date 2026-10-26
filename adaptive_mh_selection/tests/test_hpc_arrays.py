@@ -109,19 +109,26 @@ exit "${PYTHON_EXIT:-0}"
                     self.assertEqual(result.returncode, 0, result.stderr)
                     args = (self.root / "python.args").read_text().splitlines()
                     family, index = families[task // 3], task % 3
-                    task_root = f"{self.shell_root}/batch/items_{size}/mknapcb{family}_inst_{index:02d}"
-                    output = task_root + "/campaign"
+                    output = f"{self.shell_root}/batch/items_{size}/mknapcb{family}_inst_{index:02d}"
+                    reservation = (f"{self.shell_root}/batch/.reservations/items_{size}/"
+                                   f"mknapcb{family}_inst_{index:02d}")
                     self.assertEqual(args, ["-B", "-u", "-m", "adaptive_mh_selection.campaign",
                                            "--families", str(family), "--indices", str(index),
                                            "--runs", "31", "--seed", "42", "--iterations", "1000",
                                            "--selectors", "adaptive", "--modes", "ddtw",
                                            "--selection-trace", "--output", output])
+                    self.assertNotIn("/campaign", output)
                     settings = dict(line.split("=", 1) for line in
                                     (self.root / "python.env").read_text().splitlines())
                     for key in (*THREADS, "PYTHONUNBUFFERED"):
                         self.assertEqual(settings[key], "1")
                     self.assertEqual(settings["MPLBACKEND"], "Agg")
-                    self.assertEqual(settings["MPLCONFIGDIR"], task_root + "/mplconfig")
+                    self.assertEqual(settings["MPLCONFIGDIR"], reservation + "/mplconfig")
+                    self.assertNotEqual(Path(settings["MPLCONFIGDIR"]).parent.as_posix(), output)
+                    self.assertTrue((self.root / "batch/.reservations" / f"items_{size}"
+                                     / f"mknapcb{family}_inst_{index:02d}" / "mplconfig").is_dir())
+                    self.assertTrue((self.root / "batch" / f"items_{size}"
+                                     / f"mknapcb{family}_inst_{index:02d}").is_dir())
                     outputs.add(output)
                     caches.add(settings["MPLCONFIGDIR"])
                     cases.add((family, index))
@@ -188,8 +195,12 @@ exit "${PYTHON_EXIT:-0}"
                      (self.shell_root, "100", "relative"),
                      (self.shell_root, "100", self.shell_root, "extra")):
             self.reject(lambda: self.call(SCRIPTS[1], *args))
-        existing = self.root / "batch/items_100/mknapcb1_inst_00/campaign"
-        existing.mkdir(parents=True)
+        output = self.root / "batch/items_100/mknapcb1_inst_00"
+        output.mkdir(parents=True)
+        self.reject(lambda: self.worker())
+        shutil.rmtree(output)
+        reservation = self.root / "batch/.reservations/items_100/mknapcb1_inst_00"
+        reservation.mkdir(parents=True)
         self.reject(lambda: self.worker())
 
     def test_partial_submission_preserves_failure_and_accepted_ids(self):

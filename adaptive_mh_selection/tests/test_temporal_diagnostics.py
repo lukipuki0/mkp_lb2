@@ -225,7 +225,18 @@ class TemporalTests(unittest.TestCase):
             if Path(path).name == 'fig_temporal_diagnostics.png':
                 inspected.append(path)
                 self.assertEqual(len(fig.axes), 5)
+                self.assertEqual(fig._suptitle.get_text(), 'MKP temporal diagnostics — DTW')
+                self.assertEqual(len(fig.texts), 1)
                 axes = fig.axes
+                legend = axes[0].get_legend()
+                self.assertEqual([text.get_text() for text in legend.get_texts()],
+                                 [r'$f_t^*$', 'PSO', 'GA'])
+                self.assertTrue(all(text.get_fontsize() >= 8 for text in legend.get_texts()))
+                self.assertGreaterEqual(axes[0].lines[0].get_linewidth(), 1.6)
+                delta_line = next(line for line in axes[-1].lines if line.get_label() == 'Recorded delta')
+                threshold_line = next(line for line in axes[-1].lines if line.get_label() == 'Recorded theta_delta')
+                self.assertNotEqual(delta_line.get_color(), threshold_line.get_color())
+                self.assertEqual(threshold_line.get_linestyle(), '--')
                 self.assertGreater(axes[0].get_position().y0, axes[-1].get_position().y0)
                 self.assertIn('active MH', axes[0].get_title(loc='left'))
                 self.assertIn('Native Iteration', axes[-1].get_xlabel())
@@ -321,9 +332,8 @@ class TemporalTests(unittest.TestCase):
             np.testing.assert_equal(d1.get_ydata(), data['D1_vs_ramp'][finite])
             self.assertGreaterEqual(distance.get_ylim()[1], np.nanmax(data['D1_vs_ramp']))
             self.assertLessEqual(distance.get_ylim()[0], 0)
-            disclosure = ' '.join(text.get_text() for text in fig.texts).lower()
-            self.assertIn('linear', disclosure)
-            self.assertIn('not measurement', disclosure)
+            self.assertEqual([text.get_text() for text in fig.texts],
+                             ['MKP temporal diagnostics — DTW'])
             self.assertIn('serif', a._left_title.get_fontfamily())
             fig.canvas.draw()
             renderer = fig.canvas.get_renderer()

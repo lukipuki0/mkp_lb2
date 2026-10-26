@@ -98,9 +98,9 @@ def write_run(result: dict, output: Path, *, name: str, instance, best=False):
         handle.write(f"Instancia          : {name}\n")
         handle.write(f"Items / Restricc.  : {instance.n} / {instance.m}\n")
         handle.write(f"Mejor valor global : {native.mejor_valor_global:.1f}\n")
-        handle.write(f"Optimo conocido    : {native.valor_optimo:.1f}\n")
+        handle.write(f"Valor de referencia: {native.valor_optimo:.1f}\n")
         if summary["gap_pct"] is not None:
-            handle.write(f"Gap relativo       : {summary['gap_pct']:.2f}%\n")
+            handle.write(f"Brecha vs referencia: {summary['gap_pct']:.2f}%\n")
         handle.write(f"Iteraciones pedidas: {summary['requested_iterations']}\n")
         handle.write(f"Iteraciones reales : {summary['actual_iterations']}\n")
         handle.write(f"Sobrepaso de epoch : {summary['iteration_overshoot']}\n")
@@ -129,7 +129,7 @@ def write_batch(results: list[dict], output: Path, *, name: str, instance, plots
     write_csv(output / "runs_resultados.csv", records, list(records[0]))
     with (output / "resumen_pipeline.txt").open("w", encoding="utf-8") as handle:
         handle.write(f"Instancia          : {name}\nItems / Restricc.  : {instance.n} / {instance.m}\n")
-        handle.write(f"Runs ejecutados    : {len(results)}\nOptimo conocido    : {instance.valor_optimo:.1f}\n")
+        handle.write(f"Runs ejecutados    : {len(results)}\nValor de referencia: {instance.valor_optimo:.1f}\n")
         for label, value in (("Media valor", np.mean(values)), ("Desviacion est.", np.std(values)),
                              ("Mediana valor", np.median(values)), ("Mejor valor", max(values)), ("Peor valor", min(values))):
             handle.write(f"{label:<19}: {value:.2f}\n")
@@ -140,6 +140,8 @@ def write_batch(results: list[dict], output: Path, *, name: str, instance, plots
                          f"reales={record['iteraciones_reales']}, sobrepaso={record['sobrepaso']}\n")
     if plots:
         from .plotting import plot_run, plot_distribution
-        plot_run(results[best_index]["native_result"], best_dir, metadata=results[best_index]["summary"])
+        plot_run(results[best_index]["native_result"], best_dir,
+                 metadata=results[best_index]["summary"],
+                 selection_records=results[best_index].get("selection_records"))
         plot_distribution(name, values, instance.valor_optimo, output)
     return best_dir

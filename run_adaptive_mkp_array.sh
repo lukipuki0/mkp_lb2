@@ -27,15 +27,18 @@ task=${SLURM_ARRAY_TASK_ID-}
 family=${families[task / 3]}
 index=$((task % 3))
 printf -v case_name 'mknapcb%s_inst_%02d' "$family" "$index"
-task_root="$batch/items_$size/$case_name"
-[[ ! -e $task_root && ! -L $task_root ]] || fail "La tarea ya tiene salida/reserva: $task_root"
+output="$batch/items_$size/$case_name"
+reservation="$batch/.reservations/items_$size/$case_name"
+[[ ! -e $output && ! -L $output && ! -e $reservation && ! -L $reservation ]] || fail "La tarea ya tiene salida/reserva: $output"
 
-# Validación terminada. Reserva atómica por caso antes de activar el entorno.
+# Validación terminada. La reserva oculta es exclusiva y no es la salida.
 # Se conserva incluso si falla Conda/Python: no hay reanudación automática.
-mkdir -p -- "$batch/items_$size"
-mkdir -- "$task_root"
-export MPLCONFIGDIR="$task_root/mplconfig"
+# El directorio de campaña sigue siendo nuevo: no se crea antes de Python.
+mkdir -p -- "$batch/.reservations/items_$size"
+mkdir -- "$reservation"
+export MPLCONFIGDIR="$reservation/mplconfig"
 mkdir -- "$MPLCONFIGDIR"
+mkdir -p -- "$batch/items_$size"
 cd -- "$repo"
 source "${MKP_CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 conda activate mkp_env
@@ -54,4 +57,4 @@ exec python3 -B -u -m adaptive_mh_selection.campaign \
     --families "$family" --indices "$index" \
     --runs 31 --seed 42 --iterations 1000 \
     --selectors adaptive --modes ddtw --selection-trace \
-    --output "$task_root/campaign"
+    --output "$output"

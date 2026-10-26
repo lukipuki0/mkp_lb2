@@ -70,17 +70,68 @@ def _typed_metric(raw, case, condition):
     }
 
 
-def _analyze_grouped(campaign: Path) -> dict:
-    """Read every runs_resultados.csv. Do not reduce a case to its winner."""
-    paths = sorted(campaign.glob("items_*/mknapcb*/inst_*/*/runs_resultados.csv"))
-    if not paths:
-        raise ValueError("Campaign has no run summaries")
-    metrics, failures, cases = [], [], set()
-    for path in paths:
+def _inside_campaign(campaign: Path, relative: str):
+    """Resolve a protocol path and reject absolute paths or escapes."""
+    if not isinstance(relative, str) or relative.startswith(("/", "\\")) or ":" in relative:
+        return None
+    root = campaign.resolve()
+    candidate = (campaign / relative).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _case_label(case):
+    relative = case.get("relative_output_path")
+    if isinstance(relative, str) and relative:
+        return relative
+    try:
+        return f"items_{int(case['n'])}/mknapcb{int(case['family'])}_inst_{int(case['index']):02d}"
+    except (KeyError, TypeError, ValueError):
+        return relative if isinstance(relative, str) else ""
+
+
+def _protocol_metric_files(campaign: Path, protocol: dict):
+    """Prefer paths stored in the protocol, including a single-case output root."""
+    found = []
+    cases = protocol.get("cases")
+    if not isinstance(cases, list):
+        return found
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        label = _case_label(case)
+        conditions = case.get("conditions")
+        if not isinstance(conditions, list):
+            continue
+        for condition in conditions:
+            if not isinstance(condition, dict) or not isinstance(condition.get("relative_output_path"), str):
+                continue
+            directory = _inside_campaign(campaign, condition["relative_output_path"])
+            if directory is None:
+                continue
+            path = directory / "runs_resultados.csv"
+            if path.is_file():
+                found.append((path, label, str(condition.get("condition") or "")))
+    return found
+
+
+def _legacy_metric_files(campaign: Path):
+    """Schema-3 layout from before case/condition folders were flattened."""
+    found = []
+    for path in sorted(campaign.glob("items_*/mknapcb*/inst_*/*/runs_resultados.csv")):
         relative = path.relative_to(campaign)
         if len(relative.parts) < 5:
             raise ValueError("Campaign has no run summaries")
-        case, condition = "/".join(relative.parts[:3]), relative.parts[3]
+        found.append((path, "/".join(relative.parts[:3]), relative.parts[3]))
+    return found
+
+
+def _collect_metrics(identified):
+    metrics, failures, cases = [], [], set()
+    for path, case, condition in identified:
         cases.add(case)
         with path.open(encoding="utf-8", newline="") as handle:
             for raw in csv.DictReader(handle):
@@ -88,11 +139,20 @@ def _analyze_grouped(campaign: Path) -> dict:
                 metrics.append(metric)
                 if metric["status"] == "failed":
                     failures.append(metric)
+    return metrics, failures, cases, len(identified)
+
+
+def _analyze_grouped(campaign: Path, protocol: dict) -> dict:
+    """Read every runs_resultados.csv. Do not reduce a case to its winner."""
+    identified = _protocol_metric_files(campaign, protocol) or _legacy_metric_files(campaign)
+    if not identified:
+        raise ValueError("Campaign has no run summaries")
+    metrics, failures, cases, case_conditions = _collect_metrics(identified)
     if not metrics:
         raise ValueError("Campaign has no run summaries")
     return {
         "schema_version": 3, "budget_unit": "native_iterations", "kind": "grouped_mkp_campaign",
-        "distinct_cases": len(cases), "case_conditions": len(paths),
+        "distinct_cases": len(cases), "case_conditions": case_conditions,
         "successful_runs": sum(metric["status"] == "success" for metric in metrics),
         "failed_runs": len(failures), "metrics": metrics, "failures": failures,
         "note": "Read-only grouped metrics for later within-case statistics; no inference and no new plots",
@@ -107,7 +167,7 @@ def analyze_campaign(campaign: Path) -> dict:
     if version == 2 and budget == "native_iterations":
         return _analyze_iteration_runs(campaign)
     if version == 3 and budget == "native_iterations" and protocol.get("kind") == "grouped_mkp_campaign":
-        return _analyze_grouped(campaign)
+        return _analyze_grouped(campaign, protocol)
     raise ValueError("This is a retired evaluation campaign; use its original files without relabeling them as iterations")
 
 

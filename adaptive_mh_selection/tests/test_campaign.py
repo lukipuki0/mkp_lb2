@@ -117,6 +117,8 @@ class CampaignTests(unittest.TestCase):
         from adaptive_mh_selection.config import RunConfig, default_monitor
         study, source = RunConfig(), default_monitor()
         self.assertEqual(protocol["conditions"], ["adaptive_ddtw"])
+        self.assertIn("OR-Library mkcbres.txt best feasible", protocol["reference_policy"])
+        self.assertIn("SHA-256", protocol["reference_policy"])
         self.assertEqual(protocol["modes"], ["ddtw"])
         self.assertEqual(protocol["selectors"], [study.selector])
         self.assertEqual(protocol["iterations"], study.max_iters)
@@ -142,11 +144,14 @@ class CampaignTests(unittest.TestCase):
         )
         for case in protocol["cases"]:
             self.assertEqual(case["file"], f"mknapcb{case['family']}.txt")
-            self.assertEqual(case["relative_output_path"], f"items_{case['n']}/mknapcb{case['family']}/inst_{case['index']:02d}")
-            self.assertEqual(case["reference_value"], 0)
-            self.assertIn("zero means unknown", case["reference_source"])
-            self.assertEqual(case["conditions"][0]["relative_output_path"],
-                             f"{case['relative_output_path']}/adaptive_ddtw")
+            self.assertEqual(case["relative_output_path"],
+                             f"items_{case['n']}/mknapcb{case['family']}_inst_{case['index']:02d}")
+            self.assertGreater(case["reference_value"], 0)
+            self.assertIn("best feasible value found", case["reference_source"])
+            self.assertEqual(case["conditions"][0]["condition"], "adaptive_ddtw")
+            self.assertEqual(case["conditions"][0]["relative_output_path"], case["relative_output_path"])
+            self.assertNotIn("/inst_", case["relative_output_path"])
+            self.assertNotIn("adaptive_ddtw", case["relative_output_path"])
         self.assertNotIn("max_evaluations", stdout.getvalue())
         self.assertEqual(before, set(Path("resultados/adaptive_mh_selection").glob("*")))
 
@@ -257,7 +262,65 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(protocol["planned_cases"], 1)
         self.assertEqual(protocol["conditions"], ["adaptive_dtw", "uniform_dtw", "adaptive_ddtw", "uniform_ddtw"])
         self.assertEqual(protocol["planned_runs"], 124)
+        self.assertEqual(protocol["cases"][0]["relative_output_path"], "")
+        self.assertEqual(
+            [item["relative_output_path"] for item in protocol["cases"][0]["conditions"]],
+            protocol["conditions"],
+        )
         self.assertFalse((self.root / "multi").exists())
+
+    def test_layout_omits_repeated_case_segments_and_keeps_condition_identity(self):
+        from adaptive_mh_selection.campaign import main
+
+        def protocol_for(*args):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main(["--dry-run", "--runs", "1", "--output", str(self.root / "layout"), *args])
+            self.assertEqual(code, 0)
+            self.assertFalse((self.root / "layout").exists())
+            return json.loads(stdout.getvalue())
+
+        single = protocol_for("--families", "1", "--indices", "0", "--modes", "dtw")
+        self.assertEqual(single["planned_cases"], 1)
+        self.assertEqual(single["conditions"], ["adaptive_dtw"])
+        case = single["cases"][0]
+        self.assertEqual(case["relative_output_path"], "")
+        self.assertEqual(case["conditions"][0]["condition"], "adaptive_dtw")
+        self.assertEqual(case["conditions"][0]["relative_output_path"], "")
+
+        compared = protocol_for("--families", "1", "--indices", "0",
+                                "--selectors", "adaptive", "uniform", "--modes", "dtw")
+        self.assertEqual(compared["cases"][0]["relative_output_path"], "")
+        self.assertEqual(
+            [(item["condition"], item["relative_output_path"]) for item in compared["cases"][0]["conditions"]],
+            [("adaptive_dtw", "adaptive_dtw"), ("uniform_dtw", "uniform_dtw")],
+        )
+
+        several = protocol_for("--families", "1", "2", "--indices", "0", "1", "--modes", "ddtw")
+        self.assertEqual(
+            [(item["n"], item["family"], item["index"], item["relative_output_path"],
+              item["conditions"][0]["relative_output_path"], item["conditions"][0]["condition"])
+             for item in several["cases"]],
+            [
+                (100, 1, 0, "items_100/mknapcb1_inst_00", "items_100/mknapcb1_inst_00", "adaptive_ddtw"),
+                (100, 1, 1, "items_100/mknapcb1_inst_01", "items_100/mknapcb1_inst_01", "adaptive_ddtw"),
+                (250, 2, 0, "items_250/mknapcb2_inst_00", "items_250/mknapcb2_inst_00", "adaptive_ddtw"),
+                (250, 2, 1, "items_250/mknapcb2_inst_01", "items_250/mknapcb2_inst_01", "adaptive_ddtw"),
+            ],
+        )
+
+        both = protocol_for("--families", "1", "4", "--indices", "0",
+                            "--selectors", "uniform", "adaptive", "--modes", "dtw", "ddtw")
+        names = ["adaptive_dtw", "uniform_dtw", "adaptive_ddtw", "uniform_ddtw"]
+        self.assertEqual(both["conditions"], names)
+        self.assertGreater(both["planned_cases"], 1)
+        for item in both["cases"]:
+            base = f"items_{item['n']}/mknapcb{item['family']}_inst_{item['index']:02d}"
+            self.assertEqual(item["relative_output_path"], base)
+            self.assertEqual(
+                [(entry["condition"], entry["relative_output_path"]) for entry in item["conditions"]],
+                [(name, f"{base}/{name}") for name in names],
+            )
 
     def test_execution_retains_31_rows_original_winner_and_analysis_metrics(self):
         from adaptive_mh_selection.campaign import main
@@ -271,7 +334,7 @@ class CampaignTests(unittest.TestCase):
 
         def fake(instance, config):
             if calls:
-                rows = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")
+                rows = read_csv(output / "runs_resultados.csv")
                 self.assertEqual(len(rows), len(calls))
                 estado = read_csv(output / "estado_ejecucion.csv")
                 self.assertEqual(estado[0]["status"], "running")
@@ -294,9 +357,11 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(calls, list(range(42, 73)))
         self.assertEqual(writer.call_count, 1)
         self.assertTrue(writer.call_args.kwargs["best"])
-        condition = output / "items_100/mknapcb1/inst_00/adaptive_dtw"
+        condition = output
         rows = read_csv(condition / "runs_resultados.csv")
         self.assertEqual(len(rows), 31)
+        self.assertFalse((output / "items_100/mknapcb1").exists())
+        self.assertFalse((output / "adaptive_dtw").exists())
         self.assertEqual(rows[0]["status"], "failed")
         self.assertEqual(rows[0]["run"], "1")
         self.assertEqual(rows[0]["seed"], "42")
@@ -310,7 +375,7 @@ class CampaignTests(unittest.TestCase):
                          ["best_run_17"])
         self.assertFalse(any(path.name.startswith("run_") for path in condition.iterdir()))
         self.assertEqual([path.relative_to(output).as_posix() for path in output.rglob("selection_trace.csv")],
-                         ["items_100/mknapcb1/inst_00/adaptive_dtw/best_run_17/selection_trace.csv"])
+                         ["best_run_17/selection_trace.csv"])
         self.assertTrue(all("best_run_17" in path.as_posix() for path in output.rglob("native_result.json")))
         self.assertTrue(all("best_run_17" in path.as_posix() for path in output.rglob("historial_dtw.csv")))
         self.assertEqual(len(list(output.rglob("summary.json"))), 1)
@@ -320,6 +385,8 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(len(plotted), 30)
         estado = read_csv(output / "estado_ejecucion.csv")
         self.assertEqual(estado[0]["status"], "partial_failure")
+        self.assertEqual(estado[0]["condition"], "adaptive_dtw")
+        self.assertEqual(estado[0]["relative_output_path"], "")
         self.assertEqual(estado[0]["winner_run"], "17")
         self.assertEqual(int(estado[0]["planned_runs"]), 31)
         self.assertEqual(int(estado[0]["succeeded_runs"]), 30)
@@ -358,6 +425,32 @@ class CampaignTests(unittest.TestCase):
         self.assertIsInstance(report["metrics"][16]["iterations"], int)
         self.assertNotEqual(len(report["metrics"]), 1)
 
+    def test_winner_plot_gets_records_without_selection_trace(self):
+        from adaptive_mh_selection.campaign import main
+
+        library = self.root / "library"
+        library.mkdir()
+        write_instances(library, 1, [{"n": 100, "m": 2}])
+        produced = []
+
+        def fake(instance, config):
+            result = fake_result(instance, config, 4)
+            produced.append(result)
+            return result
+
+        output = self.root / "probability-export"
+        with patch("adaptive_mh_selection.campaign.run_pipeline", side_effect=fake), \
+                patch("adaptive_mh_selection.plotting.plot_run") as plot_run, \
+                patch("adaptive_mh_selection.plotting.plot_distribution"):
+            code = main(["--output", str(output), "--instances-dir", str(library),
+                         "--families", "1", "--indices", "0", "--runs", "1", "--iterations", "2",
+                         "--modes", "dtw"])
+        self.assertEqual(code, 0)
+        plot_run.assert_called_once()
+        self.assertIs(plot_run.call_args.kwargs["selection_records"], produced[0]["selection_records"])
+        self.assertEqual(list(output.rglob("selection_trace.csv")), [])
+        self.assertTrue((output / "best_run_01").is_dir())
+
     def test_tie_keeps_first_ordinal_and_failed_ordinal_is_not_reused(self):
         from adaptive_mh_selection.campaign import main
 
@@ -376,8 +469,9 @@ class CampaignTests(unittest.TestCase):
                          "--families", "1", "--indices", "0", "--runs", "4", "--iterations", "2",
                          "--modes", "dtw", "--no-plots", "--selection-trace"])
         self.assertEqual(code, 1)
-        condition = output / "items_100/mknapcb1/inst_00/adaptive_dtw"
+        condition = output
         self.assertTrue((condition / "best_run_02").is_dir())
+        self.assertFalse((output / "adaptive_dtw").exists())
         self.assertFalse((condition / "best_run_01").exists())
         self.assertFalse((condition / "best_run_04").exists())
         self.assertEqual(list(output.rglob("selection_trace.csv")),
@@ -401,8 +495,8 @@ class CampaignTests(unittest.TestCase):
                          "--families", "1", "--indices", "0", "1", "--runs", "1", "--iterations", "2",
                          "--modes", "dtw", "--no-plots"])
         self.assertEqual(code, 0)
-        known = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")[0]
-        unknown = read_csv(output / "items_100/mknapcb1/inst_01/adaptive_dtw/runs_resultados.csv")[0]
+        known = read_csv(output / "items_100/mknapcb1_inst_00/runs_resultados.csv")[0]
+        unknown = read_csv(output / "items_100/mknapcb1_inst_01/runs_resultados.csv")[0]
         self.assertEqual(float(known["gap_pct"]), 0.0)
         self.assertEqual(float(known["final_fitness"]), 4.0)
         self.assertEqual(unknown["gap_pct"], "")
@@ -427,7 +521,7 @@ class CampaignTests(unittest.TestCase):
                          "--families", "1", "--indices", "0", "--runs", "1", "--iterations", "2",
                          "--modes", "dtw", "--no-plots"])
         self.assertEqual(code, 0)
-        row = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")[0]
+        row = read_csv(output / "runs_resultados.csv")[0]
         self.assertEqual(row["requested_iterations"], "2")
         self.assertEqual(row["actual_iterations"], "5")
         self.assertEqual(row["iteration_overshoot"], "3")
@@ -458,11 +552,11 @@ class CampaignTests(unittest.TestCase):
                          "--families", "1", "--indices", "0", "--runs", "3", "--iterations", "2",
                          "--modes", "dtw", "--no-plots"])
         self.assertEqual(code, 1)
-        rows = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")
+        rows = read_csv(output / "runs_resultados.csv")
         self.assertEqual([row["status"] for row in rows], ["failed", "failed", "success"])
         self.assertEqual(rows[0]["final_fitness"], "")
         self.assertEqual(rows[1]["error"].split(":")[0], "ValueError")
-        self.assertTrue((output / "items_100/mknapcb1/inst_00/adaptive_dtw/best_run_03").is_dir())
+        self.assertTrue((output / "best_run_03").is_dir())
         self.assertEqual(read_csv(output / "estado_ejecucion.csv")[0]["status"], "partial_failure")
 
     def test_all_failed_has_no_winner_and_later_case_still_runs(self):
@@ -487,8 +581,8 @@ class CampaignTests(unittest.TestCase):
                          "--modes", "dtw"])
         self.assertEqual(code, 1)
         self.assertEqual(pipeline.call_count, 4)
-        failed = output / "items_100/mknapcb1/inst_00/adaptive_dtw"
-        later = output / "items_250/mknapcb2/inst_00/adaptive_dtw"
+        failed = output / "items_100/mknapcb1_inst_00"
+        later = output / "items_250/mknapcb2_inst_00"
         self.assertEqual(list(failed.glob("best_run_*")), [])
         self.assertEqual(list(failed.glob("run_*")), [])
         self.assertEqual(list(failed.rglob("*.png")), [])
@@ -541,11 +635,11 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(writer.call_count, 2)
         estado = {row["family"]: row for row in read_csv(output / "estado_ejecucion.csv")}
         self.assertEqual(estado["1"]["status"], "export_failed")
-        self.assertIn("Status: export_failed", (output / "items_100/mknapcb1/inst_00/adaptive_dtw/resumen_pipeline.txt").read_text(encoding="utf-8"))
+        self.assertIn("Status: export_failed", (output / "items_100/mknapcb1_inst_00/resumen_pipeline.txt").read_text(encoding="utf-8"))
         self.assertEqual(estado["2"]["status"], "complete")
         self.assertEqual(list(output.rglob("selection_trace.csv")),
-                         [output / "items_250/mknapcb2/inst_00/adaptive_dtw/best_run_01/selection_trace.csv"])
-        failed_rows = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")
+                         [output / "items_250/mknapcb2_inst_00/best_run_01/selection_trace.csv"])
+        failed_rows = read_csv(output / "items_100/mknapcb1_inst_00/runs_resultados.csv")
         self.assertEqual(failed_rows[0]["status"], "success")
         self.assertEqual(float(failed_rows[0]["final_fitness"]), 4)
 
@@ -578,10 +672,10 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(estado[0]["planned_runs"], "3")
         self.assertEqual(estado[0]["winner_run"], "")
         self.assertNotEqual(estado[0]["status"], "complete")
-        rows = read_csv(output / "items_100/mknapcb1/inst_00/adaptive_dtw/runs_resultados.csv")
+        rows = read_csv(output / "items_100/mknapcb1_inst_00/runs_resultados.csv")
         self.assertEqual([row["status"] for row in rows], ["success", "interrupted"])
         self.assertEqual(rows[1]["final_fitness"], "")
-        report = (output / "items_100/mknapcb1/inst_00/adaptive_dtw/resumen_pipeline.txt").read_text(encoding="utf-8")
+        report = (output / "items_100/mknapcb1_inst_00/resumen_pipeline.txt").read_text(encoding="utf-8")
         self.assertIn("Status: interrupted", report)
         self.assertIn("Planned runs: 3", report)
         self.assertIn("Successful runs: 1", report)
@@ -610,8 +704,9 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(seen, [("adaptive", False, 42, 0.4, 8), ("adaptive", False, 43, 0.4, 8),
                                 ("uniform", False, 42, 0.4, 8), ("uniform", False, 43, 0.4, 8)])
-        self.assertTrue((output / "items_250/mknapcb1/inst_00/adaptive_dtw/best_run_01").is_dir())
-        self.assertTrue((output / "items_250/mknapcb1/inst_00/uniform_dtw/best_run_01").is_dir())
+        self.assertTrue((output / "adaptive_dtw/best_run_01").is_dir())
+        self.assertTrue((output / "uniform_dtw/best_run_01").is_dir())
+        self.assertFalse((output / "items_250/mknapcb1").exists())
         summary = read_csv(output / "resumen_global.csv")
         self.assertEqual([row["condition"] for row in summary], ["adaptive_dtw", "uniform_dtw"])
         self.assertEqual([float(row["mean_fitness"]) for row in summary], [10, 40])
@@ -629,13 +724,19 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(protocol["schema_version"], 3)
         self.assertEqual(protocol["cases"][0]["n"], 100)
         self.assertEqual(protocol["cases"][0]["m"], 5)
-        self.assertEqual(protocol["cases"][0]["reference_value"], 0)
-        condition = output / "items_100/mknapcb1/inst_00/adaptive_dtw"
+        self.assertEqual(protocol["cases"][0]["reference_value"], 24381)
+        self.assertIn("best feasible value found", protocol["cases"][0]["reference_source"])
+        condition = output
+        self.assertEqual(protocol["cases"][0]["relative_output_path"], "")
+        self.assertEqual(protocol["cases"][0]["conditions"][0]["relative_output_path"], "")
+        self.assertEqual(protocol["cases"][0]["conditions"][0]["condition"], "adaptive_dtw")
         rows = read_csv(condition / "runs_resultados.csv")
         self.assertEqual(len(rows), 2)
         self.assertEqual([row["seed"] for row in rows], ["42", "43"])
         self.assertTrue(all(row["status"] == "success" for row in rows))
-        self.assertTrue(all(row["gap_pct"] == "" for row in rows))
+        for row in rows:
+            expected_gap = 100 * (24381 - float(row["final_fitness"])) / 24381
+            self.assertAlmostEqual(float(row["gap_pct"]), expected_gap, places=2)
         self.assertTrue(all(int(row["requested_iterations"]) == 2 for row in rows))
         self.assertTrue(all(int(row["actual_iterations"]) >= 2 for row in rows))
         self.assertTrue(all(int(row["iteration_overshoot"]) == int(row["actual_iterations"]) - 2 for row in rows))

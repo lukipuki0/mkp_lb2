@@ -50,6 +50,26 @@ class AdaptiveSelector:
         self.uses[selected] += 1
 
 
+class AdaptiveExploratorySelector(AdaptiveSelector):
+    """Experimental count-weighted exploration; reuse EWMA, validation and RNG."""
+
+    def probabilities(self):
+        weights = {name: 1. / math.sqrt(self.uses[name] + 1) for name in self.names}
+        weight_total = math.fsum(weights.values())
+        exploration = {name: weight / weight_total for name, weight in weights.items()}
+        score_total = math.fsum(self.scores.values())
+        if score_total == 0:
+            return exploration
+        # Preserve a representable positive floor even for subnormal epsilon.
+        probabilities = {
+            name: max(math.ulp(0.), self.epsilon * exploration[name]
+                      + (1 - self.epsilon) * (self.scores[name] / score_total))
+            for name in self.names
+        }
+        total = math.fsum(probabilities.values())
+        return {name: probability / total for name, probability in probabilities.items()}
+
+
 class UniformSelector(AdaptiveSelector):
     """Native random.choice stream, without reward-dependent probabilities."""
 

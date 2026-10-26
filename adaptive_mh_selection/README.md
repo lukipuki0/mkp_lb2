@@ -2,7 +2,7 @@
 
 Esta variante ejecuta **el mismo `hybrid_mkp.orchestrator.ejecutar_pipeline()`** que el sistema original. Mantiene los operadores, inicialización, alternancia poblacional/trayectoria, transferencia de la mejor solución y reglas DTW. La única diferencia de búsqueda es la política que elige la próxima MH.
 
-**La unidad es iteraciones nativas, no evaluaciones.** Se retiraron el contador de evaluaciones y sus adaptadores. Por pedido posterior del usuario, se eliminó `instantaneous_convergence.png` y se agregó un diagnóstico temporal de cuatro paneles basado solo en los registros reales.
+**La unidad es iteraciones nativas, no evaluaciones.** Se retiraron el contador de evaluaciones y sus adaptadores. Por pedido posterior del usuario, se eliminó `instantaneous_convergence.png` y se agregó un diagnóstico temporal de cuatro paneles basado solo en los registros reales. Este pipeline ya no genera `instantaneous_fitness_only.png`: la función nativa permanece para otros consumidores y un archivo previo con ese nombre no se borra al redibujar. Si hay probabilidades de selección registradas, se agrega `selection_probabilities.png`.
 
 ## Campaña agrupada: 27 casos y 31 corridas por caso
 
@@ -37,7 +37,7 @@ python -B -m adaptive_mh_selection.campaign --help
 Por caso y condición se conservan **todas las 31 filas numéricas**, pero **solo el ganador** tiene solución, historiales y gráficos completos:
 
 ```text
-<campaña>/
+<campaña>/                          # varios casos y una sola condición: sin carpeta de condición
   protocol.json
   environment.json
   estado_ejecucion.csv
@@ -46,33 +46,31 @@ Por caso y condición se conservan **todas las 31 filas numéricas**, pero **sol
   items_100/
     resumen_grupo.csv
     resumen_grupo.txt
-    mknapcb1/
-      inst_00/
-        adaptive_ddtw/
-          runs_resultados.csv       # las 31 mediciones, no solo el mejor fitness
-          resumen_pipeline.txt
-          boxplot_runs.png
-          best_run_XX/              # ordinal original del ganador
-            config.json
-            summary.json
-            native_result.json
-            resumen_pipeline_best_run.txt
-            historial_dtw.csv
-            historial_dtw_detalle.txt
-            ... gráficos nativos y diagnóstico temporal ...
-      inst_01/
-      inst_02/
-    mknapcb4/
-    mknapcb7/
+    mknapcb1_inst_00/
+      runs_resultados.csv         # las 31 mediciones, no solo el mejor fitness
+      resumen_pipeline.txt
+      boxplot_runs.png
+      best_run_XX/                # ordinal original del ganador
+        config.json
+        summary.json
+        native_result.json
+        resumen_pipeline_best_run.txt
+        historial_dtw.csv
+        historial_dtw_detalle.txt
+        ... gráficos nativos, diagnóstico temporal y selection_probabilities.png ...
+    mknapcb1_inst_01/
+    mknapcb4_inst_00/
   items_250/
-    ... mknapcb2, mknapcb5, mknapcb8 ...
+    ... mknapcb2_inst_XX, mknapcb5_inst_XX, mknapcb8_inst_XX ...
   items_500/
-    ... mknapcb3, mknapcb6, mknapcb9 ...
+    ... mknapcb3_inst_XX, mknapcb6_inst_XX, mknapcb9_inst_XX ...
 ```
+
+Un solo caso escribe esas mediciones en la raíz de la campaña, no otra vez dentro de `items_N/mknapcbF/inst_XX`. Si se comparan varias condiciones, cada una conserva su directorio (`adaptive_dtw/`, `uniform_dtw/`, …) bajo el caso o, si hay un solo caso, bajo la raíz. La identidad de la condición sigue en `protocol.json` y en los CSV de estado/resumen aunque el directorio se omita. Los resúmenes de grupo siguen en `items_N/`.
 
 La mejor corrida maximiza fitness; en empate gana la primera. Se conserva su número original, incluso si una ejecución anterior falló. No se crean directorios `run_XX` con trazas de los perdedores ni se acumulan los 31 historiales completos en memoria.
 
-Cada CSV queda identificado por su ruta de tamaño/familia/índice/condición. Cada fila incluye semilla, fitness, gap si existe referencia, tiempo, iteraciones solicitadas/reales/sobrepaso, bloques/transiciones y estado/error. Los fallos no se convierten en fitness cero ni se ocultan: un caso con 30 éxitos y un fallo no se anuncia como 31 corridas válidas. Si todos fallan, no se fabrica un ganador. Un error de exportación también produce estado de fallo y salida no cero.
+Cada fila incluye semilla, fitness, gap si existe referencia, tiempo, iteraciones solicitadas/reales/sobrepaso, bloques/transiciones y estado/error. Los fallos no se convierten en fitness cero ni se ocultan: un caso con 30 éxitos y un fallo no se anuncia como 31 corridas válidas. Si todos fallan, no se fabrica un ganador. Un error de exportación también produce estado de fallo y salida no cero.
 
 Las métricas se actualizan tras cada intento y el estado registra los casos pendientes, activos y terminados. Los resúmenes de grupo/global tienen una fila por caso y condición: **no promedian fitness crudo entre instancias diferentes**. La desviación estándar es muestral (`ddof=1`) y queda ausente si hay menos de dos éxitos. Las referencias desconocidas permanecen ausentes; la del índice 0 nunca se copia a los índices 1 o 2.
 
@@ -80,7 +78,7 @@ Si se seleccionan otras políticas o detectores, se repiten las mismas semillas 
 
 Las carpetas existentes no se sobrescriben. Esta primera versión es secuencial y no ofrece reanudación ni reintentos automáticos; en una interrupción, los registros parciales deben revisarse y no se consideran una campaña completa. El ganador completo se exporta al terminar el caso, no después de cada intento.
 
-El lector de datos es de solo lectura y conserva todas las filas, incluyendo tiempo, bloques, transiciones y valores ausentes de los fallos:
+El lector de datos es de solo lectura y conserva todas las filas, incluyendo tiempo, bloques, transiciones y valores ausentes de los fallos. Usa las rutas descritas en el protocolo y, si no están, el árbol anterior `items_N/mknapcbF/inst_XX/condicion/`:
 
 ```bash
 python -B -m adaptive_mh_selection.analysis --campaign resultados/adaptive_mh_selection/<carpeta_de_campaña>
@@ -125,19 +123,18 @@ resultados/adaptive_mh_selection/batch_estudio_01/
   jobs.tsv                         # tamaño e ID devuelto por sbatch --parsable
   logs/estudio_01_items_100_%A_%a.out
   errors/estudio_01_items_100_%A_%a.err
-  items_100/mknapcb1_inst_00/        # reserva exclusiva; otros ocho casos al lado
-    mplconfig/                     # caché privada
-    campaign/                      # campaña independiente de UN caso
-      protocol.json
-      resumen_global.csv           # global solo de esta campaña/caso
-      items_100/mknapcb1/inst_00/adaptive_ddtw/
-        runs_resultados.csv        # las 31 filas numéricas
-        best_run_XX/               # solo el ganador tiene trazas completas
-  items_250/...                    # nueve casos, cada uno con su campaign/
-  items_500/...                    # nueve casos, cada uno con su campaign/
+  .reservations/items_100/mknapcb1_inst_00/
+    mplconfig/                     # caché privada; la reserva no es la salida
+  items_100/mknapcb1_inst_00/      # campaña nueva de un caso y una condición
+    protocol.json
+    resumen_global.csv             # global solo de esta campaña/caso
+    runs_resultados.csv            # las 31 filas numéricas
+    best_run_XX/                   # solo el ganador tiene trazas completas
+  items_250/...                    # nueve casos, cada uno con su propia salida
+  items_500/...                    # nueve casos, cada uno con su propia salida
 ```
 
-Cada `campaign/` conserva el resto del árbol estándar descrito arriba: **no hay un protocolo o resumen global fusionado del lote** ni escrituras compartidas de CSV/JSON entre tareas. `jobs.tsv` es solo un registro de envíos, no evidencia de que terminaron las corridas. Si falla un envío, se detiene la secuencia, se devuelve el código de `sbatch` y se muestran los IDs ya aceptados; no se cancelan automáticamente. Si falla una tarea, su reserva/salida queda para inspección y un reintento con el mismo lote/caso se rechaza antes de activar Conda. No hay limpieza, reanudación ni fusión automática: revisar primero los jobs y resultados parciales antes de decidir otro lote.
+La reserva oculta y la salida visible son directorios distintos. El worker no crea la salida antes de Python: `campaign` la rechaza si ya existe. **No hay un protocolo o resumen global fusionado del lote** ni escrituras compartidas de CSV/JSON entre tareas. `jobs.tsv` es solo un registro de envíos, no evidencia de que terminaron las corridas. Si falla un envío, se detiene la secuencia, se devuelve el código de `sbatch` y se muestran los IDs ya aceptados; no se cancelan automáticamente. Si falla una tarea, su reserva queda para inspección y un reintento con el mismo lote/caso se rechaza antes de activar Conda, tanto si existe la reserva como si existe la salida. No hay limpieza, reanudación ni fusión automática: revisar primero los jobs y resultados parciales antes de decidir otro lote.
 
 Las pruebas locales usan Slurm, activación Conda y Python **falsos**, con rutas temporales que contienen espacios. No comprueban disponibilidad, asignación de recursos ni integración real del cluster, y no ejecutan las 837 corridas.
 
@@ -184,27 +181,41 @@ No hay equivalencia entre una iteración de GA y una de SA en número de candida
 | `--instance` / `--index` | `instancias/mknapcb1.txt` / `0` | Archivo OR-Library local e índice base cero. |
 | `--seed` / `--runs` | `42` / `1` | Semillas consecutivas `seed + i`, empezando en 42. |
 | `--seeds` | sin definir | Lista explícita de semillas distintas, alternativa a la expansión de runs. |
-| `--selectors` | `adaptive` | `adaptive`, `uniform` o ambas. |
+| `--selectors` | `adaptive` | `adaptive`, `uniform`, `adaptive_exploratory` o varias. La variante exploratoria requiere selección explícita. |
+| `--population-pool` | GA PSO GWO WOA EHO ACO | Solo `run`: subconjunto poblacional no vacío, sin repetidos. |
+| `--trajectory-pool` | SA TS ILS VNS | Solo `run`: subconjunto de trayectoria no vacío, sin repetidos. |
 | `--modes` | `ddtw` | Detector de `RunConfig.use_ddtw`. `--modes dtw` selecciona DTW. |
 | `--iterations` | `1000` | Iteraciones nativas solicitadas. |
 | `--max-epoch-iters` | sin cap | Igual que la opción del pipeline original. |
 | `--alpha` / `--epsilon` | `0.3` / `0.2` | Memoria exponencial y mezcla de exploración del selector. |
 | `--window` / `--min-slope` | `70` / `2` | De `default_monitor` en `config.py`, no de `rotating_benchmark`. |
 | `--plateau-max` / `--patience` | `25` / `15` | De `config.py`. La paciencia mínima por MH del solver original sigue aplicando. |
-| `--reference-value` | cabecera del archivo | Referencia positiva explícita solo para reportar gap y graficar. |
-| `--selection-trace` | desactivado | CSV opcional de elecciones, probabilidades y recompensas; sin nuevos gráficos. |
+| `--reference-value` | referencia del archivo o mkcbres.txt | Referencia positiva explícita para reportar la brecha y graficar; tiene prioridad sobre las referencias automáticas. |
+| `--selection-trace` | desactivado | CSV opcional de elecciones, probabilidades y recompensas. No hace falta para `selection_probabilities.png`, que sale de los registros en memoria. |
 | `--no-plots` / `--dry-run` | desactivados | Reportes sin PNG / validación sin ejecución ni escritura. |
+
+La copia local `data/mkcbres.txt` proviene de [OR-Library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/mkcbres.txt); sus valores best-feasible se usan, no la segunda tabla de cotas LP.
 
 La banda 7, los percentiles 30/70, `adapt_thresholds` y `improvement_tol` no tienen flag. Viajan completos en el protocolo y en cada `RunConfig`. Cambiar `--window` o `--modes` no los reinicia.
 
-Se mantiene la paciencia mínima 14 para GA, ILS, WOA y GWO. Los parámetros efectivos se registran en cada `summary.json`. Una referencia igual a cero significa gap desconocido, no gap cero.
+Se mantiene la paciencia mínima 14 para GA, ILS, WOA y GWO. Los parámetros efectivos se registran en cada `summary.json`. Para los archivos OR-Library `mknapcb1..9.txt` intactos del repositorio, el protocolo usa automáticamente la primera tabla de [`data/mkcbres.txt`](data/mkcbres.txt) cuando el encabezado de la instancia contiene cero. Esos valores son los **mejores factibles publicados**, no óptimos certificados; se informa brecha contra esa referencia, que puede ser negativa si la corrida la supera. La selección requiere que el SHA-256 del archivo coincida con el conjunto incluido; archivos modificados o conjuntos personalizados sin referencia explícita siguen con gap desconocido. `--reference-value` explícito siempre prevalece.
 
 ## Lo que cambia: elegir la siguiente MH
 
-Los pools y la alternancia son los nativos:
+Por defecto, los pools y la alternancia son los nativos:
 
 - Poblacionales: GA, PSO, GWO, WOA, EHO, ACO.
 - Trayectoria: SA, TS, ILS, VNS.
+
+`run` permite reducir cada pool explícitamente, sin cambiar los pools globales de `hybrid_mkp` ni los defaults de `campaign`. Los nombres son sensibles a mayúsculas, deben pertenecer al pool correspondiente y no pueden repetirse; se conserva el orden solicitado para la selección. En Python, `RunConfig(population_pool=(...), trajectory_pool=(...))` acepta tuplas o listas; omitir un campo o usar `None` conserva su pool nativo completo. Los pools efectivos quedan explícitos en `protocol.json`, `config.json` y `summary.json.settings`.
+
+Para inspeccionar tres MH por pool, primero validar sin ejecutar:
+
+```bash
+.venv/Scripts/python.exe -B -m adaptive_mh_selection.run --instance instancias/mknapcb1.txt --index 0 --seed 60 --runs 1 --iterations 1000 --modes ddtw --window 20 --selectors adaptive_exploratory --population-pool GA PSO ACO --trajectory-pool SA ILS VNS --selection-trace --dry-run
+```
+
+Quitar `--dry-run` ejecuta esa corrida y genera seis paneles de probabilidades, en PNG y PDF. La alternancia, recompensa y duración nativa de las épocas no cambian; 1000 iteraciones nominales pueden sobrepasarse.
 
 Cada pool conserva su propio estado, reiniciado por corrida. El primer bloque recibe recompensa cero: establece la escala y no tiene un fitness global heredado finito con el que comparar. **No se evalúa una solución inicial adicional.** Para los bloques siguientes:
 
@@ -215,7 +226,7 @@ recompensa = min(1, ganancia / escala / iteraciones_del_bloque)
 q[mh] = (1 - alpha) * q[mh] + alpha * recompensa
 ```
 
-Si todas las valoraciones son cero, las probabilidades son uniformes. Si no:
+Para el baseline `adaptive` (sin cambios), si todas las valoraciones son cero, las probabilidades son uniformes. Si no:
 
 ```text
 p[mh] = epsilon / cantidad_mh + (1 - epsilon) * q[mh] / sum(q)
@@ -223,16 +234,52 @@ p[mh] = epsilon / cantidad_mh + (1 - epsilon) * q[mh] / sum(q)
 
 El control `uniform` conserva el `random.choice` y la secuencia RNG original de los solvers. La selección adaptativa tiene un generador local por pool. Los generadores globales Python/NumPy se siembran una vez por corrida y se restauran al salir. No se soportan corridas concurrentes en hilos.
 
+### Piloto opcional: `adaptive_exploratory`
+
+Disponible en `run` y `campaign`, sin cambiar el default `adaptive` ni el control `uniform`. Reutiliza el mismo EWMA, `alpha`, `epsilon`, contador `uses` y RNG local por pool. Solo el bloque completado incrementa `uses[mh]` y actualiza su score; no cambia recompensas, operadores ni alternancia.
+
+```text
+w[mh] = 1 / sqrt(uses[mh] + 1)
+e[mh] = w[mh] / sum(w)
+si sum(q) > 0: p[mh] = epsilon * e[mh] + (1 - epsilon) * q[mh] / sum(q)
+si sum(q) == 0: p[mh] = e[mh]
+```
+
+Se normaliza la mezcla; las probabilidades son finitas y suman 1 salvo redondeo. El piso de exploración es positivo pero depende del uso, no es el piso constante `epsilon / cantidad_mh` del baseline. Para evitar ceros por subdesbordamiento con un `epsilon` extremadamente pequeño, se conserva el mínimo flotante positivo antes de normalizar.
+
+Una MH seleccionada sin recompensa decae su score y reduce su peso exploratorio frente a las menos usadas, incluso si todos los scores son cero. **Limitación de la explotación normalizada:** si solo esa MH tiene score positivo, `q[mh] / sum(q)` sigue siendo 1 mientras no llegue a cero; su pérdida de probabilidad proviene entonces solo de la exploración. No implica una caída grande ni inmediata de su dominio. Las no seleccionadas no reciben recompensa ni mejoran su score: ganan cuota exploratoria relativa, no evidencia de mejora empírica.
+
+Para revisar una comparación bajo los mismos parámetros del ejemplo anterior (sin ejecutar todavía):
+
+```bash
+python -B -m adaptive_mh_selection.run --instance instancias/mknapcb1.txt --index 0 --seed 60 --runs 1 --iterations 1000 --modes ddtw --window 20 --selectors adaptive adaptive_exploratory --selection-trace --dry-run
+python -B -m adaptive_mh_selection.campaign --families 1 --indices 0 --runs 1 --seed 60 --iterations 1000 --modes ddtw --window 20 --selectors adaptive adaptive_exploratory --dry-run
+```
+
+Quitar `--dry-run` ejecuta la comparación y guarda cada condición por separado. `run` respeta el orden solicitado; `campaign` conserva el orden canónico `adaptive`, `uniform` y añade `adaptive_exploratory` al final. El protocolo conserva el nombre explícito y los mismos `alpha`/`epsilon`; las trazas y gráficos usan las probabilidades registradas, sin reinterpretarlas.
+
+Es un algoritmo piloto: no garantiza encontrar el óptimo global ni mejorar a `adaptive`/`uniform`. Una corrida sirve para inspeccionar comportamiento, no para concluir superioridad estadística.
+
 ## Gráficos y archivos
 
-Se conservan cuatro funciones originales de `hybrid_mkp.plots`, sin copiar ni cambiar sus ejes, colores, leyendas o tipografía:
+Se conservan tres funciones originales de `hybrid_mkp.plots` en esta exportación, sin copiar ni cambiar sus ejes, colores, leyendas o tipografía:
 
 1. `fitness_convergence.png`: convergencia por iteraciones acumuladas, coloreada por MH.
 2. `dtw_delta.png`: delta DTW con los offsets globales originales.
 3. `switches_gantt.png`: turnos poblacionales/trayectoria en tiempo real.
-4. `instantaneous_fitness_only.png`: fitness instantáneo por iteración.
 
-`instantaneous_convergence.png` ya no se genera y se elimina de la carpeta de salida al redibujar. La función original del híbrido permanece intacta para otros consumidores.
+`grafico_solo_instantaneo` permanece intacta para otros consumidores, pero este pipeline ya no la llama y no genera `instantaneous_fitness_only.png`. Un archivo previo con ese nombre no se borra al redibujar. `instantaneous_convergence.png` ya no se genera y se elimina de la carpeta de salida al redibujar.
+
+`selection_probabilities.png` y `.pdf` muestran las `probabilities_before` registradas en un mini-panel por MH configurada o registrada, con sus mismos `COLORES_MH`: diez con los pools completos, seis en el ejemplo reducido. Si falta un pool completo, sus paneles indican `No recorded decisions` sin inventar curvas; en trazas antiguas sin configuración se conservan los nombres nativos para ese pool ausente. Cada panel tiene su propia escala vertical fija de 0 a 100 %. El eje horizontal son las decisiones de selección **dentro del pool correspondiente**, y el título identifica el pool. Esas probabilidades son condicionales al pool: no son probabilidades globales ni la frecuencia con la que se eligió cada MH. No se renormalizan ni se rellenan valores ausentes. Si no hay registros, la figura no se inventa. Se escribe en el mejor run de `run` y de `campaign` aunque `--selection-trace` esté apagado, porque los registros ya están en memoria. El CSV sigue siendo opcional.
+
+Para una vista previa desde un `selection_trace.csv` ya guardado, sin volver a optimizar:
+
+```python
+from pathlib import Path
+from adaptive_mh_selection.plotting import load_selection_trace, plot_selection_probabilities
+
+plot_selection_probabilities(load_selection_trace(Path("selection_trace.csv")), Path("preview"))
+```
 
 La distribución `boxplot_runs.png` reutiliza el renderer del ejecutor híbrido de primeras instancias. Si no hay deltas DTW finitos, el renderer nativo omite esa imagen; no se rellenan observaciones inventadas.
 
@@ -261,7 +308,8 @@ resultados/adaptive_mh_selection/run_iterations_<timestamp>/
       fitness_convergence.png
       dtw_delta.png
       switches_gantt.png
-      instantaneous_fitness_only.png
+      selection_probabilities.png  # mini-panel por MH; no requiere el CSV
+      selection_probabilities.pdf
       fig_temporal_diagnostics.png
       fig_temporal_diagnostics.pdf
       temporal_diagnostics.csv
@@ -283,11 +331,13 @@ La figura sigue el formato compacto de `fig_temporal_diagnostics (2).pdf/`: 7.4 
 | (c) | `D1`, `D2`, `theta_r` y `theta_c` en **escala lineal**, después del calentamiento de cada bloque | Espera ventana completa y 10 muestras listas si los umbrales son adaptativos; conserva todas las magnitudes posteriores y el CSV completo |
 | (d) | Delta, `theta_delta` y disparos registrados, sin franja inferior de MH | Los datos de MH siguen en el CSV; no inventa exploración/explotación ni F/CR |
 
+El título conserva el modo DTW/DDTW, sin mostrar la semilla. La leyenda de (a) identifica las MH por el color de fondo. La trayectoria y delta usan líneas más gruesas; en (d), delta es verde y el umbral es magenta discontinuo, con leyenda ampliada. No se imprime texto explicativo al pie. El panel (c) conserva su escala, datos y estilo.
+
 Las ventanas elegidas se marcan con el mismo azul/naranja en los paneles globales. Si falta una ventana verificada, ese subeje dice que no está disponible; no se inventa.
 
 Las referencias de (b) se reconstruyen con `window`, `band`, `min_slope` y `use_ddtw` guardados para la MH. Solo se muestran si recalcular las distancias reproduce los `D1/D2` registrados.
 
-En las **series y CSV**, los faltantes siguen en blanco. En **(c)/(d)** los segmentos entre muestras existentes son guías visuales, no mediciones; la figura y `temporal_diagnostics.json` lo dicen. No se extrapola fuera de la primera o última muestra. Delta puede usar su historial nativo separado cuando existe.
+En las **series y CSV**, los faltantes siguen en blanco. En **(c)/(d)** los segmentos entre muestras existentes son guías visuales, no mediciones; `temporal_diagnostics.json` conserva esta aclaración. No se extrapola fuera de la primera o última muestra. Delta puede usar su historial nativo separado cuando existe.
 
 Para redibujar una corrida guardada, sin optimizar otra vez ni cambiar su JSON/CSV original:
 

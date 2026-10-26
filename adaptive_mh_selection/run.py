@@ -10,12 +10,13 @@ import json
 import math
 from pathlib import Path
 import platform
+import re
 import sys
 import traceback
 
 import numpy as np
 
-from .config import RunConfig, monitor_with_cli_overrides
+from .config import RunConfig, monitor_with_cli_overrides, POPULATION_POOL, TRAJECTORY_POOL
 from .exports import write_json, write_run, write_batch, write_csv
 from .orchestrator import run_pipeline
 from hybrid_mkp.mkp_core.data_loader import parsear_instancias
@@ -67,18 +68,26 @@ def parser_for_run():
     parser.add_argument("--iterations", "--max-iters", dest="iterations", type=positive, default=study.max_iters,
                         help="Native accumulated iterations (default: %(default)s); finishes the last epoch")
     parser.add_argument("--max-epoch-iters", type=positive, help="Optional native epoch cap; unset preserves original epoch lengths")
-    parser.add_argument("--selectors", nargs="+", choices=("uniform", "adaptive"), default=[study.selector])
+    parser.add_argument("--selectors", nargs="+", choices=("uniform", "adaptive", "adaptive_exploratory"),
+                        default=[study.selector], help="Selection policies; adaptive_exploratory is experimental opt-in")
+    parser.add_argument("--population-pool", nargs="+", metavar="MH",
+                        help="Nonempty unique population subset, in selection order (default: "
+                             + " ".join(POPULATION_POOL) + ")")
+    parser.add_argument("--trajectory-pool", nargs="+", metavar="MH",
+                        help="Nonempty unique trajectory subset, in selection order (default: "
+                             + " ".join(TRAJECTORY_POOL) + ")")
     parser.add_argument("--modes", nargs="+", choices=("dtw", "ddtw"),
                         default=["ddtw" if study.use_ddtw else "dtw"])
     parser.add_argument("--alpha", type=float, default=study.alpha, help="EWMA learning rate (default: %(default)s)")
-    parser.add_argument("--epsilon", type=float, default=study.epsilon, help="Uniform probability mixture (default: %(default)s)")
+    parser.add_argument("--epsilon", type=float, default=study.epsilon, help="Exploration mixture: uniform for adaptive, inverse-sqrt uses for adaptive_exploratory (default: %(default)s)")
     parser.add_argument("--window", type=positive, default=monitor.window)
     parser.add_argument("--min-slope", type=float, default=monitor.min_slope,
                         help="Configured ramp slope (default: %(default)s)")
     parser.add_argument("--plateau-max", type=positive, default=monitor.plateau_max)
     parser.add_argument("--patience", type=positive, default=monitor.patience, help="Existing per-MH patience minima still apply")
     parser.add_argument("--reference-value", type=float, help="Known positive reporting reference; not used by selector")
-    parser.add_argument("--selection-trace", action="store_true", help="Also save choice/reward CSV; no extra graph families")
+    parser.add_argument("--selection-trace", action="store_true",
+                        help="Also save choice/reward CSV. The conditional-probability figure does not depend on this flag.")
     parser.add_argument("--output", type=Path, help="NEW campaign directory; existing paths are refused")
     parser.add_argument("--no-plots", action="store_true", help="Write native CSV/TXT/JSON reports without PNGs")
     parser.add_argument("--dry-run", action="store_true", help="Validate and print protocol without running or writing files")
@@ -111,18 +120,30 @@ def main(argv=None):
         raw = instances[args.index]
         if raw["n"] < 1 or raw["m"] < 1 or not all(np.all(np.isfinite(raw[k])) for k in ("p", "r", "b")):
             raise ValueError("Instance dimensions and numeric data must be valid and finite")
+        reference_source = "file header; zero means unknown"
         if args.reference_value is not None:
             raw["valor_optimo"] = args.reference_value
+            reference_source = "explicit override"
+        elif float(raw["valor_optimo"]) == 0:
+            from .best_known import lookup_best_feasible, reference_source as best_known_source
+            match = re.fullmatch(r"mknapcb([1-9])\.txt", args.instance.name)
+            digest = hashlib.sha256(data).hexdigest()
+            known = (lookup_best_feasible(int(match.group(1)), args.index, digest)
+                     if match else None)
+            if known is not None:
+                raw["valor_optimo"] = known
+                reference_source = best_known_source()
         instance = MKPInstance.from_dict(raw)
         monitor = monitor_with_cli_overrides(args.window, args.min_slope, args.plateau_max, args.patience)
         configs = [RunConfig(seed=seed, selector=selector, max_iters=args.iterations,
                              max_epoch_iters=args.max_epoch_iters, alpha=args.alpha,
-                             epsilon=args.epsilon, use_ddtw=mode == "ddtw", monitor=monitor)
+                             epsilon=args.epsilon, use_ddtw=mode == "ddtw", monitor=monitor,
+                             population_pool=args.population_pool, trajectory_pool=args.trajectory_pool)
                    for mode in args.modes for selector in args.selectors for seed in seeds]
         protocol = {"schema_version": 2, "budget_unit": "native_iterations", "instance_file": str(args.instance.resolve()),
                     "index": args.index, "instance_dimensions": {"n": instance.n, "m": instance.m},
                     "instance_sha256": hashlib.sha256(data).hexdigest(), "reference_value": float(instance.valor_optimo),
-                    "reference_source": "explicit override" if args.reference_value is not None else "file header; zero means unknown",
+                    "reference_source": reference_source,
                     "runs": [asdict(config) for config in configs], "plots": not args.no_plots,
                     "selection_trace": args.selection_trace,
                     "stopping": "Same native epoch-boundary stopping; report requested and actual iterations separately"}

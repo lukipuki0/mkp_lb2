@@ -44,12 +44,24 @@ class RunConfig:
     use_ddtw: bool = True
     pop_injection_mode: str = 'mixed'
     monitor: StagnationConfig = field(default_factory=default_monitor)
+    population_pool: tuple[str, ...] | None = None
+    trajectory_pool: tuple[str, ...] | None = None
 
     def __post_init__(self):
+        for name, native_pool in (('population_pool', POPULATION_POOL),
+                                  ('trajectory_pool', TRAJECTORY_POOL)):
+            names = getattr(self, name)
+            if names is None:
+                names = native_pool
+            if (not isinstance(names, (tuple, list)) or not names
+                    or any(not isinstance(mh, str) or mh not in native_pool for mh in names)
+                    or len(set(names)) != len(names)):
+                raise ValueError(f'{name} must be a nonempty unique subset of ' + ', '.join(native_pool))
+            object.__setattr__(self, name, tuple(names))
         if isinstance(self.seed, bool) or not isinstance(self.seed, int) or not 0 <= self.seed < 2**32:
             raise ValueError('seed must be an unsigned 32-bit integer')
-        if self.selector not in ('adaptive', 'uniform'):
-            raise ValueError('selector must be adaptive or uniform')
+        if self.selector not in ('adaptive', 'uniform', 'adaptive_exploratory'):
+            raise ValueError('selector must be adaptive, uniform or adaptive_exploratory')
         positive_integer(self.max_iters, 'max_iters')
         if self.max_epoch_iters is not None:
             positive_integer(self.max_epoch_iters, 'max_epoch_iters')

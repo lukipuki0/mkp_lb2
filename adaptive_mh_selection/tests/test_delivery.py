@@ -41,6 +41,9 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
         self.assertIn('--iterations', help_result.stdout)
         self.assertNotIn('--max-evaluations', help_result.stdout)
+        self.assertIn('--selection-trace', help_result.stdout)
+        self.assertNotIn('no extra graph families', help_result.stdout)
+        self.assertIn('does not depend on this flag', help_result.stdout)
         with temporary() as tmp:
             output = Path(tmp) / 'campaign'
             result = invoke('--dry-run', '--output', output)
@@ -95,8 +98,7 @@ class DeliveryTests(unittest.TestCase):
     def test_remaining_native_renderers_and_temporal_diagnostics(self):
         import hybrid_mkp.plots as native_plots
         from adaptive_mh_selection.plotting import plot_run
-        functions = ['grafico_convergencia', 'grafico_dtw_delta', 'grafico_switches',
-                     'grafico_solo_instantaneo']
+        functions = ['grafico_convergencia', 'grafico_dtw_delta', 'grafico_switches']
         result = native_result()
         with temporary() as tmp, contextlib.ExitStack() as stack:
             calls = {name: stack.enter_context(patch.object(native_plots, name, wraps=getattr(native_plots, name)))
@@ -111,14 +113,19 @@ class DeliveryTests(unittest.TestCase):
                 return original(ax, *args, **kwargs)
             obsolete = Path(tmp) / 'instantaneous_convergence.png'
             obsolete.write_bytes(b'obsolete plot')
-            with patch.object(Axes, 'plot', new=capture), patch.object(native_plots, 'grafico_instantaneo') as retired:
+            kept = Path(tmp) / 'instantaneous_fitness_only.png'
+            kept.write_bytes(b'preexisting instantaneous')
+            with patch.object(Axes, 'plot', new=capture), patch.object(native_plots, 'grafico_instantaneo') as retired, \
+                    patch.object(native_plots, 'grafico_solo_instantaneo') as instantaneous:
                 paths = plot_run(result, Path(tmp))
             retired.assert_not_called()
+            instantaneous.assert_not_called()
             self.assertFalse(obsolete.exists())
+            self.assertEqual(kept.read_bytes(), b'preexisting instantaneous')
             expected = {'fitness_convergence.png', 'dtw_delta.png', 'switches_gantt.png',
-                        'instantaneous_fitness_only.png', 'fig_temporal_diagnostics.png',
-                        'fig_temporal_diagnostics.pdf'}
+                        'fig_temporal_diagnostics.png', 'fig_temporal_diagnostics.pdf'}
             self.assertEqual({Path(p).name for p in paths}, expected)
+            self.assertNotIn('selection_probabilities.png', {Path(p).name for p in paths})
             self.assertEqual(lines, [[1], [1, 3]])
             for name, call in calls.items():
                 call.assert_called_once()
@@ -136,9 +143,11 @@ class DeliveryTests(unittest.TestCase):
         result.dtw_deltas_global = [float('nan')] * 4
         with temporary() as tmp:
             paths = plot_run(result, Path(tmp))
-            self.assertEqual(len(paths), 5)
+            self.assertEqual(len(paths), 4)
             self.assertFalse((Path(tmp) / 'dtw_delta.png').exists())
             self.assertFalse((Path(tmp) / 'instantaneous_convergence.png').exists())
+            self.assertFalse((Path(tmp) / 'instantaneous_fitness_only.png').exists())
+            self.assertFalse((Path(tmp) / 'selection_probabilities.png').exists())
 
     def test_native_export_missing_info_does_not_shift_later_blocks(self):
         from adaptive_mh_selection.exports import write_histories, write_json
@@ -183,9 +192,10 @@ class DeliveryTests(unittest.TestCase):
             best, = condition.glob('best_run_*')
             for name in ('resumen_pipeline_best_run.txt', 'historial_dtw.csv', 'historial_dtw_detalle.txt',
                          'fitness_convergence.png', 'switches_gantt.png',
-                         'instantaneous_fitness_only.png', 'fig_temporal_diagnostics.png',
+                         'selection_probabilities.png', 'fig_temporal_diagnostics.png',
                          'fig_temporal_diagnostics.pdf'):
                 self.assertTrue((best / name).is_file(), name)
+            self.assertFalse((best / 'instantaneous_fitness_only.png').exists())
             self.assertFalse((best / 'instantaneous_convergence.png').exists())
             # The configured window is larger than these capped blocks, so no delta plot is ready.
             self.assertFalse((best / 'dtw_delta.png').exists())

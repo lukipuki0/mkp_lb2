@@ -10,7 +10,7 @@ import numpy as np
 from hybrid_mkp import orchestrator as native
 from .config import RunConfig, positive_integer
 from .reward import compute_reward
-from .selection import AdaptiveSelector, UniformSelector
+from .selection import AdaptiveSelector, AdaptiveExploratorySelector, UniformSelector
 
 
 @contextmanager
@@ -34,12 +34,13 @@ class SelectionPolicy:
     """Implement native choose/observe, updating only the completed block's pool."""
 
     def __init__(self, config: RunConfig):
-        cls = AdaptiveSelector if config.selector == 'adaptive' else UniformSelector
+        cls = {'adaptive': AdaptiveSelector, 'uniform': UniformSelector,
+               'adaptive_exploratory': AdaptiveExploratorySelector}[config.selector]
         self.selectors = {
             tipo: cls(tuple(names), random.Random(f'{config.seed}:{tipo}'),
                       alpha=config.alpha, epsilon=config.epsilon)
-            for tipo, names in (('poblacional', native.POOL_POBLACIONAL),
-                                ('trayectoria', native.POOL_TRAYECTORIA))
+            for tipo, names in (('poblacional', config.population_pool),
+                                ('trayectoria', config.trajectory_pool))
         }
         self.first_block_fitness = None
         self.records = []
@@ -48,7 +49,9 @@ class SelectionPolicy:
 
     def choose(self, pool_names, tipo):
         selector = self.selectors[tipo]
-        if tuple(pool_names) != selector.names or self.pending is not None:
+        expected = (native.POOL_POBLACIONAL if tipo == 'poblacional'
+                    else native.POOL_TRAYECTORIA)
+        if tuple(pool_names) != tuple(expected) or self.pending is not None:
             raise ValueError('Policy requires native pools and one completed block per choice')
         mh, probabilities = selector.choose()
         self.pending = (mh, tipo, probabilities, selector.scores.copy())

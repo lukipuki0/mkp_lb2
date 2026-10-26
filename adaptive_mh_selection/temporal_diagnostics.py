@@ -184,6 +184,7 @@ def _draw_window(axis, window, title):
 def _compose_temporal_figure(data, metadata, mode):
     import matplotlib.pyplot as plt
     from matplotlib.ticker import FuncFormatter, MaxNLocator
+    from matplotlib.patches import Patch
 
     t = data['t']
     windows = {window['kind']: window for window in data['windows']}
@@ -197,13 +198,18 @@ def _compose_temporal_figure(data, metadata, mode):
     delta = fig.add_subplot(grid[3, 0], sharex=trajectory)
 
     _shade_blocks(trajectory, data['blocks'], .28)
-    trajectory.step(t, data['fitness'], where='post', color='#1a1a1a', lw=1.05, label=r'$f_t^*$', zorder=3)
+    trajectory.step(t, data['fitness'], where='post', color='#1a1a1a', lw=1.8, label=r'$f_t^*$', zorder=3)
     for axis in (trajectory, distance, delta):
         _mark_windows(axis, data['windows'])
     trajectory.set_xlim(1, float(t[-1]) if len(t) > 1 else 2.)
     trajectory.set_ylabel('Best fitness')
     trajectory.set_title('(a)  Trajectory and active MH', loc='left')
-    trajectory.legend(loc='lower right', frameon=False)
+    handles, labels = trajectory.get_legend_handles_labels()
+    for solver in dict.fromkeys(block['solver'] for block in data['blocks']):
+        handles.append(Patch(facecolor=COLORES_MH.get(solver, 'gray'), alpha=.28))
+        labels.append(solver)
+    trajectory.legend(handles, labels, loc='lower right', frameon=True,
+                      framealpha=.95, fontsize=8, ncol=3)
     trajectory.xaxis.set_major_locator(MaxNLocator(7, integer=True))
 
     progress_lines = _draw_window(rising, windows.get('progress'),
@@ -234,8 +240,8 @@ def _compose_temporal_figure(data, metadata, mode):
     distance.tick_params(labelbottom=False)
     distance.legend(loc='upper right', frameon=False, ncol=2)
 
-    _plot_observed(delta, t, data['delta'], color='#009E73', lw=.95, label='Recorded delta')
-    _plot_observed(delta, t, data['theta_delta'], color='#009E73', lw=.8, ls='--', label='Recorded theta_delta')
+    _plot_observed(delta, t, data['delta'], color='#009E73', lw=1.8, label='Recorded delta')
+    _plot_observed(delta, t, data['theta_delta'], color='#CC79A7', lw=1.6, ls='--', label='Recorded theta_delta')
     fires = data['fire'] == 1
     visible = fires & np.isfinite(data['delta'])
     if np.any(visible):
@@ -249,19 +255,10 @@ def _compose_temporal_figure(data, metadata, mode):
     delta.set_ylabel('Delta DTW')
     delta.set_title('(d)  Delta, threshold and recorded triggers', loc='left')
     delta.set_xlabel('Native Iteration $t$')
-    delta.legend(loc='lower right', frameon=False, ncol=2)
+    delta.legend(loc='lower right', frameon=True, framealpha=.95, fontsize=8, ncol=1)
 
-    seed = metadata.get('seed', 'not supplied')
-    fig.suptitle(f'MKP temporal diagnostics — {mode}, seed {seed}', fontsize=8, y=.995)
-    fig.subplots_adjust(left=.16, right=.985, top=.942, bottom=.118)
-    missing = data['missing_detail_iterations']
-    note = (' '.join(data['notes']) + ' ') if data['notes'] else ''
-    fig.text(.16, .008,
-             f'Details unavailable at {missing}/{len(t)} iterations. {note}'
-             'Panels (c) and (d) join recorded samples only; connecting segments are visual guides, not measurements.\n'
-             'Panel (c) is linear and omits block warm-up plus the first 9 ready samples when thresholds adapt.\n'
-             'All later magnitudes are retained; CSV preserves the complete recorded series.',
-             fontsize=6.1, va='bottom', ha='left')
+    fig.suptitle(f'MKP temporal diagnostics — {mode}', fontsize=8, y=.995)
+    fig.subplots_adjust(left=.16, right=.985, top=.942, bottom=.075)
     return fig
 
 

@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import re
 import sys
 import time
 
@@ -29,7 +30,7 @@ from hybrid_mkp.mkp_core.problem import MKPInstance
 
 ALLOWED_N = (100, 250, 500)
 MODE_ORDER = {"dtw": 0, "ddtw": 1}
-SELECTOR_ORDER = {"adaptive": 0, "uniform": 1}
+SELECTOR_ORDER = {"adaptive": 0, "uniform": 1, "adaptive_exploratory": 2}
 RUN_FIELDS = [
     "run", "seed", "status", "error", "final_fitness", "gap_pct",
     "requested_iterations", "actual_iterations", "iteration_overshoot",
@@ -63,11 +64,12 @@ def parser_for_campaign():
                         help="Native accumulated iterations (default: %(default)s); no evaluation budget")
     parser.add_argument("--max-epoch-iters", type=positive,
                         help="Optional native epoch cap for short checks; unset preserves epoch overshoot")
-    parser.add_argument("--selectors", nargs="+", choices=("uniform", "adaptive"), default=[study.selector])
+    parser.add_argument("--selectors", nargs="+", choices=("uniform", "adaptive", "adaptive_exploratory"),
+                        default=[study.selector], help="Selection policies; adaptive_exploratory is experimental opt-in")
     parser.add_argument("--modes", nargs="+", choices=("dtw", "ddtw"),
                         default=["ddtw" if study.use_ddtw else "dtw"])
     parser.add_argument("--alpha", type=float, default=study.alpha, help="EWMA learning rate (default: %(default)s)")
-    parser.add_argument("--epsilon", type=float, default=study.epsilon, help="Uniform mixture (default: %(default)s)")
+    parser.add_argument("--epsilon", type=float, default=study.epsilon, help="Exploration mixture: uniform for adaptive, inverse-sqrt uses for adaptive_exploratory (default: %(default)s)")
     parser.add_argument("--window", type=positive, default=monitor.window)
     parser.add_argument("--min-slope", type=float, default=monitor.min_slope,
                         help="Configured ramp slope (default: %(default)s)")
@@ -78,7 +80,7 @@ def parser_for_campaign():
     parser.add_argument("--output", type=Path, help="New campaign directory; existing paths are refused")
     parser.add_argument("--no-plots", action="store_true")
     parser.add_argument("--selection-trace", action="store_true",
-                        help="Save selection_trace.csv for the winning run only")
+                        help="Save selection_trace.csv for the winning run only. The conditional-probability figure does not depend on this flag.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Validate, print the resolved protocol, and do not run or write")
     return parser
@@ -110,7 +112,7 @@ def load_family(instances_dir: Path, family: int):
     return path, hashlib.sha256(data).hexdigest(), parsed
 
 
-def load_instance(path_name, parsed, index):
+def load_instance(path_name, parsed, index, instance_file_sha256=None):
     if index >= len(parsed):
         raise ValueError(f"index {index} is missing from {path_name}")
     raw = parsed[index]
@@ -124,6 +126,16 @@ def load_instance(path_name, parsed, index):
         raise ValueError(f"invalid instance data in {path_name}: {error}") from error
     if n < 1 or m < 1 or not valid_shape or not finite or not math.isfinite(reference) or reference < 0:
         raise ValueError(f"invalid instance data in {path_name}")
+    reference_source = "file header; zero means unknown"
+    if reference == 0 and instance_file_sha256 is not None:
+        from .best_known import lookup_best_feasible, reference_source as best_known_source
+        family_match = re.fullmatch(r"mknapcb([1-9])\.txt", Path(path_name).name)
+        if family_match:
+            known = lookup_best_feasible(int(family_match.group(1)), index, instance_file_sha256)
+            if known is not None:
+                reference = float(known)
+                reference_source = best_known_source()
+                raw = dict(raw, valor_optimo=reference)
     if n not in ALLOWED_N:
         raise ValueError(f"loaded n={n} is not an allowed group; groups are 100, 250 or 500")
     try:
@@ -132,7 +144,15 @@ def load_instance(path_name, parsed, index):
         raise ValueError(f"invalid instance data in {path_name}: {error}") from error
     if float(instance.valor_optimo) != reference:
         raise ValueError("file header reference was replaced; unknown zero must stay unknown")
-    return instance, reference
+    return instance, reference, reference_source
+
+
+def output_paths(n, family, index, condition, *, multiple_cases, multiple_conditions):
+    """Drop repeated case folders for one case, and the condition folder unless conditions are compared."""
+    case = f"items_{n}/mknapcb{family}_inst_{index:02d}" if multiple_cases else ""
+    if not multiple_conditions:
+        return case, case
+    return case, f"{case}/{condition}" if case else condition
 
 
 def build_plan(args):
@@ -162,21 +182,28 @@ def build_plan(args):
         {"condition": f"{selector}_{mode}", "selector": selector, "mode": mode, "use_ddtw": mode == "ddtw"}
         for mode in modes for selector in selectors
     ]
+    multiple_cases = len(families) * len(indices) > 1
+    multiple_conditions = len(condition_templates) > 1
     cases, jobs = [], []
     for family in families:
         _path, digest, parsed = load_family(args.instances_dir, family)
         for index in indices:
-            instance, reference = load_instance(f"mknapcb{family}.txt", parsed, index)
-            relative = f"items_{instance.n}/mknapcb{family}/inst_{index:02d}"
-            conditions = [
-                {**template, "relative_output_path": f"{relative}/{template['condition']}"}
-                for template in condition_templates
-            ]
+            instance, reference, reference_source = load_instance(
+                f"mknapcb{family}.txt", parsed, index, digest)
+            relative, _condition_path = output_paths(
+                instance.n, family, index, condition_templates[0]["condition"],
+                multiple_cases=multiple_cases, multiple_conditions=multiple_conditions)
+            conditions = []
+            for template in condition_templates:
+                _case_path, condition_path = output_paths(
+                    instance.n, family, index, template["condition"],
+                    multiple_cases=multiple_cases, multiple_conditions=multiple_conditions)
+                conditions.append({**template, "relative_output_path": condition_path})
             case = {
                 "family": family, "file": f"mknapcb{family}.txt", "index": index,
                 "n": instance.n, "m": instance.m, "relative_output_path": relative,
                 "instance_sha256": digest, "reference_value": reference,
-                "reference_source": "file header; zero means unknown",
+                "reference_source": reference_source,
                 "conditions": conditions,
             }
             cases.append(case)
@@ -202,7 +229,7 @@ def build_plan(args):
         "planned_conditions": len(jobs), "planned_runs": len(jobs) * len(seeds),
         "cases": cases,
         "grouping": "loaded n in {100, 250, 500}; m comes from the instance; family number is not a size",
-        "reference_policy": "file header only; zero means unknown and gap stays null; index 0 reference is not copied",
+        "reference_policy": "Nonzero file header takes precedence; otherwise an exact SHA-256 match to bundled mknapcb1..9 enables the corresponding OR-Library mkcbres.txt best feasible value (not a certified optimum); unmatched zero stays unknown; references are mapped by family, n, m and index, never copied from index 0.",
         "winner_rule": "strictly greater fitness replaces the incumbent; ties keep the earliest original run ordinal",
         "retention": "every attempt is in runs_resultados.csv; only the winning run is exported in full",
         "statistics": "within-case only; failures excluded; sample std ddof=1; no pooled objective; no significance test",
@@ -375,14 +402,16 @@ def export_winner(protocol, job, best, metrics, directory: Path):
     if protocol["plots"]:
         from . import plotting
         values = [item["final_fitness"] for item in metrics if item["status"] == "success"]
-        plotting.plot_run(result["native_result"], best_dir, metadata=result["summary"])
+        plotting.plot_run(result["native_result"], best_dir, metadata=result["summary"],
+                          selection_records=result.get("selection_records"))
         plotting.plot_distribution(name, values, job["instance"].valor_optimo, directory)
 
 
 def run_condition(output: Path, protocol, job, row, rows):
     """Run one case condition sequentially. Full results are not accumulated."""
     directory = output / job["relative_output_path"]
-    directory.mkdir(parents=True, exist_ok=False)
+    if directory != output:
+        directory.mkdir(parents=True, exist_ok=False)
     metrics, best = [], None
     started = time.perf_counter()
     row.update(status="running", error=None, elapsed_seconds=0)
