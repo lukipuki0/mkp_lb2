@@ -14,7 +14,7 @@ if str(PKG_ROOT) not in sys.path:
     sys.path.insert(0, str(PKG_ROOT))
 
 from gwo_de_dtw import (  # noqa: E402
-    EXPLOIT, EXPLORE, GWODEHybrid, Profile, ProfileController, run_hybrid,
+    EXPLOIT, EXPLORE, POLICIES, GWODEHybrid, Profile, ProfileController, run_hybrid,
 )
 from gwo_de_dtw.binarization import (  # noqa: E402
     SIGMOID_EVALUATIONS, lb2_binarize, lb2_probabilities, sigmoid_binarize,
@@ -672,8 +672,10 @@ def plot_lines(folder):
             f"  [plot] temporal_diagnostics.png -> '{Path(folder) / 'temporal_diagnostics.png'}'"]
 
 
-def assert_png_files(test, folder, names):
-    test.assertEqual(sorted(p.name for p in Path(folder).iterdir()), sorted(names + TEMPORAL_FILES))
+def assert_png_files(test, folder, names, extra=()):
+    """`extra`: other files expected in `folder` (e.g. the run's result.json)."""
+    test.assertEqual(sorted(p.name for p in Path(folder).iterdir()),
+                     sorted(names + TEMPORAL_FILES + list(extra)))
     for name in names:
         data = (Path(folder) / name).read_bytes()
         test.assertGreater(len(data), len(PNG_SIGNATURE))
@@ -809,14 +811,17 @@ class RunCliTests(unittest.TestCase):
             lines = res.stdout.splitlines()
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=dtw W=40 pop=8 iterations=5 seed=3")
-            self.assertRegex(lines[1], r"^best=\d+ known_optimum=\d+ gap=\d+\.\d{2}% "
-                                       r"evaluations=168 generations=5 changes=\d+$")
-            # S15: plot lines follow the summary; 5 < W, so the delta plot is skipped.
-            self.assertEqual(len(lines), 6)
-            self.assertTrue(all(line.startswith("  [plot] ") for line in lines[2:]))
-            assert_png_files(self, Path(tmp) / "run_plots",
-                             [f for f in PLOT_FILES if f != "dtw_delta.png"])
-            data = json.loads(out_path.read_text())
+            # S15/S21: plot lines follow each policy line; 5 < W, so the delta plot is skipped.
+            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
+            for i, policy in enumerate(POLICIES):
+                block = lines[1 + 5 * i:6 + 5 * i]
+                self.assertRegex(block[0], rf"^policy={policy} best=\d+ known_optimum=\d+ "
+                                           r"gap=\d+\.\d{2}% evaluations=168 generations=5 "
+                                           r"changes=\d+$")
+                self.assertTrue(all(line.startswith("  [plot] ") for line in block[1:]))
+            assert_png_files(self, Path(tmp) / "run" / "binary_complex",
+                             [f for f in PLOT_FILES if f != "dtw_delta.png"], ["result.json"])
+            data = json.loads((Path(tmp) / "run" / "binary_complex" / "result.json").read_text())
             self.assertEqual(data["generations"], 5)
             self.assertEqual(data["iterations"], 5)
             self.assertEqual(data["evaluations"], 168)
@@ -828,7 +833,7 @@ class RunCliTests(unittest.TestCase):
             })
             self.assertEqual(len(data["best_solution"]), 100)
 
-    # S15: --out also writes the three plots into <out without suffix>_plots/
+    # S15: --out X.json writes each policy's record and plots into X/<policy>/
     def test_cli_out_writes_plots_next_to_json(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
@@ -840,31 +845,42 @@ class RunCliTests(unittest.TestCase):
             lines = res.stdout.splitlines()
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=ddtw W=40 pop=8 iterations=45 seed=3")
-            self.assertRegex(lines[1], r"^best=\d+ known_optimum=\d+ gap=\d+\.\d{2}% "
-                                       r"evaluations=1448 generations=45 changes=\d+$")
-            folder = Path(tmp) / "demo_plots"
-            self.assertEqual(lines[2:], plot_lines(folder))
-            assert_png_files(self, folder, PLOT_FILES)
-            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()),
-                             ["demo.json", "demo_plots"])
+            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
+            for i, policy in enumerate(POLICIES):
+                block = lines[1 + 5 * i:6 + 5 * i]
+                self.assertRegex(block[0], rf"^policy={policy} best=\d+ known_optimum=\d+ "
+                                           r"gap=\d+\.\d{2}% evaluations=1448 generations=45 "
+                                           r"changes=\d+$")
+                folder = Path(tmp) / "demo" / policy
+                self.assertEqual(block[1:], plot_lines(folder))
+                assert_png_files(self, folder, PLOT_FILES, ["result.json"])
+            self.assertEqual([p.name for p in Path(tmp).iterdir()], ["demo"])
+            self.assertEqual(sorted(p.name for p in (Path(tmp) / "demo").iterdir()),
+                             sorted(list(POLICIES) + ["convergence_comparison.pdf",
+                                                      "convergence_comparison.png"]))
 
     # S14
     def test_cli_runs_with_sigmoid(self):
-        res = self.run_cli("--binarization", "sigmoid", "--iterations", "5", "--pop", "8",
-                           "--seed", "3", "--signal", "dtw")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:  # keeps the output out of results/
+            res = self.run_cli("--binarization", "sigmoid", "--iterations", "5", "--pop", "8",
+                               "--seed", "3", "--signal", "dtw", "--out", str(Path(tmp) / "run"))
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stderr, "")
         lines = res.stdout.splitlines()
-        self.assertEqual(len(lines), 2)
+        self.assertEqual(len(lines), 1 + 4 * 5 + 2)
         self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=sigmoid "
                                    "signal=dtw W=40 pop=8 iterations=5 seed=3")
-        self.assertRegex(lines[1], r"^best=\d+ known_optimum=\d+ gap=\d+\.\d{2}% "
-                                   r"evaluations=88 generations=5 changes=\d+$")
+        for line, policy in zip(lines[1:21:5], POLICIES):
+            self.assertRegex(line, rf"^policy={policy} best=\d+ known_optimum=\d+ "
+                                   r"gap=\d+\.\d{2}% evaluations=88 generations=5 changes=\d+$")
 
     # S14: the --g2 check is an LB2 rule only
     def test_cli_sigmoid_ignores_g2_check(self):
-        res = self.run_cli("--binarization", "sigmoid", "--g2", "120",
-                           "--iterations", "1", "--pop", "8")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:  # keeps the output out of results/
+            res = self.run_cli("--binarization", "sigmoid", "--g2", "120",
+                               "--iterations", "1", "--pop", "8", "--out", str(Path(tmp) / "run"))
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertTrue(res.stdout.startswith("instance=mknapcb1.txt[0] binarization=sigmoid "))
 
@@ -917,12 +933,13 @@ class RunCliTests(unittest.TestCase):
             lines = res.stdout.splitlines()
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=dtw W=40 pop=8 iterations=5 seed=3")
-            data = json.loads(out_path.read_text())
+            folder = Path(tmp) / "run" / "binary_complex"
+            data = json.loads((folder / "result.json").read_text())
             self.assertEqual(data["G"], {
                 "G1": 0.5, "G2": 0.5, "G3_exploit": 0.2, "G3_explore": 0.4,
             })
             self.assertEqual(data["parameter_series"]["G3"], [0.2] * 5)
-            self.assertTrue((Path(tmp) / "run_plots" / "parameters.png").is_file())
+            self.assertTrue((folder / "parameters.png").is_file())
 
 
 if __name__ == "__main__":

@@ -1,18 +1,24 @@
 """
-Run the GWO-DE hybrid on one OR-Library MKP instance.
+Run the GWO-DE hybrid on one OR-Library MKP instance with the four policies.
 
 Usage (from the repository root):
     python -m gwo_de_dtw.run --instance instancias/mknapcb1.txt --index 0 \
         --binarization lb2 --signal ddtw --window 40 --pop 30 --iterations 1000 \
         --seed 1 --out gwo_de_dtw/results/mknapcb1_0_ddtw_s1.json
 
-Defaults come from config.py. After a profile change the monitor is discarded
-(fresh window): no decision until W new observations. With --out, the plots
-are saved next to the JSON in <out without suffix>_plots/
-(e.g. results/x.json -> results/x_plots/).
+Defaults come from config.py. The policies of policies.POLICIES run one after
+the other with the same settings, each with its own hybrid seeded with --seed.
+Every invocation writes one group folder: <policy>/result.json and its plots
+for each policy, plus convergence_comparison.png/.pdf with the four policies.
+--out X.json uses the folder X/ (results/x.json -> results/x/binary_simple/...),
+any other --out is the folder itself; without --out a new folder
+<instance>_<index>_s<seed>_<YYYYmmdd-HHMMSS> is created in gwo_de_dtw/results/
+(relative to the working directory). A non-empty or non-folder destination is
+rejected before running.
 """
 
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 
@@ -23,7 +29,11 @@ from .problem import cargar_instancia
 from dtw_stagnation import StagnationConfig
 
 from .controller import run_hybrid
-from .plots import save_all_plots
+from .policies import POLICIES
+from .plots import plot_convergence_comparison, save_all_plots
+
+# Parent of the default groups, relative to the working directory (the repository root).
+RESULTS_DIR = Path("gwo_de_dtw") / "results"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -71,11 +81,49 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--g3-explore", type=float, default=config.EXPLORE_G3,
                         help="LB2 base flip probability G3 while exploring "
                              "(default: %(default)s; same value as --g3-exploit = fixed G3)")
+    parser.add_argument("--dtw-kirito", action=argparse.BooleanOptionalAction,
+                        default=config.DTW_KIRITO,
+                        help="binary policies use the Kirito rolling control: one "
+                             "monitor for the whole run, explore iff the trigger holds on "
+                             "each ready observation, exploit otherwise (default: off = "
+                             "fresh window after every change); continuous policies are "
+                             "unchanged")
+    parser.add_argument("--hybrid-mode", choices=("competitive", "sequential"),
+                        default=config.HYBRID_MODE,
+                        help="how GWO and DE are combined each generation: competitive = "
+                             "GWO and DE candidates compete per individual; sequential = "
+                             "full GWO sweep, then full DE sweep over the resulting "
+                             "population (experimental) (default: %(default)s)")
     parser.add_argument("--out", type=Path, default=None,
-                        help="optional JSON file with the full run record; plots go to "
-                             "<out without suffix>_plots/, including temporal PNG/PDF "
-                             "and NPZ/CSV diagnostics")
+                        help="group folder of this run: X.json means folder X/, any other "
+                             "path is the folder itself; it must not exist or be empty. "
+                             "Each policy writes <policy>/result.json (full run record) "
+                             "and its plots, including temporal PNG/PDF and NPZ/CSV "
+                             "diagnostics; the folder also gets "
+                             "convergence_comparison.png/.pdf with the four policies "
+                             "(default: new folder <instance>_<index>_s<seed>_<timestamp> "
+                             "in gwo_de_dtw/results/)")
     return parser
+
+
+def output_group(out: Path) -> Path:
+    """Group folder named by --out: X.json -> X/, any other path is the folder itself."""
+    return out.with_suffix("") if out.suffix.lower() == ".json" else out
+
+
+def new_default_group(instance: str, index: int, seed: int) -> Path:
+    """Creates and returns a new timestamp folder in RESULTS_DIR (never an existing one)."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    base = f"{Path(instance).stem}_{index}_s{seed}_{stamp}"
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    n = 1
+    while True:
+        group = RESULTS_DIR / (base if n == 1 else f"{base}_{n}")
+        try:
+            group.mkdir()
+            return group
+        except FileExistsError:
+            n += 1
 
 
 def _to_json(value):
@@ -96,6 +144,13 @@ def main(argv=None) -> int:
     if args.binarization == "lb2" and args.g2 >= config.V_MAX:
         parser.error(f"--g2 must be below v_max={config.V_MAX:g} "
                      "(otherwise the LB2 slope changes sign)")
+    group = None
+    if args.out is not None:
+        group = output_group(args.out)
+        if group.exists() and not group.is_dir():
+            parser.error(f"output path is not a directory: {group}")
+        if group.is_dir() and any(group.iterdir()):
+            parser.error(f"output directory is not empty: {group}")
     cfg = StagnationConfig(
         window=args.window, band=args.band, min_slope=config.MIN_SLOPE,
         plateau_max=args.plateau_max, patience=args.patience,
@@ -103,27 +158,44 @@ def main(argv=None) -> int:
         p_low=config.P_LOW, p_high=config.P_HIGH, improvement_tol=config.IMPROVEMENT_TOL,
     )
     inst = cargar_instancia(args.instance, args.index)
-    res = run_hybrid(inst, cfg, pop_size=args.pop,
-                     iterations=args.iterations, seed=args.seed,
-                     G1=args.g1, G2=args.g2,
-                     g3_exploit=args.g3_exploit, g3_explore=args.g3_explore,
-                     binarization=args.binarization)
-    res["instance"] = f"{Path(args.instance).name}[{args.index}]"
-    res["signal"] = args.signal
+    instance = f"{Path(args.instance).name}[{args.index}]"
+    if group is None:
+        group = new_default_group(args.instance, args.index, args.seed)
+    else:
+        group.mkdir(parents=True, exist_ok=True)
 
-    print(f"instance={res['instance']} binarization={res['binarization']} "
+    print(f"instance={instance} binarization={args.binarization} "
           f"signal={args.signal} W={args.window} "
-          f"pop={args.pop} iterations={args.iterations} seed={args.seed}")
-    gap = res["gap_pct"]
-    gap_txt = f"{gap:.2f}%" if gap is not None else "n/a"
-    print(f"best={res['best_fitness']:.0f} known_optimum={res['known_optimum']:.0f} "
-          f"gap={gap_txt} evaluations={res['evaluations']} "
-          f"generations={res['generations']} changes={len(res['changes'])}")
+          f"pop={args.pop} iterations={args.iterations} seed={args.seed}"
+          + (" dtw_kirito=True" if args.dtw_kirito else "")
+          + (f" hybrid_mode={args.hybrid_mode}"
+             if args.hybrid_mode != "competitive" else ""))
+    records = []
+    for policy in POLICIES:
+        res = run_hybrid(inst, cfg, pop_size=args.pop,
+                         iterations=args.iterations, seed=args.seed,
+                         G1=args.g1, G2=args.g2,
+                         g3_exploit=args.g3_exploit, g3_explore=args.g3_explore,
+                         binarization=args.binarization, policy=policy,
+                         dtw_kirito=args.dtw_kirito, hybrid_mode=args.hybrid_mode)
+        res["instance"] = instance
+        res["signal"] = args.signal
 
-    if args.out is not None:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(json.dumps(res, default=_to_json, indent=1))
-        save_all_plots(res, args.out.with_name(args.out.stem + "_plots"))
+        gap = res["gap_pct"]
+        gap_txt = f"{gap:.2f}%" if gap is not None else "n/a"
+        print(f"policy={policy} best={res['best_fitness']:.0f} "
+              f"known_optimum={res['known_optimum']:.0f} "
+              f"gap={gap_txt} evaluations={res['evaluations']} "
+              f"generations={res['generations']} changes={len(res['changes'])}")
+
+        folder = group / policy
+        folder.mkdir()
+        (folder / "result.json").write_text(json.dumps(res, default=_to_json, indent=1))
+        save_all_plots(res, folder)
+        records.append(res)
+
+    plot_convergence_comparison(records, group)
+    print(f"output={group}")
     return 0
 
 

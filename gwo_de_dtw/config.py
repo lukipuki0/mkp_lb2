@@ -5,7 +5,7 @@ hybrid.py, controller.py and run.py take their defaults from here. Monitor
 values follow hybrid_mkp (dtw_stagnation.StagnationConfig) except
 MIN_SLOPE = 2.0 and USE_DDTW = True.
 
-Spec: odd/tasks/gwo-de-dtw-hybrid.md (S12, S14, S15).
+Spec: odd/tasks/gwo-de-dtw-hybrid.md (S12, S14, S15, S20).
 """
 
 # Instance
@@ -22,6 +22,11 @@ SEED = 1
 BINARIZATION = "lb2"
 SIGMOID_V_MAX = 6.0
 
+# How GWO and DE are combined each generation (hybrid.py): "competitive"
+# (GWO and DE candidates compete per individual) or "sequential" (opt-in
+# experiment: full GWO sweep, then full DE sweep on the resulting population).
+HYBRID_MODE = "competitive"
+
 # Continuous space [-V_MAX, V_MAX] and LB2 binarization
 V_MAX = 100.0
 G1 = 0.5
@@ -33,6 +38,17 @@ EXPLORE_G3 = 0.1
 # Joint GWO/DE profiles
 EXPLOIT_A, EXPLOIT_F, EXPLOIT_CR = 0.5, 0.5, 0.9
 EXPLORE_A, EXPLORE_F, EXPLORE_CR = 2.0, 0.9, 0.3
+
+# Profile policy (policies.py) used by run_hybrid / ProfileController;
+# run.py runs all four.
+POLICY = "binary_complex"
+SCALE = 2.0           # continuous_simple: D2 / (theta_c * SCALE)
+K = 5.0               # continuous_complex: sigmoid slope
+CENTER = 0.5          # continuous_complex: delta / theta_delta at intensity 0.5
+# Binary policies only. False: fresh window after every change and S8 return.
+# True: Kirito rolling control, one monitor for the whole run and, on
+# every ready observation, explore iff the policy trigger holds, else exploit.
+DTW_KIRITO = False
 
 # Plot color of each profile (plots/)
 PROFILE_COLORS = {"exploit": "#1f77b4", "explore": "#ff7f0e"}

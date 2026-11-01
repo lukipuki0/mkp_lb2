@@ -2,6 +2,11 @@
 
 Replay only the monitor, never the optimizer or RNG. Verify the recorded
 observations before exporting; reset after the decision, not before it.
+Binary policies reset the monitor after every change; continuous policies
+never do (a change there only means the blended profile changed name).
+Binary runs with `dtw_kirito` true never reset either; older JSONs that store
+the same flag as `dtw_main` are read as `dtw_kirito`.
+JSONs without `policy` are binary_complex runs; without either flag, fresh-window runs.
 """
 import json
 from pathlib import Path
@@ -10,12 +15,14 @@ import numpy as np
 from dtw_stagnation import (StagnationConfig, StagnationMonitor,
                             constant_baseline, ramp_baseline,
                             dtw_distance, ddtw_distance)
+from ..policies import BINARY_POLICIES
 from ._common import plt, profile_color, profile_segments
 
 
 SCALARS = ('t', 'f_star', 'D_R', 'D_C', 'delta', 'theta_R', 'theta_C',
            'theta_delta', 's', 'mode_used', 'a', 'F', 'CR', 'ready',
-           'adaptive_threshold', 'fire', 'no_improve_len', 'trigger_streak')
+           'adaptive_threshold', 'fire', 'no_improve_len', 'trigger_streak',
+           'intensity')
 
 
 def build_series(res: dict) -> dict:
@@ -29,6 +36,10 @@ def build_series(res: dict) -> dict:
     data['f_star'] = np.asarray(res['best_series'], dtype=float)
     for key in ('a', 'F', 'CR'):
         data[key] = np.asarray(res['parameter_series'][key], dtype=float)
+    intensity = res.get('intensity_series') or [None] * count
+    data['intensity'] = np.array([np.nan if v is None else v for v in intensity], dtype=float)
+    resets = (res.get('policy', 'binary_complex') in BINARY_POLICIES
+              and not res.get('dtw_kirito', res.get('dtw_main', False)))
     for i, fitness in enumerate(res['best_series']):
         out = monitor.update(fitness)
         saved = res['monitor'][i]
@@ -55,7 +66,7 @@ def build_series(res: dict) -> dict:
                                    ('delta', 'delta'), ('theta_R', 'theta_r'),
                                    ('theta_C', 'theta_c'), ('theta_delta', 'theta_delta')):
                 data[target][i] = out[source]
-        if saved['changed']:
+        if saved['changed'] and resets:
             monitor = StagnationMonitor(cfg)
     return data
 
@@ -98,12 +109,13 @@ def plot_temporal(res: dict, output_dir) -> str:
     data = build_series(res)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    meta = {key: res[key] for key in ('instance', 'seed', 'binarization', 'monitor_config',
+    meta = {key: res[key] for key in ('instance', 'seed', 'binarization', 'policy', 'monitor_config',
                                     'best_fitness', 'gap_pct', 'evaluations') if key in res}
     meta['notes'] = {'s': 'Decision after t, used at t+1; 0 exploit, 1 explore.',
                      'mode_used': 'Profile that generated iteration t; used for shading.',
                      'X': 'Monitor-filtered window; NaN while warming up after each reset.',
                      'parameters': 'a, F, CR used at t; G3 is not plotted.',
+                     'intensity': 'Continuous policies: intensity of the blended profile used at t (0 exploit, 1 explore). NaN for binary policies.',
                      'window_selection': 'Rising exploit window with total rise closest to its ramp (fallback any rising); midpoint of longest flat explore run (fallback any flat). Missing categories omitted.'}
     np.savez_compressed(output / 'temporal_series.npz', **data)
     np.savetxt(output / 'temporal_series.csv', np.column_stack([data[k] for k in SCALARS]),
@@ -155,13 +167,19 @@ def plot_temporal(res: dict, output_dir) -> str:
         ax_d.set(title='(d) Relative indicator and controller decision', ylabel='D_R - D_C')
         ax_d.legend()
         ax_s.step(t, data['s'], where='post', color='black', label='Decision s(t), applied at t+1')
+        if np.isfinite(data['intensity']).any():
+            ax_s.plot(t, data['intensity'], color='tab:purple', label='Intensity used at t')
         ax_s.set(yticks=[0, 1], yticklabels=['Exploit', 'Explore'], ylim=(-.2, 1.4), xlabel='Generation (1..T)')
         ax_s.legend(loc='upper right')
-        # Describe parameters actually used, without plotting the fixed G3.
+        # Describe parameters actually used, without plotting the fixed G3;
+        # blended (continuous) profiles show their min-max range.
         descriptions = []
+        names = np.asarray(res['profile_series'])
         for name in dict.fromkeys(res['profile_series']):
-            i = res['profile_series'].index(name)
-            descriptions.append(name + ': ' + ', '.join(f'{key}={data[key][i]:g}' for key in ('a', 'F', 'CR')))
+            values = {key: data[key][names == name] for key in ('a', 'F', 'CR')}
+            descriptions.append(name + ': ' + ', '.join(
+                f'{key}={v.min():g}' if v.min() == v.max() else f'{key}={v.min():g}-{v.max():g}'
+                for key, v in values.items()))
         ax_s.set_title('; '.join(descriptions), fontsize=9)
         for ax in (ax_a, ax_c, ax_d, ax_s):
             ax.set_xlim(.5, len(t) + .5)

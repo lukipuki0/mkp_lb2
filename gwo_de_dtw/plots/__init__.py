@@ -7,6 +7,10 @@ One PNG per plot, each function `(res, output_dir) -> path`:
   - plot_parameters  : parameters.png, a, F and CR used per generation
   - plot_temporal    : four-panel PNG/PDF and verified temporal series (NPZ/CSV)
 
+One group of runs (the four policies):
+  - plot_convergence_comparison : convergence_comparison.png/.pdf, best-so-far of
+    every record on one axes (convergence_comparison_figure builds the figure)
+
 Spec: odd/tasks/gwo-de-dtw-hybrid.md (S15).
 """
 
@@ -18,6 +22,7 @@ from .dtw_delta import plot_dtw_delta
 from .parameters import plot_parameters
 
 from .temporal import plot_temporal
+from .comparison import convergence_comparison_figure, plot_convergence_comparison
 
 PLOTS = (plot_convergence, plot_dtw_delta, plot_parameters, plot_temporal)
 
@@ -30,7 +35,9 @@ def save_all_plots(res: dict, output_dir) -> List[str]:
 
 
 __all__ = [
+    "convergence_comparison_figure",
     "plot_convergence",
+    "plot_convergence_comparison",
     "plot_dtw_delta",
     "plot_parameters",
     "plot_temporal",

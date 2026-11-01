@@ -2,10 +2,16 @@
 GWO-DE hybrid over a single shared population for the binary MKP.
 
 Every individual keeps a real vector (where GWO and DE do arithmetic), a
-repaired binary solution and its fitness. Each generation, every individual
-gets one GWO candidate and one DE/rand/1/bin candidate; the better of the two
-replaces it when it is at least as good (real and binary written together).
-The operators live in gwo.py and de.py; this module only combines them.
+repaired binary solution and its fitness. The operators live in gwo.py and
+de.py; this module only combines them, in one of two modes (hybrid_mode):
+  - "competitive" (default): each generation, every individual gets one GWO
+    candidate and one DE/rand/1/bin candidate; the better of the two replaces
+    it when it is at least as good (real and binary written together).
+  - "sequential" (opt-in experiment): one full GWO sweep, each candidate
+    replacing its individual when at least as good; then one full DE sweep
+    over the population that results from it. DE works in place, so a DE
+    candidate also sees the DE candidates already accepted in that sweep.
+    GWO and DE never compete with each other.
 
 Binarization (see binarization.py) is selectable:
   - "lb2" (default): the real vector gives flip probabilities over the
@@ -60,6 +66,7 @@ EXPLORE = Profile("explore", a=config.EXPLORE_A, F=config.EXPLORE_F,
                   CR=config.EXPLORE_CR, G3=config.EXPLORE_G3)
 
 BINARIZATIONS = ("lb2", "sigmoid")
+HYBRID_MODES = ("competitive", "sequential")
 
 
 class GWODEHybrid:
@@ -74,11 +81,14 @@ class GWODEHybrid:
         G1: float = config.G1,
         G2: float = config.G2,
         binarization: str = config.BINARIZATION,
+        hybrid_mode: str = config.HYBRID_MODE,
     ):
         if pop_size < 4:
             raise ValueError("pop_size must be >= 4 (DE/rand/1 needs three other individuals)")
         if binarization not in BINARIZATIONS:
             raise ValueError(f"binarization must be one of {BINARIZATIONS}, got {binarization!r}")
+        if hybrid_mode not in HYBRID_MODES:
+            raise ValueError(f"hybrid_mode must be one of {HYBRID_MODES}, got {hybrid_mode!r}")
         if v_max is None:
             # lb2 works in [-V_MAX, V_MAX], sigmoid in [-SIGMOID_V_MAX, SIGMOID_V_MAX].
             v_max = config.V_MAX if binarization == "lb2" else config.SIGMOID_V_MAX
@@ -88,6 +98,7 @@ class GWODEHybrid:
         self.rng = rng
         self.pop_size = pop_size
         self.binarization = binarization
+        self.hybrid_mode = hybrid_mode
         self.v_max = v_max
         self.G1, self.G2 = G1, G2
         self.profile = EXPLOIT
@@ -141,6 +152,8 @@ class GWODEHybrid:
 
         order = np.argsort(self.fit)[::-1]
         leaders = self.x_real[order[:3]].copy()  # frozen for this generation (S3)
+        if self.hybrid_mode == "sequential":
+            return self._step_sequential(leaders)
         gwo_wins = de_wins = accepted = 0
 
         for i in range(self.pop_size):
@@ -165,6 +178,41 @@ class GWODEHybrid:
 
         self.last_step_stats = {"gwo_wins": gwo_wins, "de_wins": de_wins, "accepted": accepted}
         self._update_best()
+        return self.best_fitness
+
+    def _step_sequential(self, leaders: np.ndarray) -> float:
+        """Full GWO sweep, then full DE sweep over the resulting population.
+
+        Same cost as competitive: one GWO and one DE candidate per individual.
+        Stats count accepted candidates per phase (no GWO-vs-DE wins);
+        accepted_total = gwo_accepted + de_accepted, at most 2N.
+        """
+        gwo_accepted = 0
+        for i in range(self.pop_size):
+            u = gwo_candidate(self.x_real[i], leaders, self.profile.a, self.rng, self.v_max)
+            b, f = self._evaluate(u, self.x_bin[i])
+            if f >= self.fit[i]:
+                self.x_real[i] = u
+                self.x_bin[i] = b
+                self.fit[i] = f
+                gwo_accepted += 1
+        self._update_best()
+
+        de_accepted = 0
+        for i in range(self.pop_size):
+            # In place: rows already accepted in this DE sweep are used as donors.
+            u = de_candidate(i, self.x_real, self.profile.F, self.profile.CR,
+                             self.rng, self.v_max)
+            b, f = self._evaluate(u, self.x_bin[i])
+            if f >= self.fit[i]:
+                self.x_real[i] = u
+                self.x_bin[i] = b
+                self.fit[i] = f
+                de_accepted += 1
+        self._update_best()
+
+        self.last_step_stats = {"gwo_accepted": gwo_accepted, "de_accepted": de_accepted,
+                                "accepted_total": gwo_accepted + de_accepted}
         return self.best_fitness
 
     def _update_best(self) -> None:
