@@ -19,10 +19,10 @@ import matplotlib
 
 import woa_abc.solver as hybrid
 import woa_abc.benchmark as bench
+import woa_abc.plots as bench_plots
 from woa_abc.solver import CycleRecord, HybridResult
 from woa_abc.benchmark import (
     EXPECTED_ARTIFACTS,
-    OPTIONAL_ARTIFACTS,
     RUN_CSV_FIELDS,
     ExportRequest,
     HistoryRow,
@@ -411,7 +411,7 @@ class ExporterTests(unittest.TestCase):
             self.assertEqual((parent / "sentinel.txt").read_text(encoding="utf-8"), "keep")
             self.assertFalse((parent / "tiny").exists())
 
-    def test_tiny_run_keeps_reference_and_matches_raw_json(self) -> None:
+    def test_tiny_run_without_best_known_file_is_unknown_and_matches_raw_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             instance = root / "mknapcb1.txt"
@@ -444,6 +444,7 @@ class ExporterTests(unittest.TestCase):
             self.assertEqual(manifest["detector_request"]["band"], 0)
             self.assertEqual(manifest["detector_request"]["band_mode"], "auto")
             self.assertEqual(manifest["input"]["reference"], 0.0)
+            self.assertEqual(manifest["input"]["reference_source"], "unknown")
             self.assertEqual(manifest["input"]["index"], 0)
             self.assertEqual(manifest["input"]["sha256"], hashlib.sha256(instance.read_bytes()).hexdigest())
             self.assertEqual(Path(manifest["input"]["path"]), instance.resolve())
@@ -468,6 +469,8 @@ class ExporterTests(unittest.TestCase):
             self.assertEqual(len(run_row), 1)
             self.assertEqual(run_row[0]["run"], "1")
             self.assertEqual(run_row[0]["gap_pct"], "")
+            self.assertEqual(run_row[0]["reference"], "0")
+            self.assertEqual(run_row[0]["reference_source"], "unknown")
             self.assertEqual(run_row[0]["n_switches"], "0")
             self.assertEqual(run_row[0]["seed"], "43")
             self.assertEqual(int(run_row[0]["evaluations"]), raw["evaluations"])
@@ -525,6 +528,8 @@ class ExporterTests(unittest.TestCase):
             self.assertNotEqual(row["gap_pct"], "")
             manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["input"]["reference"], 20.0)
+            self.assertEqual(manifest["input"]["reference_source"], "header")
+            self.assertEqual((row["reference"], row["reference_source"]), ("20", "header"))
 
     def test_budget_partial_cycle_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -635,7 +640,8 @@ class PlotTests(unittest.TestCase):
             outcome = self._export(Path(tmp))
             self.assertEqual(outcome.code, 0, outcome.message)
             best = outcome.output_dir / "best_run_01"
-            for relative in EXPECTED_ARTIFACTS + OPTIONAL_ARTIFACTS:
+            self.assertIn("best_run_01/dtw_delta.png", EXPECTED_ARTIFACTS)
+            for relative in EXPECTED_ARTIFACTS:
                 self.assertTrue((outcome.output_dir / relative).is_file(), relative)
             for relative, size in GWO_DE_SIZES.items():
                 width, height, dpi = _png_size(outcome.output_dir / relative)
@@ -652,14 +658,55 @@ class PlotTests(unittest.TestCase):
             self.assertEqual(meta["policy"], "binary_complex")
             self.assertEqual(meta["instance"], "mknapcb1/inst_00")
 
-    def test_no_ready_window_skips_only_the_delta_plot(self) -> None:
+    def test_run_shorter_than_the_window_still_writes_the_delta_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             outcome = self._export(Path(tmp), iterations=5)
             self.assertEqual(outcome.code, 0, outcome.message)
-            self.assertFalse((outcome.output_dir / "best_run_01" / "dtw_delta.png").exists())
+            delta = outcome.output_dir / "best_run_01" / "dtw_delta.png"
+            self.assertTrue(delta.is_file())
+            width, height, _ = _png_size(delta)
+            self.assertEqual((width, height), (14 * DPI, 5 * DPI))
             manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
-            self.assertTrue(manifest["output_completeness"]["complete"])
-            self.assertNotIn("best_run_01/dtw_delta.png", manifest["output_completeness"]["missing"])
+            completeness = manifest["output_completeness"]
+            self.assertTrue(completeness["complete"])
+            self.assertIn("best_run_01/dtw_delta.png", completeness["expected"])
+            self.assertIn("best_run_01/dtw_delta.png", completeness["present"])
+            self.assertNotIn("best_run_01/dtw_delta.png", completeness["missing"])
+
+    def test_missing_delta_plot_makes_the_output_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            without_delta = (bench_plots.plot_convergence, bench_plots.plot_parameters,
+                             bench_plots.plot_temporal)
+
+            def save_without_delta(record, folder):
+                return [plot(record, folder) for plot in without_delta]
+
+            with patch.object(bench, "save_all_plots", side_effect=save_without_delta), \
+                    patch("sys.stdout", StringIO()):
+                outcome = self._export(Path(tmp), iterations=5)
+            manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertFalse(manifest["output_completeness"]["complete"])
+            self.assertEqual(manifest["output_completeness"]["missing"], ["best_run_01/dtw_delta.png"])
+
+    def test_mknapcb1_reference_comes_from_mkcbres(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            outcome = self._export(Path(tmp), iterations=5)
+            self.assertEqual(outcome.code, 0, outcome.message)
+            output = outcome.output_dir
+            raw = json.loads((output / "runs" / "run_01.json").read_text(encoding="utf-8"))
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            row = _read_csv(output / "runs_resultados.csv")[0]
+            summary = (output / "resumen_pipeline.txt").read_text(encoding="utf-8")
+        gap = (24381.0 - raw["best_value"]) / 24381.0 * 100.0
+        self.assertAlmostEqual(raw["gap"], gap)
+        self.assertEqual(manifest["input"]["reference"], 24381.0)
+        self.assertEqual(manifest["input"]["reference_source"], "mkcbres.txt")
+        self.assertEqual(raw["metadata"]["instance"]["reference_source"], "mkcbres.txt")
+        self.assertEqual((row["reference"], row["reference_source"]), ("24381", "mkcbres.txt"))
+        self.assertEqual(row["gap_pct"], f"{gap:.2f}")
+        self.assertRegex(summary, r"Optimo conocido\s*:\s*24381\.0")
+        self.assertRegex(summary, r"Fuente del optimo\s*:\s*mkcbres\.txt")
+        self.assertRegex(summary, r"Gap\s*:\s*" + re.escape(f"{gap:.2f}%"))
 
 
 class DocumentTests(unittest.TestCase):

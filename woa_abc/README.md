@@ -112,6 +112,18 @@ result = solve(instance, config, seed=1)
 
 `instance` must be an `MKPInstance` with nonnegative profits, weights, and capacities, and positive weight on every item. A zero reference means the optimum is unknown and `gap` is `None`. A positive reference produces the percentage gap `(reference - best) / reference * 100`.
 
+## References
+
+The headers of `instancias/mknapcb*.txt` store 0. Every command that loads a file (`python -m woa_abc`, `woa_abc.benchmark`, `woa_abc.campaign`, `woa_abc.run`) then takes the best known value of that same index from `mkcbres.txt` in the folder of the instance file (OR-Library, Chu & Beasley 1997, first table "Best Feasible Solution Value"). The lookup is `woa_abc/best_known.py`, copied from `gwo_de_dtw/problem.py` on `feat/gwo-de-dtw-hybrid`: `mknapcbK.txt` index `i` is the entry `<m>.<n>-<ii>` of `FAMILY_PREFIX`, for example `mknapcb1.txt` index 0 is `5.100-00` = 24381. A positive header value is kept. Without `mkcbres.txt`, or without that entry, the reference is 0 and `gap` is `None`. It is never copied from another index.
+
+| `reference_source` | Meaning |
+|--------------------|---------|
+| `header` | Positive value stored in the instance file |
+| `mkcbres.txt` | Header was 0; best known value from `mkcbres.txt` |
+| `unknown` | Header was 0 and no best known entry; reference 0, no gap |
+
+The solver JSON (`metadata.instance`), the single-run manifest (`input`), `runs_resultados.csv`, `resumen_pipeline.txt`, and the campaign files carry `reference` and `reference_source`.
+
 `result.metadata` repeats the seed, the resolved budget and scout limit, the LB2 constants, the policy, `dtw_kirito`, both profiles, and the effective detector settings. `result.history` has one record per entered cycle, including a partial final cycle.
 
 ## Variants
@@ -136,7 +148,7 @@ The command reads one local OR-Library file. It rejects URLs and other non-files
 python -m woa_abc --instance instancias/mknapcb1.txt --instance-index 0 --seed 1 --population-size 4 --iterations 6 --max-evaluations 200
 ```
 
-`--instance-index` is zero-based. `--scout-limit` is optional. `--variant` is `v0` when omitted. `--policy` is `binary_complex` when omitted; the choices are `binary_simple`, `binary_complex`, `continuous_simple`, and `continuous_complex`. `--dtw-kirito` selects the rolling binary control. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps the exploit profile. JSON is printed to stdout and includes the search result, profile changes, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`).
+`--instance-index` is zero-based. `--scout-limit` is optional. `--variant` is `v0` when omitted. `--policy` is `binary_complex` when omitted; the choices are `binary_simple`, `binary_complex`, `continuous_simple`, and `continuous_complex`. `--dtw-kirito` selects the rolling binary control. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps the exploit profile. JSON is printed to stdout and includes the search result, profile changes, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`, `reference_source`).
 
 ## Checks
 
@@ -156,7 +168,7 @@ One local command writes a fresh results folder for one functional check. It doe
 PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000
 ```
 
-Defaults are seed 43, population 30, 1000 hybrid cycles, index 0, variant `v0`, and policy `binary_complex`. Pass `--policy` and `--dtw-kirito` as in the solver CLI. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A stored reference of 0 stays unknown.
+Defaults are seed 43, population 30, 1000 hybrid cycles, index 0, variant `v0`, and policy `binary_complex`. Pass `--policy` and `--dtw-kirito` as in the solver CLI. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A header reference of 0 is resolved from `mkcbres.txt` (see References).
 
 One checked run per variant uses the same instance, seed, population, horizon, and evaluation cap. Run them separately. This command still writes one folder and does not grow a multi-run option.
 
@@ -170,11 +182,11 @@ The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/
 
 | File | What it is |
 |------|------------|
-| `manifest.json` | Effective solver config, input path/hash/index, timing, actual counts, output completeness |
+| `manifest.json` | Effective solver config, input path/hash/index/reference/reference_source, timing, actual counts, output completeness |
 | `runs/run_01.json` | Full solver result, written before plots |
-| `runs_resultados.csv` | One row. `n_switches` is 0. `n_profile_changes` and `policy` describe the reaction |
-| `resumen_pipeline.txt` | Single-run note. No superiority claim |
-| `best_run_01/` | History (with profile per cycle), detail, and the GWO–DE plot set below |
+| `runs_resultados.csv` | One row. `n_switches` is 0. `n_profile_changes` and `policy` describe the reaction. `reference` and `reference_source` give the gap's reference |
+| `resumen_pipeline.txt` | Single-run note with the known optimum and its source. No superiority claim |
+| `best_run_01/` | History (with profile per cycle), detail, and the GWO–DE plot set below. `dtw_delta.png` is a required artifact |
 
 ## Plots
 
@@ -183,7 +195,7 @@ The plots are the GWO–DE plots. `woa_abc/plots/` is a copy of `gwo_de_dtw/plot
 | File | What it shows |
 |------|---------------|
 | `fitness_convergence.png` | Best fitness per cycle, one colored segment per profile turn, a dashed line where each turn starts, and the optimum line when the reference is positive |
-| `dtw_delta.png` | Monitor delta per cycle, segmented and colored by profile like the convergence plot. Skipped when the monitor never had a ready window, as in GWO–DE |
+| `dtw_delta.png` | Monitor delta per cycle, segmented and colored by profile like the convergence plot. Always written: without a ready window it is an empty diagnostic that says "No DTW delta: no complete window" (run shorter than the window) or "No DTW delta: detection off" |
 | `parameters.png` | Two panels: `a (WOA)` and `rho (ABC)` per cycle over a background shaded by profile. `G3` is recorded but not plotted |
 | `temporal_diagnostics.png` / `.pdf` | Four panels: best fitness and profile used, a rising and a flat window against their ramp and constant baselines, distances and thresholds, and delta with the controller decision |
 | `temporal_series.npz` / `.csv`, `temporal_metadata.json` | The series behind the temporal panels. The monitor is replayed from the saved config and checked against every recorded observation before anything is written |
@@ -198,7 +210,7 @@ GWO–DE has no boxplot, so `boxplot_runs.png` is no longer written. The old par
 - Series have one entry per complete cycle. A partial final cycle, stopped by the evaluation cap, is left out because it never updated the monitor. `best_fitness` is still the archived best.
 - The monitor entry of cycle `g` is the diagnostic of cycle `g`. Its `profile` is the decision taken after `g`, used from `g + 1`.
 - With the detector on, a complete cycle without its diagnostic is an error.
-- With the detector off there is no monitor output. The delta plot and the temporal outputs are skipped. Convergence and parameters are still written.
+- With the detector off there is no monitor output. The temporal outputs are skipped. Convergence, parameters, and the empty delta diagnostic are still written.
 
 ## Four-policy group run
 
@@ -244,7 +256,7 @@ Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation 
 | Policy | One policy for the whole campaign, recorded in `experiment.json`, `campaign_summary.json`, and each CSV row |
 | Groups | Loaded `n`, checked against the file: 1, 4, 7 → 100; 2, 5, 8 → 250; 3, 6, 9 → 500 |
 | Budget | The cap is the explicit 180030 default. A variant may finish before 1000 cycles |
-| Reference | Use that index's stored value. 0 stays unknown. Do not copy index 0 onto index 1 or 2 |
+| Reference | That index's header value, else its `mkcbres.txt` entry, else 0 (unknown). Recorded with `reference_source`. Do not copy index 0 onto index 1 or 2 |
 | Collision | Refuse an existing campaign directory or destination. Do not overwrite it |
 | Failure | Stop, keep the raw artifacts, do not rerun, and do not mark the campaign completed. No superiority claim is added |
 
@@ -254,7 +266,7 @@ Each variant folder holds the single-run artifacts directly: `manifest.json`, `r
 
 - [ ] 81 start lines and 81 completion lines, or a failed stop with the raw JSON still present
 - [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after 81 completions
-- [ ] A stored reference of 0 is still unknown in that run's manifest
+- [ ] Each run's manifest shows the resolved `reference` and its `reference_source`
 
 ## Next step
 

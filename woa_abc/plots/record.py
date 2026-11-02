@@ -15,8 +15,8 @@ Alignment rules:
     complete cycle without its diagnostic is an error.
   - With the detector off (use_stagnation=False) there is no monitor: every
     entry is a not-ready placeholder and monitor_config is absent, so
-    dtw_delta.png and the temporal outputs are skipped, as GWO-DE skips them
-    for missing data.
+    dtw_delta.png is an empty diagnostic and the temporal outputs are
+    skipped, as GWO-DE skips them for missing data.
 """
 
 from typing import Optional

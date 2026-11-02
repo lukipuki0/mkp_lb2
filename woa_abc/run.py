@@ -11,7 +11,10 @@ single-run exporter's (benchmark.inherited_stagnation_config). The policies of
 profiles.POLICIES run one after the other with the same settings, each with
 its own solve seeded with --seed. Every invocation writes one group folder:
 <policy>/result.json (the full WOA-ABC result) and its plots for each policy,
-plus convergence_comparison.png/.pdf with the four policies.
+plus convergence_comparison.png/.pdf with the four policies. dtw_delta.png is
+always written, as an empty diagnostic when no window was ready. A header
+reference of 0 is the best known value from mkcbres.txt next to the instance
+file (woa_abc.best_known), so gap and the optimum line appear.
 --out X.json uses the folder X/ (resultados/x.json -> resultados/x/binary_simple/...),
 any other --out is the folder itself; without --out a new folder
 <instance>_<index>_s<seed>_<YYYYmmdd-HHMMSS> is created in woa_abc/resultados/
@@ -137,7 +140,8 @@ def main(argv=None) -> int:
         group.mkdir(parents=True, exist_ok=True)
 
     print(f"instance={instance} signal={args.signal} W={args.window} "
-          f"pop={args.pop} iterations={args.iterations} seed={args.seed}"
+          f"pop={args.pop} iterations={args.iterations} seed={args.seed} "
+          f"reference={info['reference']:.0f} reference_source={info['reference_source']}"
           + (" dtw_kirito=True" if args.dtw_kirito else "")
           + (f" variant={args.variant}" if args.variant != "v0" else ""))
     records = []

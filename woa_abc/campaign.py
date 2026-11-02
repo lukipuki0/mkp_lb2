@@ -60,6 +60,7 @@ RESULT_FIELDS = (
     "m",
     "seed",
     "reference",
+    "reference_source",
     "gap",
     "fitness",
     "evaluations",
@@ -73,7 +74,9 @@ RESULT_FIELDS = (
 )
 NOTE = (
     "One run per selection. n=1 is not inferential evidence and claims no superiority. "
-    "A stored reference of 0 is unknown and is not copied from another index."
+    "A header reference of 0 is the best known value of that same index in mkcbres.txt "
+    "next to the instance file; without that entry it is unknown. It is never copied "
+    "from another index."
 )
 
 
@@ -90,6 +93,7 @@ class Selection:
     n: int
     m: int
     reference: float
+    reference_source: str
 
 
 @dataclass
@@ -199,6 +203,7 @@ def _selections(instances_dir: Path) -> list[Selection]:
                         n=int(info["n"]),
                         m=int(info["m"]),
                         reference=float(info["reference"]),
+                        reference_source=str(info["reference_source"]),
                     )
                 )
     counts: dict[int, int] = {}
@@ -240,6 +245,7 @@ def _outcome_row(selection: Selection, destination: Path, outcome: ExportOutcome
         "n": selection.n,
         "m": selection.m,
         "reference": selection.reference,
+        "reference_source": selection.reference_source,
         "gap": None if raw is None else raw.get("gap"),
         "fitness": None if raw is None else raw.get("best_value"),
         "evaluations": None if raw is None else raw.get("evaluations"),
@@ -279,6 +285,7 @@ def _documents(campaign: Path, selections: list[Selection], settings: dict) -> t
                 "n": item.n,
                 "m": item.m,
                 "reference": item.reference,
+                "reference_source": item.reference_source,
                 "output_path": str(destination_for(campaign, item)),
             }
             for item in selections

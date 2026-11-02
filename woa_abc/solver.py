@@ -25,6 +25,7 @@ from lb2.binarization import _calcular_L1, _calcular_L2
 from mkp_core.problem import MKPInstance
 from mkp_core.repair import reparar_solucion
 
+from .best_known import resolve_reference
 from .profiles import (
     CENTER,
     EXPLOIT,
@@ -850,13 +851,15 @@ def _load_local_instance(path: Path, index: int) -> tuple[MKPInstance, dict]:
         raise ValueError(f"could not parse local OR-Library file: {exc}") from exc
     if index >= len(rows):
         raise ValueError(f"instance index must be in 0..{len(rows) - 1}")
-    instance = _instance_from_row(rows[index])
+    reference, source = resolve_reference(path, index, float(rows[index]["valor_optimo"]))
+    instance = _instance_from_row({**rows[index], "valor_optimo": reference})
     info = {
         "path": str(path.resolve()),
         "index": index,
         "n": instance.n,
         "m": instance.m,
         "reference": float(instance.valor_optimo),
+        "reference_source": source,
     }
     return instance, info
 

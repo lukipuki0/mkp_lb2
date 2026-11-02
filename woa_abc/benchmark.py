@@ -77,6 +77,8 @@ RUN_CSV_FIELDS = (
     "n_profile_changes",
     "policy",
     "termination_reason",
+    "reference",
+    "reference_source",
 )
 HISTORY_CSV_FIELDS = (
     "iteracion",
@@ -117,6 +119,7 @@ EXPECTED_ARTIFACTS = (
     "best_run_01/historial_dtw.csv",
     "best_run_01/historial_dtw_detalle.txt",
     "best_run_01/fitness_convergence.png",
+    "best_run_01/dtw_delta.png",
     "best_run_01/parameters.png",
     "best_run_01/temporal_diagnostics.png",
     "best_run_01/temporal_diagnostics.pdf",
@@ -124,8 +127,6 @@ EXPECTED_ARTIFACTS = (
     "best_run_01/temporal_series.csv",
     "best_run_01/temporal_metadata.json",
 )
-# Written only when the monitor had a ready window, as gwo_de_dtw skips it.
-OPTIONAL_ARTIFACTS = ("best_run_01/dtw_delta.png",)
 
 
 class ExportError(Exception):
@@ -344,7 +345,7 @@ def history_csv_row(row: HistoryRow) -> dict[str, str]:
     }
 
 
-def run_csv_row(result, elapsed: float) -> dict[str, str]:
+def run_csv_row(result, elapsed: float, reference: float, reference_source: str) -> dict[str, str]:
     gap = result.gap
     return {
         "run": "1",
@@ -359,6 +360,8 @@ def run_csv_row(result, elapsed: float) -> dict[str, str]:
         "n_profile_changes": str(count_profile_changes(result.diagnostics)),
         "policy": _policy_label(result),
         "termination_reason": str(result.termination_reason),
+        "reference": _number(reference),
+        "reference_source": reference_source,
     }
 
 
@@ -405,11 +408,11 @@ def _policy_label(result) -> str:
 
 def _gap_line(reference: float, gap: float | None) -> str:
     if reference <= 0.0 or gap is None:
-        return "desconocido (referencia almacenada; no se reemplaza)"
+        return "desconocido (sin referencia en la cabecera ni en mkcbres.txt)"
     return f"{float(gap):.2f}%"
 
 
-def summary_text(result, instance, display_name: str, elapsed: float) -> str:
+def summary_text(result, instance, display_name: str, elapsed: float, reference_source: str) -> str:
     config = result.metadata.get("config") or {}
     ceiling = config.get("max_evaluations")
     reference = float(instance.valor_optimo)
@@ -427,6 +430,7 @@ def summary_text(result, instance, display_name: str, elapsed: float) -> str:
         _labeled("Items / Restricc.", f"{instance.n} / {instance.m}"),
         _labeled("Runs ejecutados", 1),
         _labeled("Optimo conocido", f"{reference:.1f}"),
+        _labeled("Fuente del optimo", reference_source),
         _labeled("Mejor valor", _number(result.best_value)),
         _labeled("Gap", _gap_line(reference, result.gap)),
         _labeled("n_switches", N_SWITCHES),
@@ -446,8 +450,8 @@ def summary_text(result, instance, display_name: str, elapsed: float) -> str:
     return "\n".join(lines)
 
 
-def best_summary_text(result, instance, display_name: str, elapsed: float) -> str:
-    body = summary_text(result, instance, f"{display_name} (Run #01)", elapsed)
+def best_summary_text(result, instance, display_name: str, elapsed: float, reference_source: str) -> str:
+    body = summary_text(result, instance, f"{display_name} (Run #01)", elapsed, reference_source)
     return body + "El único run es run 01. No hay selección entre campañas.\n"
 
 
@@ -474,10 +478,23 @@ def write_plots(output_dir: Path, result, instance, name: str) -> list[str]:
     return save_all_plots(record, output_dir / "best_run_01")
 
 
-def write_tables(output_dir: Path, result, rows: list[HistoryRow], instance, display_name: str, elapsed: float) -> None:
-    _write_csv(output_dir / "runs_resultados.csv", RUN_CSV_FIELDS, [run_csv_row(result, elapsed)])
+def write_tables(
+    output_dir: Path,
+    result,
+    rows: list[HistoryRow],
+    instance,
+    display_name: str,
+    elapsed: float,
+    reference_source: str,
+) -> None:
+    reference = float(instance.valor_optimo)
+    _write_csv(
+        output_dir / "runs_resultados.csv",
+        RUN_CSV_FIELDS,
+        [run_csv_row(result, elapsed, reference, reference_source)],
+    )
     (output_dir / "resumen_pipeline.txt").write_text(
-        summary_text(result, instance, display_name, elapsed),
+        summary_text(result, instance, display_name, elapsed, reference_source),
         encoding="utf-8",
     )
     best = output_dir / "best_run_01"
@@ -485,7 +502,7 @@ def write_tables(output_dir: Path, result, rows: list[HistoryRow], instance, dis
     _write_csv(best / "historial_dtw.csv", HISTORY_CSV_FIELDS, [history_csv_row(row) for row in rows])
     (best / "historial_dtw_detalle.txt").write_text(detail_text(rows, display_name), encoding="utf-8")
     (best / "resumen_pipeline_best_run.txt").write_text(
-        best_summary_text(result, instance, display_name, elapsed),
+        best_summary_text(result, instance, display_name, elapsed, reference_source),
         encoding="utf-8",
     )
 
@@ -495,7 +512,6 @@ def output_completeness(output_dir: Path, *, manifest_present: bool) -> dict:
     if manifest_present:
         present.append("manifest.json")
     missing = [rel for rel in EXPECTED_ARTIFACTS if rel not in present]
-    present.extend(rel for rel in OPTIONAL_ARTIFACTS if (output_dir / rel).is_file())
     return {
         "complete": not missing,
         "expected": list(EXPECTED_ARTIFACTS),
@@ -515,11 +531,13 @@ def build_manifest(
     status: str,
     plot_error: str | None,
     completeness: dict,
+    reference_source: str,
 ) -> dict:
     config = result.metadata.get("config")
     if not isinstance(config, dict):
         raise ExportError("solver metadata is missing the effective config")
     solver_instance = result.metadata.get("instance")
+    # Both sides are the resolved reference (header, else mkcbres.txt).
     reference = float(instance.valor_optimo)
     if solver_instance is not None and float(solver_instance.get("reference")) != reference:
         raise ExportError("solver instance reference does not match the loaded file")
@@ -536,7 +554,8 @@ def build_manifest(
             "algorithm does not rotate. n_profile_changes counts exploit/explore "
             "profile changes. "
             "evaluation_ceiling is the resolved cap, not evaluations consumed. "
-            "A stored reference of 0 is unknown and is not replaced."
+            "A header reference of 0 is replaced by the best known value in "
+            "mkcbres.txt next to the instance file; reference_source names the origin."
         ),
         "effective_config": json.loads(json.dumps(config)),
         "detector_request": {
@@ -559,6 +578,7 @@ def build_manifest(
             "n": instance.n,
             "m": instance.m,
             "reference": reference,
+            "reference_source": reference_source,
         },
         "seed": result.metadata.get("seed"),
         "timing": {
@@ -685,7 +705,7 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
     plot_error = None
     try:
         rows = join_history(result.history, result.diagnostics)
-        write_tables(output, result, rows, instance, display, elapsed)
+        write_tables(output, result, rows, instance, display, elapsed, info["reference_source"])
     except Exception as exc:
         status = "export_failed"
         plot_error = "".join(traceback.format_exception(exc))
@@ -709,6 +729,7 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
             status,
             plot_error,
             output_completeness(output, manifest_present=True),
+            info["reference_source"],
         )
         _write_json(output / "manifest.json", manifest)
     except Exception as exc:

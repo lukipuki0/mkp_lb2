@@ -862,6 +862,7 @@ class TestCommandLine(unittest.TestCase):
         self.assertEqual(payload["metadata"]["instance"]["n"], 3)
         self.assertEqual(payload["metadata"]["instance"]["index"], 0)
         self.assertEqual(payload["metadata"]["instance"]["reference"], 9.0)
+        self.assertEqual(payload["metadata"]["instance"]["reference_source"], "header")
         self.assertEqual(sum(payload["evaluations_by_phase"].values()), payload["evaluations"])
         self.assertEqual(payload["cycles_completed"], 2)
         self.assertEqual(payload["metadata"]["config"]["policy"], "binary_complex")
@@ -954,6 +955,69 @@ class TestCommandLine(unittest.TestCase):
                     ]),
                     1,
                 )
+
+
+REPO_INSTANCES = Path(__file__).resolve().parents[1] / "instancias"
+TINY_TWO = "2\n3 1 0\n5 4 3\n2 2 2\n4\n3 1 0\n6 4 3\n2 2 2\n4\n"
+
+
+def _cli_payload(path: Path, index: int = 0) -> dict:
+    stdout = StringIO()
+    with redirect_stdout(stdout):
+        code = main([
+            "--instance", str(path), "--instance-index", str(index), "--seed", "1",
+            "--population-size", "2", "--iterations", "2", "--no-stagnation",
+        ])
+    if code != 0:
+        raise AssertionError(f"CLI exit {code}")
+    return json.loads(stdout.getvalue())
+
+
+class TestBestKnownReference(unittest.TestCase):
+    """Spec S9: a header of 0 takes the best known value from mkcbres.txt beside the file."""
+
+    def test_mknapcb1_index_0_uses_24381_and_reports_the_gap(self) -> None:
+        payload = _cli_payload(REPO_INSTANCES / "mknapcb1.txt", 0)
+        info = payload["metadata"]["instance"]
+        self.assertEqual(info["reference"], 24381.0)
+        self.assertEqual(info["reference_source"], "mkcbres.txt")
+        best = payload["best_value"]
+        self.assertAlmostEqual(payload["gap"], (24381.0 - best) / 24381.0 * 100.0)
+
+    def test_folder_without_mkcbres_keeps_0_and_no_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mknapcb1.txt"
+            path.write_text(TINY_TWO, encoding="utf-8")
+            payload = _cli_payload(path, 0)
+        self.assertEqual(payload["metadata"]["instance"]["reference"], 0.0)
+        self.assertEqual(payload["metadata"]["instance"]["reference_source"], "unknown")
+        self.assertIsNone(payload["gap"])
+
+    def test_missing_entry_or_family_is_unknown_and_header_wins(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            (folder / "mkcbres.txt").write_text(
+                "Problem Name        Best Feasible Solution Value\n\n5.100-00   24381\n\n"
+                "Problem Name     LP optimal\n\n5.100-01   99999\n",
+                encoding="utf-8",
+            )
+            family = folder / "mknapcb1.txt"
+            family.write_text(TINY_TWO, encoding="utf-8")
+            other = folder / "other.txt"
+            other.write_text(TINY_TWO, encoding="utf-8")
+            header = folder / "mknapcb2.txt"
+            header.write_text("1\n3 1 9\n5 4 3\n2 2 2\n4\n", encoding="utf-8")
+            listed = _cli_payload(family, 0)["metadata"]["instance"]
+            second_table_only = _cli_payload(family, 1)
+            no_family = _cli_payload(other, 0)
+            stored = _cli_payload(header, 0)["metadata"]["instance"]
+        self.assertEqual((listed["reference"], listed["reference_source"]), (24381.0, "mkcbres.txt"))
+        self.assertEqual(second_table_only["metadata"]["instance"]["reference"], 0.0)
+        self.assertEqual(second_table_only["metadata"]["instance"]["reference_source"], "unknown")
+        self.assertIsNone(second_table_only["gap"])
+        self.assertEqual(no_family["metadata"]["instance"]["reference_source"], "unknown")
+        self.assertIsNone(no_family["gap"])
+        self.assertEqual((stored["reference"], stored["reference_source"]), (9.0, "header"))
 
 
 if __name__ == "__main__":

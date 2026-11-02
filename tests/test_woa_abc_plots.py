@@ -85,7 +85,8 @@ class PlotRecordTests(unittest.TestCase):
         self.assertEqual(res["changes"], self.result.profile_changes)
         self.assertGreaterEqual(len(res["changes"]), 2)
         self.assertEqual(res["monitor_config"], self.result.metadata["config"]["stagnation"])
-        self.assertEqual((res["policy"], res["seed"], res["known_optimum"]), ("binary_simple", 1, 0.0))
+        self.assertEqual((res["policy"], res["seed"], res["known_optimum"]), ("binary_simple", 1, 24381.0))
+        self.assertAlmostEqual(res["gap_pct"], (24381.0 - res["best_fitness"]) / 24381.0 * 100.0)
 
     def test_json_form_gives_the_same_record(self):
         loaded = json.loads(json.dumps(asdict(self.result)))
@@ -104,16 +105,30 @@ class PlotRecordTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete cycle 49 has no diagnostic"):
             plot_record(broken)
 
-    def test_detector_off_skips_delta_and_temporal(self):
+    def test_detector_off_writes_an_empty_delta_and_skips_temporal(self):
         res = plot_record(_solve(iterations=10, use_stagnation=False))
         self.assertNotIn("monitor_config", res)
         self.assertEqual({entry["ready"] for entry in res["monitor"]}, {False})
-        with tempfile.TemporaryDirectory() as tmp:
+        names = ["dtw_delta.png", "fitness_convergence.png", "parameters.png"]
+        with tempfile.TemporaryDirectory() as tmp, _kept_figures() as kept:
             paths = _quiet(save_all_plots, res, tmp)
-            self.assertEqual(sorted(Path(path).name for path in paths),
-                             ["fitness_convergence.png", "parameters.png"])
-            self.assertEqual(sorted(path.name for path in Path(tmp).iterdir()),
-                             ["fitness_convergence.png", "parameters.png"])
+            self.assertEqual(sorted(Path(path).name for path in paths), names)
+            self.assertEqual(sorted(path.name for path in Path(tmp).iterdir()), names)
+            delta = kept[1].axes[0]
+            self.assertEqual([text.get_text() for text in delta.texts], ["No DTW delta: detection off"])
+            self.assertEqual(len(delta.lines), 0)
+
+    def test_run_shorter_than_the_window_writes_an_empty_delta(self):
+        res = plot_record(_solve(iterations=3))
+        self.assertEqual({entry["ready"] for entry in res["monitor"]}, {False})
+        with tempfile.TemporaryDirectory() as tmp, _kept_figures() as kept:
+            path = _quiet(plot_dtw_delta, res, tmp)
+            self.assertEqual(Path(path), Path(tmp) / "dtw_delta.png")
+            self.assertTrue(Path(path).is_file())
+            ax = kept[0].axes[0]
+            self.assertEqual([text.get_text() for text in ax.texts], ["No DTW delta: no complete window"])
+            self.assertEqual(tuple(kept[0].get_size_inches()), (14.0, 5.0))
+            self.assertTrue(ax.get_title().startswith("DTW/DDTW Delta per Iteration"))
 
 
 class PlotFileTests(unittest.TestCase):
@@ -144,7 +159,10 @@ class PlotFileTests(unittest.TestCase):
             _quiet(plot_convergence, self.res, tmp)
             ax = kept[0].axes[0]
             segments = [line for line in ax.lines if line.get_linewidth() == 3.0]
-            changes = [line for line in ax.lines if line.get_linestyle() == "--"]
+            changes = [line for line in ax.lines
+                       if line.get_linestyle() == "--" and line.get_color() != "red"]
+            optimum = [line for line in ax.lines if line.get_color() == "red"]
+            self.assertEqual([list(line.get_ydata()) for line in optimum], [[24381.0, 24381.0]])
             self.assertEqual(len(segments), len(self.turns))
             self.assertEqual(len(changes), len(self.turns))
             starts, offset = [], 0
@@ -153,7 +171,7 @@ class PlotFileTests(unittest.TestCase):
                 offset += n
             self.assertEqual([line.get_xdata()[0] for line in changes], starts)
             self.assertEqual([text.get_text() for text in ax.get_legend().get_texts()],
-                             ["exploit", "explore"])
+                             ["exploit", "explore", "Optimum (24381)"])
             self.assertEqual(ax.get_xlabel(), "Accumulated Iterations")
 
     def test_delta_draws_one_segment_per_profile_turn_with_a_ready_point(self):
@@ -206,19 +224,34 @@ class GroupRunTests(unittest.TestCase):
                                                       "convergence_comparison.png"]))
             for policy in POLICIES:
                 folder = group / policy
-                for name in ("result.json", "fitness_convergence.png", "parameters.png") + TEMPORAL:
+                for name in ("result.json",) + PLOT_FILES:
                     self.assertTrue((folder / name).is_file(), f"{policy}/{name}")
                 saved = json.loads((folder / "result.json").read_text(encoding="utf-8"))
+                self.assertEqual(saved["metadata"]["instance"]["reference"], 24381.0)
+                self.assertEqual(saved["metadata"]["instance"]["reference_source"], "mkcbres.txt")
+                self.assertAlmostEqual(saved["gap"], (24381.0 - saved["best_value"]) / 24381.0 * 100.0)
                 self.assertEqual(saved["metadata"]["config"]["policy"], policy)
                 self.assertEqual(saved["metadata"]["seed"], 1)
                 self.assertEqual(saved["cycles_completed"], 20)
             self.assertIn(f"output={group}", stdout.getvalue())
+            self.assertIn("reference=24381 reference_source=mkcbres.txt", stdout.getvalue())
+            self.assertEqual(stdout.getvalue().count("known_optimum=24381 "), len(POLICIES))
 
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
                 run_main(argv)
             self.assertEqual(caught.exception.code, 2)
             self.assertIn("output directory is not empty", stderr.getvalue())
+
+    def test_group_shorter_than_the_window_still_writes_every_delta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            group = Path(tmp) / "short"
+            argv = ["--instance", str(INSTANCE), "--index", "0", "--seed", "1", "--pop", "4",
+                    "--iterations", "3", "--window", "5", "--out", str(group)]
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(run_main(argv), 0)
+            for policy in POLICIES:
+                self.assertTrue((group / policy / "dtw_delta.png").is_file(), policy)
 
 
 if __name__ == "__main__":

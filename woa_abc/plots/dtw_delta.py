@@ -10,6 +10,10 @@ The delta is the distance to the ramp curve (D1) minus the distance to the
 flat curve (D2):
   - Delta > 0  => the window looks more like a plateau => stagnation
   - Delta < 0  => the window is still improving        => active improvement
+
+WOA-ABC difference (spec S10): the file is always written. Without a ready
+window (run shorter than the window, or detection off) it is an explicit
+empty diagnostic with the same title, axes and size, not a skipped file.
 """
 
 import math
@@ -24,8 +28,14 @@ def delta_series(res: dict) -> list:
     return [out["delta"] if out["ready"] else float("nan") for out in res["monitor"]]
 
 
+def _empty_reason(res: dict) -> str:
+    if "monitor_config" not in res:
+        return "No DTW delta: detection off"
+    return "No DTW delta: no complete window"
+
+
 def plot_dtw_delta(res: dict, output_dir) -> str:
-    """Saves the delta plot and returns its path ("" when no window was ready)."""
+    """Saves the delta plot (an empty diagnostic without ready windows); returns its path."""
     dtw_deltas_global = delta_series(res)
     log_switches = profile_turns(res["profile_series"])
     colores_mh = config.PROFILE_COLORS
@@ -41,11 +51,12 @@ def plot_dtw_delta(res: dict, output_dir) -> str:
                 ys_validos.append(val)
         offset += n_seg
 
-    if not ys_validos:
-        print("  [plot] dtw_delta.png  -> sin datos suficientes, omitido.")
-        return ""
-
     fig, ax = plt.subplots(figsize=(14, 5))
+    if not ys_validos:
+        ax.text(0.5, 0.5, _empty_reason(res), transform=ax.transAxes,
+                ha="center", va="center", fontsize=18, color="dimgray")
+        ax.set_xlim(0, max(len(dtw_deltas_global) - 1, 1))
+        log_switches = []
     legend_patches = []
     seen = set()
     dibujar_lineas = len(log_switches) < 50
@@ -87,8 +98,9 @@ def plot_dtw_delta(res: dict, output_dir) -> str:
     ax.set_ylabel("DTW Delta", fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=15)
     # Keep the legend inside the axes, anchored at the lower-right corner.
-    ax.legend(handles=legend_patches, loc="lower right", fontsize=15,
-              borderaxespad=0.25, frameon=True, framealpha=0.88)
+    if legend_patches:
+        ax.legend(handles=legend_patches, loc="lower right", fontsize=15,
+                  borderaxespad=0.25, frameon=True, framealpha=0.88)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 

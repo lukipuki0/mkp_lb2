@@ -183,6 +183,9 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(by_index[("mknapcb1.txt", 1)], 99.0)
             self.assertEqual(by_index[("mknapcb1.txt", 2)], 0.0)
             self.assertNotIn(24381, {item["reference"] for item in selections})
+            sources = {(item["file"], item["index"]): item["reference_source"] for item in selections}
+            self.assertEqual(sources[("mknapcb1.txt", 0)], "unknown")
+            self.assertEqual(sources[("mknapcb1.txt", 1)], "header")
             rows = _read_csv(campaign / "campaign_results.csv")
             self.assertEqual(list(rows[0]), list(RESULT_FIELDS))
             self.assertEqual(len(rows), 81)
@@ -192,6 +195,8 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual({row["gap"] for row in index1}, {"1.25"})
             self.assertEqual({row["reference"] for row in index2}, {"0"})
             self.assertEqual({row["gap"] for row in index2}, {""})
+            self.assertEqual({row["reference_source"] for row in index1}, {"header"})
+            self.assertEqual({row["reference_source"] for row in index2}, {"unknown"})
             v0 = rows[0]
             self.assertEqual(v0["variant"], "v0")
             self.assertEqual(v0["fitness"], "1")
@@ -211,6 +216,28 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(v1["scout_limit"], "100")
             self.assertEqual(v1["status"], "completed")
             self.assertEqual((instances / "counter.txt").read_text(encoding="utf-8"), "0")
+
+    def test_header_zero_takes_the_same_index_from_mkcbres(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            instances = root / "instances"
+            instances.mkdir()
+            _populate(instances, (0.0, 99.0, 0.0))
+            source = Path(__file__).resolve().parents[1] / "instancias" / "mkcbres.txt"
+            (instances / "mkcbres.txt").write_bytes(source.read_bytes())
+            with patch("sys.stdout", StringIO()):
+                outcome = self._run(instances, root / "out", [])
+            self.assertEqual(outcome.code, 0, outcome.message)
+            experiment = json.loads((outcome.output_dir / "experiment.json").read_text(encoding="utf-8"))
+            rows = _read_csv(outcome.output_dir / "campaign_results.csv")
+        found = {(item["file"], item["index"]): (item["reference"], item["reference_source"])
+                 for item in experiment["selections"]}
+        self.assertEqual(found[("mknapcb1.txt", 0)], (24381.0, "mkcbres.txt"))
+        self.assertEqual(found[("mknapcb1.txt", 1)], (99.0, "header"))
+        self.assertEqual(found[("mknapcb1.txt", 2)], (23551.0, "mkcbres.txt"))
+        first = [row for row in rows if row["file"] == "mknapcb1.txt" and row["index"] == "0"]
+        self.assertEqual({(row["reference"], row["reference_source"]) for row in first},
+                         {("24381", "mkcbres.txt")})
 
     def test_policy_and_dtw_kirito_reach_every_export(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
