@@ -44,6 +44,9 @@ K = 5.0               # continuous_complex: sigmoid slope
 CENTER = 0.5          # continuous_complex: delta / theta_delta at intensity 0.5
 DTW_KIRITO = False    # binary policies only
 
+# Plot color of each profile, as gwo_de_dtw/config.py.
+PROFILE_COLORS = {"exploit": "#1f77b4", "explore": "#ff7f0e"}
+
 POLICIES = ("binary_simple", "binary_complex", "continuous_simple", "continuous_complex")
 BINARY_POLICIES = POLICIES[:2]
 CONTINUOUS_POLICIES = POLICIES[2:]

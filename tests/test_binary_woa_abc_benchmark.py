@@ -21,23 +21,13 @@ import woa_abc.solver as hybrid
 import woa_abc.benchmark as bench
 from woa_abc.solver import CycleRecord, HybridResult
 from woa_abc.benchmark import (
-    BOX_NOTE,
-    BOX_TITLE,
-    CONVERGENCE_SIZE,
-    DELTA_SIZE,
-    DPI,
-    EMPTY_DELTA_LABEL,
     EXPECTED_ARTIFACTS,
-    PARAMETER_SIZE,
+    OPTIONAL_ARTIFACTS,
     RUN_CSV_FIELDS,
     ExportRequest,
     HistoryRow,
     build_hybrid_config,
     build_parser,
-    draw_boxplot,
-    draw_convergence,
-    draw_delta,
-    draw_parameters,
     export_single_run,
     inherited_stagnation_config,
     join_history,
@@ -580,13 +570,13 @@ class ExporterTests(unittest.TestCase):
             raw = json.loads(raw_path.read_text(encoding="utf-8"))
             self.assertIn("best_solution", raw)
             self.assertTrue((output / "runs_resultados.csv").is_file())
-            self.assertFalse((output / "boxplot_runs.png").exists())
+            self.assertFalse((output / "best_run_01" / "fitness_convergence.png").exists())
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "plot_failed")
             self.assertIn("plot boom", manifest["plot_error"])
             self.assertFalse(manifest["solver_rerun"])
             self.assertFalse(manifest["output_completeness"]["complete"])
-            self.assertIn("boxplot_runs.png", manifest["output_completeness"]["missing"])
+            self.assertIn("best_run_01/fitness_convergence.png", manifest["output_completeness"]["missing"])
             self.assertEqual(raw_path.read_text(encoding="utf-8").count("best_solution"), 1)
 
     def test_synthetic_profile_changes_do_not_become_switches(self) -> None:
@@ -599,7 +589,10 @@ class ExporterTests(unittest.TestCase):
             def solver(*_args, **_kwargs):
                 return result
 
-            outcome = export_single_run(_request(instance, root, timestamp="synth"), solver=solver)
+            # The synthetic diagnostics are not a replayable monitor history, so the
+            # verified temporal plot would refuse them; plots are checked in PlotTests.
+            with patch.object(bench, "write_plots", return_value=[]):
+                outcome = export_single_run(_request(instance, root, timestamp="synth"), solver=solver)
             self.assertEqual(outcome.code, 0, outcome.message)
             row = _read_csv(outcome.output_dir / "runs_resultados.csv")[0]
             self.assertEqual(row["n_switches"], "0")
@@ -622,136 +615,51 @@ class ExporterTests(unittest.TestCase):
             self.assertIn("no switches", text)
 
 
+GWO_DE_SIZES = {
+    "best_run_01/fitness_convergence.png": (14, 6),
+    "best_run_01/dtw_delta.png": (14, 5),
+    "best_run_01/parameters.png": (14, 7),
+}
+DPI = 150
+
+
 class PlotTests(unittest.TestCase):
-    def _rows(self) -> list[HistoryRow]:
-        return join_history(_synthetic_result().history, _synthetic_result().diagnostics)
+    def _export(self, root: Path, **overrides):
+        instance = ROOT / "instancias" / "mknapcb1.txt"
+        values = dict(population_size=4, iterations=45, timestamp="gwo")
+        values.update(overrides)
+        return export_single_run(_request(instance, root, **values), solver=hybrid.solve)
 
-    def test_fonts_profile_change_markers_and_empty_delta_label(self) -> None:
-        rows = self._rows()
-        fig, ax = matplotlib.pyplot.subplots()
-        draw_convergence(ax, rows, 0.0)
-        self.assertEqual(ax.title.get_fontsize(), 20)
-        self.assertEqual(ax.xaxis.label.get_fontsize(), 18)
-        self.assertEqual(ax.yaxis.label.get_fontsize(), 18)
-        self.assertEqual(ax.xaxis.label.get_text(), "Hybrid cycles")
-        self.assertEqual(ax.legend_.get_texts()[0].get_fontsize(), 15)
-        labels = [text.get_text() for text in ax.get_legend().get_texts()]
-        self.assertIn("WOA\u2013ABC", labels)
-        self.assertNotIn("profile change", labels)
-        self.assertNotIn("Optimum (0)", labels)
-        matplotlib.pyplot.close(fig)
-
-        fig, ax = matplotlib.pyplot.subplots()
-        draw_delta(ax, [HistoryRow(0, 1, 1, "exploit", 0.5, 1.0, 0.5, None, 1.0, True, None, None)])
-        drawn = " ".join(text.get_text() for text in ax.texts)
-        self.assertIn("Empty diagnostic", drawn)
-        self.assertIn("Not evidence of improvement", drawn)
-        self.assertIn("empty diagnostic", ax.get_title())
-        self.assertEqual(len(ax.lines), 0)
-        matplotlib.pyplot.close(fig)
-
-        fig, ax = matplotlib.pyplot.subplots()
-        draw_parameters(ax, rows)
-        handles, labels = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        self.assertIn("a", by_label)
-        self.assertIn("rho", by_label)
-        self.assertIn("exploit", by_label)
-        self.assertIn("explore", by_label)
-        self.assertIn("profile change", by_label)
-        self.assertFalse(any("recovery" in label for label in labels))
-        change_points = by_label["profile change"].get_offsets().tolist()
-        self.assertEqual(change_points, [[0.5, 0.5]])
-        a_line = by_label["a"]
-        self.assertEqual(list(a_line.get_ydata()), [0.5, 2.0, 2.0])
-        self.assertEqual(list(by_label["rho"].get_ydata()), [1.0, 2.0, 2.0])
-        self.assertIn("profile", ax.get_title())
-        matplotlib.pyplot.close(fig)
-
-        fig, ax = matplotlib.pyplot.subplots(figsize=(6, 5))
-        draw_boxplot(fig, ax, 8.0, "tiny/inst_00", 0.0)
-        self.assertIn("n = 1", ax.get_title())
-        self.assertIn("not inferential", ax.get_title())
-        self.assertNotIn("31", ax.get_title())
-        self.assertEqual(fig.texts[0].get_text(), BOX_NOTE)
-        self.assertEqual(ax.title.get_fontsize(), 11)
-        self.assertEqual(ax.xaxis.label.get_fontsize(), 10)
-        matplotlib.pyplot.close(fig)
-        self.assertIn("n = 1", BOX_TITLE)
-        self.assertIn("Empty diagnostic", EMPTY_DELTA_LABEL)
-
-    def test_mkp_style_uses_one_segment_and_keeps_profile_changes_on_parameters(self) -> None:
-        rows = self._rows()
-        expected = [row.cycle + 0.5 for row in rows if row.profile_changed]
-        self.assertTrue(expected)
-
-        def boundaries(ax):
-            return [line for line in ax.lines
-                    if line.get_linestyle() == "--"
-                    and list(line.get_xdata())[:1] == list(line.get_xdata())[1:]]
-
-        for draw in (lambda ax: draw_convergence(ax, rows, 0.0),
-                     lambda ax: draw_delta(ax, rows)):
-            with self.subTest(draw=draw):
-                fig, ax = matplotlib.pyplot.subplots()
-                try:
-                    draw(ax)
-                    starts = boundaries(ax)
-                    self.assertEqual([line.get_xdata()[0] for line in starts], [0])
-                    for line in starts:
-                        self.assertEqual(line.get_linewidth(), 1.5)
-                        self.assertEqual(line.get_alpha(), 0.5)
-                        self.assertNotEqual(line.get_color(), "#FF5722")
-                    labels = [text.get_text() for text in ax.legend_.get_texts()]
-                    self.assertIn("WOA\u2013ABC", labels)
-                    self.assertNotIn("profile change", labels)
-                    handle = ax.legend_.legend_handles[labels.index("WOA\u2013ABC")]
-                    self.assertIsInstance(handle, matplotlib.patches.Patch)
-                    self.assertEqual(ax.get_xlabel(), "Hybrid cycles")
-                    self.assertFalse(any("switch" in label.lower() for label in labels))
-                finally:
-                    matplotlib.pyplot.close(fig)
-        fig, ax = matplotlib.pyplot.subplots()
-        try:
-            draw_parameters(ax, rows)
-            self.assertEqual([line.get_xdata()[0] for line in boundaries(ax)], expected)
-            self.assertIn("profile change", ax.get_legend_handles_labels()[1])
-            self.assertNotIn("switch", " ".join(ax.get_legend_handles_labels()[1]).lower())
-        finally:
-            matplotlib.pyplot.close(fig)
-        fig, ax = matplotlib.pyplot.subplots()
-        try:
-            draw_convergence(ax, rows * 50, 0.0)
-            self.assertEqual(len(boundaries(ax)), 1)
-            self.assertNotIn("profile change", ax.get_legend_handles_labels()[1])
-        finally:
-            matplotlib.pyplot.close(fig)
-
-    def test_saved_png_signature_and_dimensions(self) -> None:
+    def test_exports_the_gwo_de_plot_set_without_boxplot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            instance = root / "plot.txt"
-            _write_instance(instance, 0.0)
-            outcome = export_single_run(_request(instance, root, timestamp="png"), solver=hybrid.solve)
+            outcome = self._export(Path(tmp))
             self.assertEqual(outcome.code, 0, outcome.message)
-            expected = {
-                "best_run_01/fitness_convergence.png": CONVERGENCE_SIZE,
-                "best_run_01/dtw_delta.png": DELTA_SIZE,
-                "best_run_01/parameter_profiles.png": PARAMETER_SIZE,
-                "boxplot_runs.png": (6, 5),
-            }
-            for relative, size in expected.items():
-                path = outcome.output_dir / relative
-                width, height, dpi = _png_size(path)
-                self.assertGreater(path.stat().st_size, 500, relative)
-                self.assertEqual(width, int(size[0] * DPI), relative)
-                self.assertEqual(height, int(size[1] * DPI), relative)
-                self.assertIsNotNone(dpi)
+            best = outcome.output_dir / "best_run_01"
+            for relative in EXPECTED_ARTIFACTS + OPTIONAL_ARTIFACTS:
+                self.assertTrue((outcome.output_dir / relative).is_file(), relative)
+            for relative, size in GWO_DE_SIZES.items():
+                width, height, dpi = _png_size(outcome.output_dir / relative)
+                self.assertEqual((width, height), (size[0] * DPI, size[1] * DPI), relative)
                 self.assertLess(abs(dpi - DPI), 1.0, relative)
-            detail = (outcome.output_dir / "best_run_01" / "historial_dtw.csv").read_text(encoding="utf-8")
-            self.assertNotIn("ESTANCAMIENTO", detail)
-            delta = outcome.output_dir / "best_run_01" / "dtw_delta.png"
-            self.assertTrue(delta.is_file())
+            self.assertFalse((outcome.output_dir / "boxplot_runs.png").exists())
+            self.assertFalse((best / "parameter_profiles.png").exists())
+            manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
+            completeness = manifest["output_completeness"]
+            self.assertTrue(completeness["complete"])
+            self.assertIn("best_run_01/dtw_delta.png", completeness["present"])
+            self.assertNotIn("boxplot_runs.png", completeness["expected"])
+            meta = json.loads((best / "temporal_metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["policy"], "binary_complex")
+            self.assertEqual(meta["instance"], "mknapcb1/inst_00")
+
+    def test_no_ready_window_skips_only_the_delta_plot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            outcome = self._export(Path(tmp), iterations=5)
+            self.assertEqual(outcome.code, 0, outcome.message)
+            self.assertFalse((outcome.output_dir / "best_run_01" / "dtw_delta.png").exists())
+            manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertTrue(manifest["output_completeness"]["complete"])
+            self.assertNotIn("best_run_01/dtw_delta.png", manifest["output_completeness"]["missing"])
 
 
 class DocumentTests(unittest.TestCase):
@@ -772,12 +680,16 @@ class DocumentTests(unittest.TestCase):
             "runs/run_01.json",
             "runs_resultados.csv",
             "resumen_pipeline.txt",
-            "boxplot_runs.png",
             "best_run_01/",
-            "parameter_profiles.png",
+            "parameters.png",
+            "temporal_diagnostics.png",
+            "python -m woa_abc.run",
+            "convergence_comparison.png",
         ):
             self.assertIn(name, text)
         self.assertNotIn("parameter_recovery.png", text)
+        self.assertNotIn("parameter_profiles.png", text)
+        self.assertNotIn("mkp_plots", text)
         for phrase in ("--policy", "--dtw-kirito", "binary_simple", "continuous_complex"):
             self.assertIn(phrase, text)
         self.assertIn("run_ddtw_", text)

@@ -2,7 +2,7 @@
 
 Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts, in that order. A stagnation detector chooses the parameter profile of the next cycle with the same policies as the GWO–DE hybrid (`gwo_de_dtw`). It does not abort the run, reset the population, or choose another algorithm.
 
-The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the 81-selection campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
+The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the four policies side by side with `python -m woa_abc.run`. Run the 81-selection campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
 
 This document describes the implementation. It does not claim that the hybrid improves on any published method.
 
@@ -174,19 +174,50 @@ The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/
 | `runs/run_01.json` | Full solver result, written before plots |
 | `runs_resultados.csv` | One row. `n_switches` is 0. `n_profile_changes` and `policy` describe the reaction |
 | `resumen_pipeline.txt` | Single-run note. No superiority claim |
-| `boxplot_runs.png` | Labelled n = 1. Not inferential evidence |
-| `best_run_01/` | History (with profile per cycle), detail, convergence, delta, and `parameter_profiles.png` |
+| `best_run_01/` | History (with profile per cycle), detail, and the GWO–DE plot set below |
 
-New exports copy the MKP drawing code into `woa_abc/mkp_plots.py`. They do not import `hybrid_mkp`, because that package loads the orchestrator.
+## Plots
 
-| Plot | Copied from | Intentional change |
-|------|-------------|--------------------|
-| `fitness_convergence.png` | `hybrid_mkp/plots/convergencia.py` `grafico_convergencia` | Title names WOA–ABC. Axis is hybrid cycles. One algorithm segment covers the run. |
-| `dtw_delta.png` | `hybrid_mkp/plots/dtw_delta.py` `grafico_dtw_delta` | Axis is hybrid cycles. The title is two lines so it stays inside the figure. A run with no finite delta still saves an honest empty diagnostic. |
-| `parameter_profiles.png` | No MKP equivalent. The Gantt chart is timed algorithm switches and is not used. | `a` and `rho` per cycle over a background shaded by profile. A change decided after cycle `g` is marked at `g + 0.5`. Fonts and legend follow the copied axes. |
-| `boxplot_runs.png` | `hybrid_mkp/batch_benchmark.py` `grafico_boxplot_runs` | Label is WOA–ABC and the sample count is n = 1. The footnote says this is not inferential and claims no superiority. |
+The plots are the GWO–DE plots. `woa_abc/plots/` is a copy of `gwo_de_dtw/plots/` from branch `feat/gwo-de-dtw-hybrid` (`__init__.py`, `_common.py`, `convergence.py`, `dtw_delta.py`, `parameters.py`, `temporal.py`, `comparison.py`). That package lives on another branch, so it is copied, not imported. Figure sizes, fonts, colors, change lines, legends, and the segment-by-profile logic are unchanged.
 
-Convergence and delta do not draw profile-change markers, because those markers would look like algorithm switches. Profile changes appear only on `parameter_profiles.png`.
+| File | What it shows |
+|------|---------------|
+| `fitness_convergence.png` | Best fitness per cycle, one colored segment per profile turn, a dashed line where each turn starts, and the optimum line when the reference is positive |
+| `dtw_delta.png` | Monitor delta per cycle, segmented and colored by profile like the convergence plot. Skipped when the monitor never had a ready window, as in GWO–DE |
+| `parameters.png` | Two panels: `a (WOA)` and `rho (ABC)` per cycle over a background shaded by profile. `G3` is recorded but not plotted |
+| `temporal_diagnostics.png` / `.pdf` | Four panels: best fitness and profile used, a rising and a flat window against their ramp and constant baselines, distances and thresholds, and delta with the controller decision |
+| `temporal_series.npz` / `.csv`, `temporal_metadata.json` | The series behind the temporal panels. The monitor is replayed from the saved config and checked against every recorded observation before anything is written |
+| `convergence_comparison.png` / `.pdf` | Group run only: the best-so-far line of each of the four policies on one axes |
+
+The only changes from GWO–DE are names. `parameters.png` has panels `a` and `rho` instead of `a`, `F`, and `CR`. The parameter and temporal titles say WOA–ABC. Axes that say "Generation" in GWO–DE say "Cycle". The convergence and delta plots keep the GWO–DE titles and the "Accumulated Iterations" axis, because GWO–DE uses those texts unchanged. `PROFILE_COLORS` lives in `woa_abc/profiles.py`.
+
+GWO–DE has no boxplot, so `boxplot_runs.png` is no longer written. The old parameter-profile plot is replaced by `parameters.png`.
+
+`woa_abc.plots.plot_record` turns a WOA–ABC result, or its JSON, into the run record the plots read:
+
+- Series have one entry per complete cycle. A partial final cycle, stopped by the evaluation cap, is left out because it never updated the monitor. `best_fitness` is still the archived best.
+- The monitor entry of cycle `g` is the diagnostic of cycle `g`. Its `profile` is the decision taken after `g`, used from `g + 1`.
+- With the detector on, a complete cycle without its diagnostic is an error.
+- With the detector off there is no monitor output. The delta plot and the temporal outputs are skipped. Convergence and parameters are still written.
+
+## Four-policy group run
+
+This command mirrors `gwo_de_dtw/run.py`. It runs `binary_simple`, `binary_complex`, `continuous_simple`, and `continuous_complex` one after the other, with the same settings and seed.
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.run --instance instancias/mknapcb1.txt --index 0 --seed 1 --pop 30 --iterations 1000 --out woa_abc/resultados/mknapcb1_0_s1.json
+```
+
+The group folder holds one `<policy>/` folder per policy and `convergence_comparison.png`/`.pdf`. Each policy folder has `result.json`, the full WOA–ABC result, plus the plot files above.
+
+Destination rules are the GWO–DE rules:
+
+- `--out X.json` writes to the folder `X/`.
+- Any other `--out` path is the folder itself.
+- Without `--out`, a new folder `<instance>_<index>_s<seed>_<timestamp>` is created in `woa_abc/resultados/`.
+- A destination that is not a folder, or is not empty, is refused before anything runs.
+
+The monitor defaults are the single-run settings above. `--signal`, `--window`, `--band`, `--plateau-max`, `--patience`, and `--dtw-kirito` override them. `--index` and `--pop` also accept `--instance-index` and `--population-size`. `--max-evaluations`, `--scout-limit`, and `--variant` work as in the solver CLI.
 
 ## Campaign of 81 runs
 
@@ -217,7 +248,7 @@ Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation 
 | Collision | Refuse an existing campaign directory or destination. Do not overwrite it |
 | Failure | Stop, keep the raw artifacts, do not rerun, and do not mark the campaign completed. No superiority claim is added |
 
-Each variant folder holds the single-run artifacts directly: `manifest.json`, `runs/run_01.json`, `runs_resultados.csv`, `resumen_pipeline.txt`, `boxplot_runs.png`, and `best_run_01/`. The campaign also writes `experiment.json`, `campaign_results.csv`, and `campaign_summary.json` at the top, plus `group_summary.csv` inside `100/`, `250/`, and `500/`. The `profile_changes` column counts profile changes per run.
+Each variant folder holds the single-run artifacts directly: `manifest.json`, `runs/run_01.json`, `runs_resultados.csv`, `resumen_pipeline.txt`, and `best_run_01/` with the GWO–DE plots. The campaign also writes `experiment.json`, `campaign_results.csv`, and `campaign_summary.json` at the top, plus `group_summary.csv` inside `100/`, `250/`, and `500/`. The `profile_changes` column counts profile changes per run.
 
 ## Checklist
 

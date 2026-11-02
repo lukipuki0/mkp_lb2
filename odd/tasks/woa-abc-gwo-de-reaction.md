@@ -18,16 +18,20 @@ Reference implementation (read-only, other branch): `gwo_de_dtw/controller.py`, 
 - S4. The monitor observes the archived best once per complete cycle (after ABC/scouts); partial final cycles do not update it. A profile change decided after cycle g applies from cycle g+1. Population, failure counters and archive are never reset.
 - S5. The old reaction (a/rho recovery clock and the variants that only alter it, `v2` and `v3`) is replaced. `v1` (scout limit 100) and `v4` (single-coordinate ABC step) are independent of the reaction and stay. `use_stagnation=False` / `--no-stagnation` keeps the exploit profile for the whole run.
 - S6. Record per cycle: profile name, a, rho, G3, intensity (None for binary), changed flag, and monitor output; record the cycles where the profile changed. Plots/exports that showed recoveries show profile changes instead.
+- S8. User: "que los de woa abc sean los mismo que gwo de" — the WOA–ABC plots are the GWO–DE plots: same files, same drawing code copied from `gwo_de_dtw/plots/` (convergence and delta segmented and coloured by profile with change lines, parameters per cycle, four-panel temporal with NPZ/CSV series, and the four-policy convergence comparison). Panels name WOA–ABC parameters (a, rho) instead of a, F, CR; titles say WOA–ABC; the x axis is cycles.
 - S7. CLI, benchmark and campaign expose `--policy` (four choices, default binary_complex) and `--dtw-kirito`. Docs (README) describe the new reaction and drop the recovery-clock text.
 
 ## Tasks
 | ID | Specs | Route | Commit |
 |----|-------|-------|--------|
-| T1 | S1–S7 | worker | this commit |
-| T2 | S1–S7 | verify inline (tests + smoke) | this commit |
+| T1 | S1–S7 | worker | f517717 |
+| T2 | S1–S7 | verify inline (tests + smoke) | f517717 |
+| T3 | S8 | worker | this commit |
 
 ## Log
 - L1. User: "cambia a la rama de woa abc, necesito que la reaccion a estancamiento sea igual a  gwo de los mismos modos, que siga secuencial se entiende?"
 - L2. User decisions: branch via separate worktree; reaction: "quiero los mismos mecanismos qye hay de binary y continous"; profile values: "despues lo discutimos" (provisional defaults, S3).
 - L3. Parent interpretation to confirm with user at close: v2/v3 removed because they only modify the replaced recovery clock (S5).
 - L4. Evidence: parent re-ran 103 targeted tests (101 pass; 2 pre-existing: `woa_abc.adaptive` import in legacy test_woa_abc_variants, TestPackageBoundary order-dependent, passes alone). Smokes seed 1, N6, 120 cycles: binary_simple best 23473 changes [18,40,63]; continuous_simple best 23423, 7 changes; worker: binary_complex 23462 (1), continuous_complex 23459 (7), kirito 23462 (3). Controller parity with gwo_de_dtw read line by line.
+- L5. User: "que los de woa abc sean los mismo que gwo de" (after the parent showed the plot differences: profile-coloured convergence/delta, parameters, temporal panel, policy comparison vs WOA–ABC single segment and boxplot).
+- L6. Evidence T3/T4: parent re-ran 110 targeted tests (only the 2 pre-existing failures); `python -m woa_abc.run` smoke (seed 1, N6, 120 cycles) wrote four policy folders with GWO–DE plot set and convergence_comparison.png/.pdf; parent inspected fitness_convergence and comparison. Removed unused woa_abc/mkp_plots.py; boxplot_runs.png and parameter_profiles.png dropped to match GWO–DE.

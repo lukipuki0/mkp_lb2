@@ -28,23 +28,7 @@ import matplotlib
 matplotlib.use("Agg", force=True)
 
 from . import solver as hybrid
-from .mkp_plots import (
-    BOX_NOTE,
-    BOX_TITLE,
-    CONVERGENCE_SIZE,
-    DELTA_SIZE,
-    DPI,
-    EMPTY_DELTA_LABEL,
-    PARAMETER_SIZE,
-    draw_boxplot,
-    draw_convergence,
-    draw_delta,
-    draw_parameters,
-    plot_boxplot,
-    plot_convergence,
-    plot_delta,
-    plot_parameters,
-)
+from .plots import plot_record, save_all_plots
 from .profiles import POLICIES, POLICY, check_policy
 from .solver import HybridConfig, solve
 from dtw_stagnation import StagnationConfig
@@ -128,15 +112,20 @@ EXPECTED_ARTIFACTS = (
     "manifest.json",
     "runs_resultados.csv",
     "resumen_pipeline.txt",
-    "boxplot_runs.png",
     "runs/run_01.json",
     "best_run_01/resumen_pipeline_best_run.txt",
     "best_run_01/historial_dtw.csv",
     "best_run_01/historial_dtw_detalle.txt",
     "best_run_01/fitness_convergence.png",
-    "best_run_01/dtw_delta.png",
-    "best_run_01/parameter_profiles.png",
+    "best_run_01/parameters.png",
+    "best_run_01/temporal_diagnostics.png",
+    "best_run_01/temporal_diagnostics.pdf",
+    "best_run_01/temporal_series.npz",
+    "best_run_01/temporal_series.csv",
+    "best_run_01/temporal_metadata.json",
 )
+# Written only when the monitor had a ready window, as gwo_de_dtw skips it.
+OPTIONAL_ARTIFACTS = ("best_run_01/dtw_delta.png",)
 
 
 class ExportError(Exception):
@@ -478,12 +467,11 @@ def detail_text(rows: list[HistoryRow], display_name: str) -> str:
     return "\n".join(preamble + body) + "\n"
 
 
-def write_plots(output_dir: Path, rows: list[HistoryRow], reference: float, name: str, best_value: float) -> None:
-    best = output_dir / "best_run_01"
-    plot_convergence(rows, reference, best / "fitness_convergence.png")
-    plot_delta(rows, best / "dtw_delta.png")
-    plot_parameters(rows, best / "parameter_profiles.png")
-    plot_boxplot(best_value, name, reference, output_dir / "boxplot_runs.png")
+def write_plots(output_dir: Path, result, instance, name: str) -> list[str]:
+    """The gwo_de_dtw plot set of this run in ``best_run_01/``; no boxplot (n = 1)."""
+
+    record = plot_record(result, instance=name, known_optimum=float(instance.valor_optimo))
+    return save_all_plots(record, output_dir / "best_run_01")
 
 
 def write_tables(output_dir: Path, result, rows: list[HistoryRow], instance, display_name: str, elapsed: float) -> None:
@@ -507,6 +495,7 @@ def output_completeness(output_dir: Path, *, manifest_present: bool) -> dict:
     if manifest_present:
         present.append("manifest.json")
     missing = [rel for rel in EXPECTED_ARTIFACTS if rel not in present]
+    present.extend(rel for rel in OPTIONAL_ARTIFACTS if (output_dir / rel).is_file())
     return {
         "complete": not missing,
         "expected": list(EXPECTED_ARTIFACTS),
@@ -703,7 +692,7 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
         traceback.print_exc()
     else:
         try:
-            write_plots(output, rows, float(instance.valor_optimo), display, float(result.best_value))
+            write_plots(output, result, instance, display)
         except Exception as exc:
             status = "plot_failed"
             plot_error = "".join(traceback.format_exception(exc))
