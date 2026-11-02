@@ -24,7 +24,7 @@ Segment = Tuple[str, int, int]  # (profile, first cycle index, end index exclusi
 
 
 def profile_color(name: str) -> str:
-    return config.PROFILE_COLORS.get(name, "gray")
+    return {"base": "#1f77b4", "recovery": "#ff7f0e"}.get(name, config.PROFILE_COLORS.get(name, "gray"))
 
 
 def profile_segments(profile_series: list) -> List[Segment]:

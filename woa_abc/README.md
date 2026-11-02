@@ -1,8 +1,8 @@
 # Binary WOA–ABC
 
-Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts, in that order. A stagnation detector chooses the parameter profile of the next cycle with the same policies as the GWO–DE hybrid (`gwo_de_dtw`). It does not abort the run, reset the population, or choose another algorithm.
+Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts, in that order. Two separate reaction modes are available: the four GWO–DE policies (default), or the original recovery-clock variants v0–v4. They never combine. It does not abort the run, reset the population, or choose another algorithm.
 
-The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the four policies side by side with `python -m woa_abc.run`. Run the 81-selection campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
+The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the four policies side by side with `python -m woa_abc.run`, or five variants with `--reaction variant`. Run the 135-selection variant campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
 
 This document describes the implementation. It does not claim that the hybrid improves on any published method.
 
@@ -36,7 +36,11 @@ The WOA leader coordinates are copied at the start of the WOA phase. Later updat
 
 `a2` and the spiral draw follow the ordinary cycle index: `a2 = -1 - s/(T-1)`. Profiles do not change them.
 
-## Profiles
+## Policy mode (default)
+
+`HybridConfig(reaction="policy")` selects policies; no `variant` is accepted. Omitted `policy` resolves to `binary_complex`.
+
+### Profiles
 
 A profile fixes three values for a whole cycle:
 
@@ -126,19 +130,21 @@ The solver JSON (`metadata.instance`), the single-run manifest (`input`), `runs_
 
 `result.metadata` repeats the seed, the resolved budget and scout limit, the LB2 constants, the policy, `dtw_kirito`, both profiles, and the effective detector settings. `result.history` has one record per entered cycle, including a partial final cycle.
 
-## Variants
+## Variant mode (separate)
 
-The default is `v0`. It is the baseline above, and its JSON does not gain a variant field. Pass `v1` or `v4` to change exactly one control. Variants do not combine, and both keep the stagnation reaction.
+API: `HybridConfig(reaction="variant", variant="v0")`. CLI: `--variant v0` (also v1–v4) selects this mode. No `policy` or `dtw_kirito` is accepted in variant mode, even an explicitly supplied default policy. Policy mode has no variant. This restores the search semantics of commit `8cc99f5`, not a variant of the profile policies.
 
-| Variant | Only change | Unchanged |
-|---------|-------------|-----------|
-| `v0` | None | Full baseline |
-| `v1` | Omitted scout limit resolves to 100 | Explicit `--scout-limit`; budget; profiles |
-| `v4` | Employed bees and onlookers perturb one random coordinate | `rho`, full-vector LB2/repair, and ABC acceptance |
+`T` stays fixed. Before any applied fire, `s` is the ordinary cycle index, `a = max(0, 2 - 2s/(T-1))`, and `rho = 1`. On fire the monitor is reset, not the population, failure counters or archive. Recovery is applied only when a next configured cycle exists and at least two evaluations remain for its first LB2 pair. A last-cycle fire is recorded but not applied. Partial cycles never update the monitor. `a2 = -1 - cycle/(T-1)` never restarts. G3 stays 0.5.
 
-`v4` draws one coordinate uniformly and adds the existing `phi` step on that coordinate only. The other coordinates are copied before the unchanged clip, LB2, and repair. LB2 still sees every coordinate, so repair may change more than one bit. ABC still accepts only a strict fitness gain.
+| Variant | Only change |
+|---------|-------------|
+| `v0` | Applied fire → next cycle `s=0`, `a=2`, `rho=2`; then `a=max(0,2-2s/(T-1))`, `rho=max(1,2-s/(T-1))` |
+| `v1` | Same clock; omitted scout limit is 100. An explicit limit still wins |
+| `v2` | After applied fire: `a=max(0,1-2s/(T-1))`, `rho=max(1,1.5-s/(T-1))`; pre-fire matches v0 |
+| `v3` | After applied fire recompute remaining cycles R, including the next cycle; for R>1 use `a=max(0,2-2s/(R-1))`, `rho=max(1,2-s/(R-1))`. R=1 uses a=0, rho=1. Another applied fire recomputes R |
+| `v4` | Same clock; employed bees and onlookers perturb one random coordinate with the scalar phi; full-vector LB2/repair and strict ABC acceptance remain unchanged |
 
-For `v1` and `v4`, `metadata.config.variant` names the variant. The single-run manifest copies that effective config. `v0` omits the key so older baseline JSON stays comparable.
+With detection off the ordinary clock still decays a, with rho=1 throughout. JSON always names `reaction` and, in variant mode, `variant` including v0; it contains no policy. Variant history records `schedule_index`, `segment` (base/recovery), a, rho, G3, best, evaluations and completeness. Diagnostics record every fire and `recovery_applied`; `profile_changes` stays empty. Exported tables distinguish `n_recoveries` from policy profile changes and algorithm switches.
 
 ## CLI
 
@@ -148,7 +154,7 @@ The command reads one local OR-Library file. It rejects URLs and other non-files
 python -m woa_abc --instance instancias/mknapcb1.txt --instance-index 0 --seed 1 --population-size 4 --iterations 6 --max-evaluations 200
 ```
 
-`--instance-index` is zero-based. `--scout-limit` is optional. `--variant` is `v0` when omitted. `--policy` is `binary_complex` when omitted; the choices are `binary_simple`, `binary_complex`, `continuous_simple`, and `continuous_complex`. `--dtw-kirito` selects the rolling binary control. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps the exploit profile. JSON is printed to stdout and includes the search result, profile changes, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`, `reference_source`).
+`--instance-index` is zero-based. `--scout-limit` is optional. Omitting `--variant` selects policy mode. `--variant v0` through `--variant v4` instead selects variant mode and cannot be combined with `--policy` or `--dtw-kirito`. `--policy` is `binary_complex` when omitted; the choices are `binary_simple`, `binary_complex`, `continuous_simple`, and `continuous_complex`. `--dtw-kirito` selects the rolling binary control. `--ddtw` selects derivative DTW. `--window`, `--band`, `--min-slope`, `--plateau-max`, and `--patience` override the corresponding monitor defaults. `--no-stagnation` keeps the exploit profile. JSON is printed to stdout and includes the search result, profile changes, diagnostics, effective config, and selected instance metadata (`path`, `index`, `n`, `m`, `reference`, `reference_source`).
 
 ## Checks
 
@@ -158,7 +164,7 @@ The focused check for this package is:
 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p "test_*woa_abc*.py" -v
 ```
 
-`tests/test_woa_abc_variants.py` imports removed legacy modules and is not a check for this package.
+All matching tests cover the current package, including mode separation, original variant clocks, replay, and isolated package-import boundaries.
 
 ## Single-run results
 
@@ -168,7 +174,7 @@ One local command writes a fresh results folder for one functional check. It doe
 PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000
 ```
 
-Defaults are seed 43, population 30, 1000 hybrid cycles, index 0, variant `v0`, and policy `binary_complex`. Pass `--policy` and `--dtw-kirito` as in the solver CLI. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A header reference of 0 is resolved from `mkcbres.txt` (see References).
+Defaults are seed 43, population 30, 1000 hybrid cycles, index 0, and policy `binary_complex` (no variant). Pass `--policy` and `--dtw-kirito` as in the solver CLI. The detector settings are the DDTW settings copied from `hybrid_mkp/batch_benchmark.py`: window 40, band 0 resolved to the auto band 4, min slope 0.1, plateau 15, patience 8, adaptive percentiles 30/70, and improvement tolerance 0. A header reference of 0 is resolved from `mkcbres.txt` (see References).
 
 One checked run per variant uses the same instance, seed, population, horizon, and evaluation cap. Run them separately. This command still writes one folder and does not grow a multi-run option.
 
@@ -176,9 +182,9 @@ One checked run per variant uses the same instance, seed, population, horizon, a
 PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.benchmark --instance instancias/mknapcb1.txt --instance-index 0 --seed 43 --population-size 30 --iterations 1000 --max-evaluations 180030 --variant v1
 ```
 
-Repeat with `--variant v4`. Omit `--variant` for the untouched `v0` baseline. Do not pass `--scout-limit` when the check is the `v1` default of 100.
+Repeat with `--variant v0`, `v2`, `v3`, and `v4` for the other recovery-clock variants. Omit `--variant` for default policy mode. Do not pass `--scout-limit` when the check is the `v1` default of 100.
 
-The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/`. The variant and policy are not part of that path. Read `manifest.json` field `effective_config` and `runs/run_01.json` fields `metadata.config.variant`, `metadata.config.policy`, `profile_changes`, `scout_limit`, `evaluations`, `evaluations_by_phase`, `metadata.config.max_evaluations`, `best_value`, `best_solution`, `gap`, and `termination_reason`. `v0` omits `variant`. The timestamp directory must not already exist. The completed seed-43 run `woa_abc/resultados/run_ddtw_20261019_071137/` was relocated here and was not rerun. It predates this stagnation reaction.
+The folder is `woa_abc/resultados/run_ddtw_<timestamp>/<file stem>/inst_<index>/`. The variant and policy are not part of that path. Read `manifest.json` field `effective_config` and `runs/run_01.json` fields `metadata.config.variant`, `metadata.config.policy`, `profile_changes`, `scout_limit`, `evaluations`, `evaluations_by_phase`, `metadata.config.max_evaluations`, `best_value`, `best_solution`, `gap`, and `termination_reason`. Variant mode always records `variant`, including `v0`. The timestamp directory must not already exist. The completed seed-43 run `woa_abc/resultados/run_ddtw_20261019_071137/` was relocated here and was not rerun. It predates this stagnation reaction.
 
 | File | What it is |
 |------|------------|
@@ -199,9 +205,9 @@ The plots are the GWO–DE plots. `woa_abc/plots/` is a copy of `gwo_de_dtw/plot
 | `parameters.png` | Two panels: `a (WOA)` and `rho (ABC)` per cycle over a background shaded by profile. `G3` is recorded but not plotted |
 | `temporal_diagnostics.png` / `.pdf` | Four panels: best fitness and profile used, a rising and a flat window against their ramp and constant baselines, distances and thresholds, and delta with the controller decision |
 | `temporal_series.npz` / `.csv`, `temporal_metadata.json` | The series behind the temporal panels. The monitor is replayed from the saved config and checked against every recorded observation before anything is written |
-| `convergence_comparison.png` / `.pdf` | Group run only: the best-so-far line of each of the four policies on one axes |
+| `convergence_comparison.png` / `.pdf` | Group run only: four policy lines or five variant lines (never mixed), with the common positive optimum reference |
 
-The only changes from GWO–DE are names. `parameters.png` has panels `a` and `rho` instead of `a`, `F`, and `CR`. The parameter and temporal titles say WOA–ABC. Axes that say "Generation" in GWO–DE say "Cycle". The convergence and delta plots keep the GWO–DE titles and the "Accumulated Iterations" axis, because GWO–DE uses those texts unchanged. `PROFILE_COLORS` lives in `woa_abc/profiles.py`.
+Policy-mode drawing retains the GWO–DE style. Variant mode uses base/recovery segment labels and the same blue/orange colors, with actual a/rho schedules; temporal replay resets on every fire (including unapplied terminal fires), not on policy changes. The temporal decision means recovery active rather than exploit/explore. Repeated recoveries remain visible in the schedules and exported changes. `parameters.png` has panels `a` and `rho` instead of `a`, `F`, and `CR`. The parameter and temporal titles say WOA–ABC. Axes that say "Generation" in GWO–DE say "Cycle". The convergence and delta plots keep the GWO–DE titles and the "Accumulated Iterations" axis, because GWO–DE uses those texts unchanged. `PROFILE_COLORS` lives in `woa_abc/profiles.py`.
 
 GWO–DE has no boxplot, so `boxplot_runs.png` is no longer written. The old parameter-profile plot is replaced by `parameters.png`.
 
@@ -229,11 +235,19 @@ Destination rules are the GWO–DE rules:
 - Without `--out`, a new folder `<instance>_<index>_s<seed>_<timestamp>` is created in `woa_abc/resultados/`.
 - A destination that is not a folder, or is not empty, is refused before anything runs.
 
-The monitor defaults are the single-run settings above. `--signal`, `--window`, `--band`, `--plateau-max`, `--patience`, and `--dtw-kirito` override them. `--index` and `--pop` also accept `--instance-index` and `--population-size`. `--max-evaluations`, `--scout-limit`, and `--variant` work as in the solver CLI.
+The monitor defaults are the single-run settings above. `--signal`, `--window`, `--band`, `--plateau-max`, `--patience`, and `--dtw-kirito` override them. `--index` and `--pop` also accept `--instance-index` and `--population-size`. `--max-evaluations` and `--scout-limit` work as in the solver CLI. Group mode is chosen by `--reaction policy|variant`; it has no individual `--variant` or `--policy` flag. `--dtw-kirito` is rejected in variant mode.
 
-## Campaign of 81 runs
+## Five-variant group run
 
-One command runs indices 0, 1, and 2 of `mknapcb1.txt` through `mknapcb9.txt` for variants `v0`, `v1`, and `v4`, all with one policy. That is 81 sequential runs (27 instances × 3 variants), one run per selection, in three groups of 27. It does not download data, repeat a selection 31 times, and it claims no superiority from n=1.
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.run --reaction variant --instance instancias/mknapcb1.txt --index 0 --seed 1 --pop 30 --iterations 1000 --max-evaluations 180030 --out woa_abc/resultados/variants_s1
+```
+
+This runs v0, v1, v2, v3, v4 separately with the same seed/settings. Each `<variant>/` contains `result.json` and exactly the same plot suite as a policy folder (including ALWAYS `dtw_delta.png`, even before window readiness), plus `convergence_comparison.png/.pdf` at group level. No policy is run or combined. Both modes preserve the optimum reference.
+
+## Campaign of 135 runs
+
+One command runs indices 0, 1, and 2 of `mknapcb1.txt` through `mknapcb9.txt` for separate variants `v0`–`v4`, without policies. That is 135 sequential runs (27 instances × 5 variants), one run per selection, in three groups of 45. It does not download data, repeat a selection 31 times, and it claims no superiority from n=1.
 
 ```text
 python -m woa_abc.campaign --instances-dir instancias
@@ -245,27 +259,27 @@ python -m woa_abc.campaign --instances-dir instancias
 python -B -m woa_abc.campaign --instances-dir instancias
 ```
 
-Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation cap of 180030, and policy `binary_complex`. `--policy` and `--dtw-kirito` apply to every run. Output is a new `woa_abc/resultados/campaign_<timestamp>/` directory. Old result folders are left in place.
+Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation cap of 180030, and reaction `variant`. Mixed policy flags are rejected before allocation. For a separate policy campaign use `--reaction policy` (all four, 108 runs), or also `--policy binary_complex` (one policy, 27 runs); `--dtw-kirito` is policy-only. Output is a new `woa_abc/resultados/campaign_<timestamp>/` directory. Old result folders are left in place.
 
 ## Details
 
 | Topic | Decision |
 |-------|----------|
 | Files | `mknapcb1.txt` … `mknapcb9.txt`, indices 0, 1, and 2 only |
-| Variants | `v0`, `v1`, `v4`, one export each. `v0` still omits the variant key in solver JSON |
-| Policy | One policy for the whole campaign, recorded in `experiment.json`, `campaign_summary.json`, and each CSV row |
+| Variants | `v0`–`v4`, one export each; reaction and variant are recorded even for v0 |
+| Policy | Separate `--reaction policy` campaign only; no variants |
 | Groups | Loaded `n`, checked against the file: 1, 4, 7 → 100; 2, 5, 8 → 250; 3, 6, 9 → 500 |
 | Budget | The cap is the explicit 180030 default. A variant may finish before 1000 cycles |
 | Reference | That index's header value, else its `mkcbres.txt` entry, else 0 (unknown). Recorded with `reference_source`. Do not copy index 0 onto index 1 or 2 |
 | Collision | Refuse an existing campaign directory or destination. Do not overwrite it |
 | Failure | Stop, keep the raw artifacts, do not rerun, and do not mark the campaign completed. No superiority claim is added |
 
-Each variant folder holds the single-run artifacts directly: `manifest.json`, `runs/run_01.json`, `runs_resultados.csv`, `resumen_pipeline.txt`, and `best_run_01/` with the GWO–DE plots. The campaign also writes `experiment.json`, `campaign_results.csv`, and `campaign_summary.json` at the top, plus `group_summary.csv` inside `100/`, `250/`, and `500/`. The `profile_changes` column counts profile changes per run.
+Each variant folder holds the single-run artifacts directly: `manifest.json`, `runs/run_01.json`, `runs_resultados.csv`, `resumen_pipeline.txt`, and `best_run_01/` with the GWO–DE plots. The campaign also writes `experiment.json`, `campaign_results.csv`, and `campaign_summary.json` at the top, plus `group_summary.csv` inside `100/`, `250/`, and `500/`. The `profile_changes` column counts policy profile changes; `recoveries` counts applied variant restarts. For a same-instance comparison PNG/PDF use the group commands above.
 
 ## Checklist
 
-- [ ] 81 start lines and 81 completion lines, or a failed stop with the raw JSON still present
-- [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after 81 completions
+- [ ] 135 start lines and 135 completion lines, or a failed stop with the raw JSON still present
+- [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after 135 variant completions
 - [ ] Each run's manifest shows the resolved `reference` and its `reference_source`
 
 ## Next step

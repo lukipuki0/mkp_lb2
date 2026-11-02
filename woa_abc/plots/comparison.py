@@ -33,18 +33,24 @@ def convergence_comparison_figure(records: Sequence[dict], seed_labels: bool = F
 
     seed_labels=True labels each line `<policy> (seed <seed>)`.
     """
+    variant = bool(records) and records[0].get("reaction") == "variant"
+    key = "variant" if variant else "policy"
+    if any((res.get("reaction") == "variant") != variant for res in records):
+        raise ValueError("cannot compare policies and variants in one group")
     for i, res in enumerate(records):
-        if not res.get("policy"):
-            raise ValueError(f"record {i} has no policy")
+        if not res.get(key):
+            raise ValueError(f"record {i} has no {key}")
         if seed_labels and res.get("seed") is None:
             raise ValueError(f"record {i} has no seed")
 
     fig, ax = plt.subplots(figsize=(14, 6))
     for res in records:
         series = res["best_series"]
-        label = f"{res['policy']} (seed {res['seed']})" if seed_labels else res["policy"]
+        label = f"{res[key]} (seed {res['seed']})" if seed_labels else res[key]
+        colors = dict(zip(('v0', 'v1', 'v2', 'v3', 'v4'),
+                          ('#0072B2', '#E69F00', '#009E73', '#CC79A7', '#000000'))) if variant else POLICY_COLORS
         ax.plot(range(1, len(series) + 1), series, label=label,
-                color=POLICY_COLORS.get(res["policy"], "gray"), linewidth=2.5, alpha=0.9)
+                color=colors.get(res[key], "gray"), linewidth=2.5, alpha=0.9)
 
     optima = {res.get("known_optimum") for res in records}
     if len(optima) == 1:
@@ -53,7 +59,8 @@ def convergence_comparison_figure(records: Sequence[dict], seed_labels: bool = F
             ax.axhline(y=optimum, color="red", linestyle="--", linewidth=2.0,
                        label=f"Best known ({optimum:.0f})")
 
-    title = "Best run of each policy" if seed_labels else "Convergence of the four policies"
+    title = ("Best run of each variant" if seed_labels else "Convergence of the five variants") if variant else (
+        "Best run of each policy" if seed_labels else "Convergence of the four policies")
     instances = {res.get("instance") for res in records}
     if len(instances) == 1 and None not in instances:
         instance_label = re.sub(r"\.txt(?=\[|$)", "", instances.pop(), flags=re.IGNORECASE)

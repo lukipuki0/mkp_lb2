@@ -16,11 +16,15 @@ Reference implementation (read-only, other branch): `gwo_de_dtw/controller.py`, 
   - Defaults as GWO–DE: scale 2.0, k 5.0, center 0.5.
 - S3. Profiles control the WOA `a` and the ABC step amplitude `rho` (phi ~ U[−rho, rho]), plus G3 (LB2 base flip probability) for parity with GWO–DE. Within a profile `a` is constant (as in GWO–DE), not the old linear decay. Values are provisional — user: "despues lo discutimos". Defaults in one config place: exploit a=0.5, rho=1.0, G3=0.5; explore a=2.0, rho=2.0, G3=0.5.
 - S4. The monitor observes the archived best once per complete cycle (after ABC/scouts); partial final cycles do not update it. A profile change decided after cycle g applies from cycle g+1. Population, failure counters and archive are never reset.
-- S5. The old reaction (a/rho recovery clock and the variants that only alter it, `v2` and `v3`) is replaced. `v1` (scout limit 100) and `v4` (single-coordinate ABC step) are independent of the reaction and stay. `use_stagnation=False` / `--no-stagnation` keeps the exploit profile for the whole run.
+- S5. Superseded by S11: policy mode uses the GWO–DE reaction, with no variants; variant mode restores v0–v4 and the original recovery clock separately. With detection off, policy mode stays exploit; variant mode follows its ordinary clock without recoveries.
 - S6. Record per cycle: profile name, a, rho, G3, intensity (None for binary), changed flag, and monitor output; record the cycles where the profile changed. Plots/exports that showed recoveries show profile changes instead.
 - S8. User: "que los de woa abc sean los mismo que gwo de" — the WOA–ABC plots are the GWO–DE plots: same files, same drawing code copied from `gwo_de_dtw/plots/` (convergence and delta segmented and coloured by profile with change lines, parameters per cycle, four-panel temporal with NPZ/CSV series, and the four-policy convergence comparison). Panels name WOA–ABC parameters (a, rho) instead of a, F, CR; titles say WOA–ABC; the x axis is cycles.
 - S9. User: "podrias copiar el archivo de los optimos que esta en isntancia" — `instancias/mkcbres.txt` is copied into this branch; when an instance header stores 0, the reference is the best-known value from mkcbres.txt next to the instance file, with the same lookup rules as `gwo_de_dtw/problem.py` (`FAMILY_PREFIX`, first table only, missing file or entry → 0 unknown). Used by solve CLI, benchmark, campaign and `woa_abc.run`, so gap and the optimum line appear.
 - S10. User: "el dtw delta tiene que generarse" — `dtw_delta.png` is always written and is a required artifact; when no ready window exists (or detection is off) it is still saved as an explicit empty diagnostic, never skipped.
+- S11. User: "ya mira usarmos los v0 v1 v2 v3 v4 pero sera algo aparte a las politicas ok? eso si quiero que genere lo mismo que woa abc que esta genera lo mismo que gwp de cierto? mismos graficos" — two separate reaction modes in woa_abc:
+  - Policy mode (current): the four GWO–DE policies (+ dtw_kirito) with the baseline search; no variant option there.
+  - Variant mode (separate): the original a/rho recovery clock restored exactly as at commit 8cc99f5 (fire → next cycle s=0, a=2, rho=2, decay with original T; a2 unchanged), with variants v0, v1 (scout limit 100), v2 (restart a=1, rho=1.5), v3 (decay over remaining cycles R), v4 (single-coordinate ABC step), exactly as described in `git show 8cc99f5:woa_abc/README.md` and implemented in `git show 8cc99f5:woa_abc/solver.py`. Variants never combine with policies.
+  - Both modes write the same GWO–DE plot set (fitness_convergence, dtw_delta always, parameters with a and rho, temporal panel) and a group comparison: policy group → four policies; variant group → five variants with convergence_comparison.png/.pdf.
 - S7. CLI, benchmark and campaign expose `--policy` (four choices, default binary_complex) and `--dtw-kirito`. Docs (README) describe the new reaction and drop the recovery-clock text.
 
 ## Tasks
@@ -29,9 +33,12 @@ Reference implementation (read-only, other branch): `gwo_de_dtw/controller.py`, 
 | T1 | S1–S7 | worker | f517717 |
 | T2 | S1–S7 | verify inline (tests + smoke) | f517717 |
 | T3 | S8 | worker | 54bfccc |
-| T5 | S9–S10 | worker | this commit |
+| T5 | S9–S10 | worker | 3153dc7 |
+| T7 | S11 | done: worker implementation and differential checks | feat(woa-abc): restore separate variant mode |
+| T8 | S11 | done: parent 119 tests OK, visual readback | feat(woa-abc): restore separate variant mode |
 
 ## Log
+- L10. User continuation: "termina todo". Worker completed separate modes; 20 variant comparisons against 8cc99f5 and 8 policy comparisons against 3153dc7 matched search behavior. Parent final suite: 119 tests, exit 0, 70.590s; diff check passed; variant comparison visually checked. Both former test failures fixed with current-mode tests and isolated import check, no skips. Large campaigns not launched; no push authorized. Work-unit boundary: this commit contains only S11 mode separation and its tests/docs, not accumulated branch work.
 - L1. User: "cambia a la rama de woa abc, necesito que la reaccion a estancamiento sea igual a  gwo de los mismos modos, que siga secuencial se entiende?"
 - L2. User decisions: branch via separate worktree; reaction: "quiero los mismos mecanismos qye hay de binary y continous"; profile values: "despues lo discutimos" (provisional defaults, S3).
 - L3. Parent interpretation to confirm with user at close: v2/v3 removed because they only modify the replaced recovery clock (S5).
@@ -40,3 +47,4 @@ Reference implementation (read-only, other branch): `gwo_de_dtw/controller.py`, 
 - L6. Evidence T3/T4: parent re-ran 110 targeted tests (only the 2 pre-existing failures); `python -m woa_abc.run` smoke (seed 1, N6, 120 cycles) wrote four policy folders with GWO–DE plot set and convergence_comparison.png/.pdf; parent inspected fitness_convergence and comparison. Removed unused woa_abc/mkp_plots.py; boxplot_runs.png and parameter_profiles.png dropped to match GWO–DE.
 - L7. User: "podrias copiar el archivo de los optimos que esta en isntancia , qie es v2 y v3? el dtw delta tiene que generarse"
 - L8. Evidence T5/T6: parent re-ran 118 targeted tests (only the 2 pre-existing failures); CLI mknapcb1[0] reference 24381 from mkcbres.txt, gap 7.37; dtw_delta required and saved empty with a message when no window or detection off.
+- L9. User: "ya mira usarmos los v0 v1 v2 v3 v4 pero sera algo aparte a las politicas ok? eso si quiero que genere lo mismo que woa abc que esta genera lo mismo que gwp de cierto? mismos graficos". Parent interpretation: variants = restored recovery-clock reaction as its own mode, not combined with policies; campaign of variants keeps v0–v4 (135 runs).

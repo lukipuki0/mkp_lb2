@@ -1,6 +1,6 @@
 """Sequential campaign for indices 0, 1, and 2 of the nine OR-Library files.
 
-One export per variant v0, v1 and v4 is 81 runs, all with the same policy. Results are grouped by the loaded
+Separate modes: five recovery-clock variants (135 runs) or four policies (108 runs). Results are grouped by the loaded
 item count: mknapcb1/4/7 are 100, mknapcb2/5/8 are 250, and mknapcb3/6/9 are
 500. This is not a 31-run study, it does not download data, and n=1 claims
 no superiority.
@@ -36,7 +36,7 @@ DEFAULT_MAX_EVALUATIONS = 180030
 DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parent / "resultados"
 
 INDICES = (0, 1, 2)
-VARIANTS = ("v0", "v1", "v4")
+VARIANTS = hybrid.VARIANTS
 FILES = tuple(f"mknapcb{number}.txt" for number in range(1, 10))
 GROUP_BY_FILE = {
     "mknapcb1.txt": 100,
@@ -49,8 +49,8 @@ GROUP_BY_FILE = {
     "mknapcb6.txt": 500,
     "mknapcb9.txt": 500,
 }
-PLANNED_RUNS = 81
-GROUP_RUNS = 27
+PLANNED_RUNS = 135
+GROUP_RUNS = 45
 RESULT_FIELDS = (
     "status",
     "variant",
@@ -71,6 +71,8 @@ RESULT_FIELDS = (
     "elapsed",
     "scout_limit",
     "output_path",
+    "reaction",
+    "recoveries",
 )
 NOTE = (
     "One run per selection. n=1 is not inferential evidence and claims no superiority. "
@@ -89,11 +91,16 @@ class Selection:
     file_name: str
     path: Path
     index: int
-    variant: str
+    variant: str | None
     n: int
     m: int
     reference: float
     reference_source: str
+    policy: str | None = None
+
+    @property
+    def label(self) -> str:
+        return self.variant or self.policy
 
 
 @dataclass
@@ -140,7 +147,7 @@ def destination_for(campaign: Path, selection: Selection) -> Path:
         / str(selection.n)
         / Path(selection.file_name).stem
         / f"inst_{selection.index:02d}"
-        / selection.variant
+        / selection.label
     )
 
 
@@ -149,11 +156,11 @@ def _validate_settings(
     population_size: int,
     iterations: int,
     max_evaluations: int,
-    policy: str = POLICY,
+    policy: str | None = None,
     dtw_kirito: bool = False,
+    reaction: str = "variant",
 ) -> None:
     hybrid._validate_seed(seed)
-    check_policy(policy)
     build_hybrid_config(
         ExportRequest(
             instance=Path("."),
@@ -161,7 +168,8 @@ def _validate_settings(
             population_size=population_size,
             iterations=iterations,
             max_evaluations=max_evaluations,
-            variant="v0",
+            reaction=reaction,
+            variant="v0" if reaction == "variant" else None,
             policy=policy,
             dtw_kirito=dtw_kirito,
         )
@@ -175,11 +183,18 @@ def _reject_local(value: object, label: str) -> None:
         raise CampaignError(str(exc)) from exc
 
 
-def _selections(instances_dir: Path) -> list[Selection]:
+def _selections(instances_dir: Path, reaction: str = "variant", policy: str | None = None) -> list[Selection]:
     _reject_local(instances_dir, "instances dir")
     directory = Path(instances_dir)
     if not directory.is_dir():
         raise CampaignError("instances dir must be an existing local directory")
+    if reaction not in hybrid.REACTIONS:
+        raise ValueError(hybrid.REACTION_ERROR)
+    if reaction == 'variant' and policy is not None:
+        raise ValueError(hybrid.VARIANT_MODE_ERROR)
+    if policy is not None:
+        check_policy(policy)
+    members = VARIANTS if reaction == 'variant' else ((policy,) if policy else POLICIES)
     found: list[Selection] = []
     for name in FILES:
         path = directory / name
@@ -193,13 +208,14 @@ def _selections(instances_dir: Path) -> list[Selection]:
                 raise CampaignError(f"{name} index {index} loaded n={info['n']}; expected {expected}")
             loaded.append((index, info))
         for index, info in loaded:
-            for variant in VARIANTS:
+            for member in members:
                 found.append(
                     Selection(
                         file_name=name,
                         path=path,
                         index=index,
-                        variant=variant,
+                        variant=member if reaction == 'variant' else None,
+                        policy=member if reaction == 'policy' else None,
                         n=int(info["n"]),
                         m=int(info["m"]),
                         reference=float(info["reference"]),
@@ -209,8 +225,8 @@ def _selections(instances_dir: Path) -> list[Selection]:
     counts: dict[int, int] = {}
     for item in found:
         counts[item.n] = counts.get(item.n, 0) + 1
-    if len(found) != PLANNED_RUNS or any(counts.get(n) != GROUP_RUNS for n in (100, 250, 500)):
-        raise CampaignError("selection count does not match 27 instances, 3 variants, and 27 runs per group")
+    if len(found) != 27 * len(members) or any(counts.get(n) != 9 * len(members) for n in (100, 250, 500)):
+        raise CampaignError("selection count does not match the selected reaction group")
     return found
 
 
@@ -256,6 +272,8 @@ def _outcome_row(selection: Selection, destination: Path, outcome: ExportOutcome
         "elapsed": timing.get("solve_seconds"),
         "scout_limit": None if raw is None else raw.get("scout_limit"),
         "output_path": str(destination),
+        "reaction": raw_config.get("reaction"),
+        "recoveries": counts.get("n_recoveries"),
     }
 
 
@@ -267,8 +285,8 @@ def _with_seed(row: dict, seed: int) -> dict:
 def _documents(campaign: Path, selections: list[Selection], settings: dict) -> tuple[dict, dict]:
     experiment = {
         "status": "running",
-        "kind": "additive_variant_campaign",
-        "runs_planned": PLANNED_RUNS,
+        "kind": "separate_reaction_campaign",
+        "runs_planned": len(selections),
         "runs_completed": 0,
         "runs_failed": 0,
         "superiority_claim": False,
@@ -276,7 +294,7 @@ def _documents(campaign: Path, selections: list[Selection], settings: dict) -> t
         "repetitions": 1,
         "note": NOTE,
         "settings": settings,
-        "groups": {"100": GROUP_RUNS, "250": GROUP_RUNS, "500": GROUP_RUNS},
+        "groups": {str(n): sum(s.n == n for s in selections) for n in (100, 250, 500)},
         "selections": [
             {
                 "file": item.file_name,
@@ -294,7 +312,7 @@ def _documents(campaign: Path, selections: list[Selection], settings: dict) -> t
     }
     summary = {
         "status": "running",
-        "runs_planned": PLANNED_RUNS,
+        "runs_planned": len(selections),
         "runs_completed": 0,
         "runs_failed": 0,
         "groups": {"100": 0, "250": 0, "500": 0},
@@ -358,13 +376,14 @@ def run_campaign(
     iterations: int = DEFAULT_ITERATIONS,
     max_evaluations: int = DEFAULT_MAX_EVALUATIONS,
     timestamp: str | None = None,
-    policy: str = POLICY,
+    policy: str | None = None,
     dtw_kirito: bool = False,
+    reaction: str = "variant",
 ) -> CampaignOutcome:
     """Validate every selected instance, then export one run at a time."""
 
-    _validate_settings(seed, population_size, iterations, max_evaluations, policy, dtw_kirito)
-    selections = _selections(Path(instances_dir))
+    _validate_settings(seed, population_size, iterations, max_evaluations, policy, dtw_kirito, reaction)
+    selections = _selections(Path(instances_dir), reaction, policy)
     root = DEFAULT_OUTPUT_ROOT if output_root is None else Path(output_root)
     campaign = _allocate(root, timestamp)
     settings = {
@@ -373,7 +392,8 @@ def run_campaign(
         "iterations": iterations,
         "max_evaluations": max_evaluations,
         "indices": list(INDICES),
-        "variants": list(VARIANTS),
+        "variants": list(VARIANTS) if reaction == 'variant' else [],
+        "reaction": reaction,
         "files": list(FILES),
         "policy": policy,
         "dtw_kirito": dtw_kirito,
@@ -397,7 +417,8 @@ def run_campaign(
             output_root=root,
             variant=selection.variant,
             destination=destination,
-            policy=policy,
+            reaction=reaction,
+            policy=selection.policy,
             dtw_kirito=dtw_kirito,
         )
         try:
@@ -438,13 +459,13 @@ def run_campaign(
             ),
             flush=True,
         )
-    if summary["runs_completed"] != PLANNED_RUNS or summary["runs_failed"] != 0:
+    if summary["runs_completed"] != len(selections) or summary["runs_failed"] != 0:
         _refresh(experiment, summary, rows, summary.get("failed_selection"), "failed")
         _persist(campaign, experiment, summary, rows)
         return CampaignOutcome(1, campaign, "campaign incomplete; solver was not rerun")
     _refresh(experiment, summary, rows, None, "completed")
     _persist(campaign, experiment, summary, rows)
-    return CampaignOutcome(0, campaign, f"completed {PLANNED_RUNS}/{PLANNED_RUNS} {campaign}")
+    return CampaignOutcome(0, campaign, f"completed {len(selections)}/{len(selections)} {campaign}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -452,10 +473,10 @@ def build_parser() -> argparse.ArgumentParser:
         prog="woa_abc.campaign",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
-            "Run 81 sequential binary WOA-ABC exports: indices 0, 1, and 2 of "
-            "mknapcb1.txt through mknapcb9.txt, for variants v0, v1, and v4, "
-            "all with one stagnation policy. "
-            "Loaded sizes form three groups of 27 (100, 250, and 500). "
+            "Run 135 sequential WOA-ABC exports: indices 0, 1, and 2 of "
+            "mknapcb1.txt through mknapcb9.txt, for separate variants v0-v4. "
+            "Variant mode has three groups of 45 (100, 250, 500). "
+            "Policy mode instead runs all four policies (108 runs), or --policy selects one (27). "
             "Each selection is one run. This does not download data and claims no superiority."
         ),
     )
@@ -490,11 +511,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_EVALUATIONS,
         help="Explicit shared evaluation cap. This does not require all cycles to run.",
     )
+    parser.add_argument('--reaction', choices=hybrid.REACTIONS, default='variant',
+                        help='Separate campaign mode; default variant (135 runs).')
     parser.add_argument(
         "--policy",
-        default=POLICY,
+        default=None,
         choices=POLICIES,
-        help="Stagnation reaction policy used by every run.",
+        help="Policy mode only: select one policy instead of the four-policy group.",
     )
     parser.add_argument(
         "--dtw-kirito",
@@ -520,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
             iterations=args.iterations,
             max_evaluations=args.max_evaluations,
             policy=args.policy,
+            reaction=args.reaction,
             dtw_kirito=bool(args.dtw_kirito),
         )
     except (CampaignError, ExportError, ValueError, OSError) as exc:

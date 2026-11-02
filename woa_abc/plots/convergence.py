@@ -9,15 +9,13 @@ not imported); hybrid_mkp's MH turns are the profile turns here.
 
 import os
 
-from .. import profiles as config  # PROFILE_COLORS
-from ._common import mpatches, plt, profile_turns
+from ._common import mpatches, plt, profile_turns, profile_color
 
 
 def plot_convergence(res: dict, output_dir) -> str:
     """Saves the convergence plot and returns its path ("" when there are no cycles)."""
     historial_global = res["best_series"]
     log_switches = profile_turns(res["profile_series"])
-    colores_mh = config.PROFILE_COLORS
     valor_optimo = res["known_optimum"]
 
     if not historial_global:
@@ -35,7 +33,7 @@ def plot_convergence(res: dict, output_dir) -> str:
         if n_seg == 0:
             continue
         seg = historial_global[offset: offset + n_seg]
-        col = colores_mh.get(mh_nombre, "gray")
+        col = profile_color(mh_nombre)
 
         # Connect with the last point of the previous profile to draw one continuous line
         if offset > 0:

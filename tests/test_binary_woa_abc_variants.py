@@ -1,8 +1,4 @@
-"""Additive v0, v1 and v4 regressions for the shared-population WOA-ABC hybrid.
-
-v0 is the unchanged baseline. Each later variant changes one control only and
-keeps the stagnation reaction.
-"""
+"""Original v0/v1/v4 search invariants in separate recovery-clock mode."""
 
 from __future__ import annotations
 
@@ -30,7 +26,7 @@ from woa_abc.solver import (
     solve,
 )
 
-VARIANT_ERROR = "variant must be one of v0, v1, v4"
+VARIANT_ERROR = "variant must be one of v0, v1, v2, v3, v4"
 CLI_VARIANT_ERROR = f"error: {VARIANT_ERROR}\n"
 
 
@@ -51,6 +47,7 @@ def _config(**overrides: object) -> HybridConfig:
         "iterations": 4,
         "max_evaluations": 10_000,
         "use_stagnation": False,
+        "reaction": "variant",
     }
     values.update(overrides)
     return HybridConfig(**values)  # type: ignore[arg-type]
@@ -58,24 +55,24 @@ def _config(**overrides: object) -> HybridConfig:
 
 def _strip_variant(payload: dict) -> dict:
     config = payload["metadata"]["config"]
-    config.pop("variant", None)
+    config["variant"] = "v0"
     return payload
 
 
 class TestVariantSelection(unittest.TestCase):
-    def test_default_and_explicit_v0_match_and_omit_variant_metadata(self) -> None:
+    def test_variant_mode_default_and_explicit_v0_match(self) -> None:
         inst = _instance()
         omitted = solve(inst, _config(), seed=5)
         explicit = solve(inst, _config(variant="v0"), seed=5)
 
         self.assertEqual(omitted.scout_limit, 2 * inst.n)
-        self.assertNotIn("variant", omitted.metadata["config"])
-        self.assertNotIn("variant", explicit.metadata["config"])
+        self.assertEqual(omitted.metadata["config"]["variant"], "v0")
+        self.assertEqual(explicit.metadata["config"]["variant"], "v0")
         self.assertEqual(asdict(omitted), asdict(explicit))
-        self.assertEqual(HybridConfig().variant, "v0")
+        self.assertIsNone(HybridConfig().variant)
 
     def test_invalid_variant_is_rejected_without_mutating_other_fields(self) -> None:
-        for value in ("v2", "v3", "v5", "V1", "", None, True, 1):
+        for value in ("v5", "V1", "", True, 1):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError) as caught:
                     _config(variant=value)
@@ -223,8 +220,8 @@ class TestV4SingleCoordinate(unittest.TestCase):
         self.assertEqual(result.scout_limit, 2 * inst.n)
         self.assertEqual(baseline.scout_limit, 2 * inst.n)
         self.assertEqual(
-            [(record.profile, record.a, record.rho, record.G3) for record in result.history],
-            [(record.profile, record.a, record.rho, record.G3) for record in baseline.history],
+            [(record.segment, record.a, record.rho, record.G3) for record in result.history],
+            [(record.segment, record.a, record.rho, record.G3) for record in baseline.history],
         )
         self.assertEqual(sum(result.evaluations_by_phase.values()), result.evaluations)
         self.assertGreater(result.evaluations_by_phase[PHASE_EMPLOYED], 0)
@@ -255,7 +252,7 @@ class TestV4SingleCoordinate(unittest.TestCase):
 
 
 class TestVariantsKeepTheReaction(unittest.TestCase):
-    def test_v1_and_v4_change_profile_on_the_same_cycles_as_v0(self) -> None:
+    def test_v1_and_v4_recover_on_the_same_cycles_as_v0(self) -> None:
         # Every repair fills the knapsack, so the archived best is constant
         # whatever the variant draws.
         constant = MKPInstance(
@@ -279,10 +276,11 @@ class TestVariantsKeepTheReaction(unittest.TestCase):
             results[variant] = solve(constant, config, seed=1)
         for variant, result in results.items():
             with self.subTest(variant=variant):
-                self.assertEqual(result.profile_changes, [4])
+                self.assertEqual(result.profile_changes, [])
+                self.assertEqual([d['cycle'] for d in result.diagnostics if d['recovery_applied']], [4])
                 self.assertEqual(
-                    [record.profile for record in result.history],
-                    ["exploit"] * 5 + ["explore"] * 3,
+                    [record.segment for record in result.history],
+                    ["base"] * 5 + ["recovery"] * 3,
                 )
 
 
@@ -298,8 +296,8 @@ class TestVariantCommandLine(unittest.TestCase):
             self.assertEqual(main(["--help"]), 0)
         self.assertIn("--variant", stdout.getvalue())
         self.assertIn("v0", stdout.getvalue())
-        self.assertNotIn("v2", stdout.getvalue())
-        self.assertNotIn("v3", stdout.getvalue())
+        self.assertIn("v2", stdout.getvalue())
+        self.assertIn("v3", stdout.getvalue())
 
         with tempfile.TemporaryDirectory() as directory:
             path = self._file(directory)
@@ -325,8 +323,9 @@ class TestVariantCommandLine(unittest.TestCase):
 
         self.assertEqual(omitted_code, 0)
         self.assertEqual(explicit_code, 0)
-        self.assertEqual(omitted.getvalue(), explicit.getvalue())
         payload = json.loads(omitted.getvalue())
+        self.assertEqual(payload['metadata']['config']['reaction'], 'policy')
+        self.assertEqual(json.loads(explicit.getvalue())['metadata']['config']['variant'], 'v0')
         self.assertNotIn("variant", payload["metadata"]["config"])
         self.assertEqual(payload["metadata"]["config"]["scout_limit"], 6)
 
@@ -358,7 +357,7 @@ class TestVariantCommandLine(unittest.TestCase):
         self.assertIn("--variant", help_text)
         self.assertNotIn("--runs", help_text)
         args = bench.build_parser().parse_args(["--instance", "instancias/mknapcb1.txt"])
-        self.assertEqual(args.variant, "v0")
+        self.assertIsNone(args.variant)
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -393,6 +392,7 @@ class TestVariantCommandLine(unittest.TestCase):
                     output_root=root / "out",
                     timestamp="variantv1",
                     variant="v1",
+                    reaction="variant",
                 )
             )
             self.assertEqual(outcome.code, 0, outcome.message)
@@ -411,6 +411,7 @@ class TestVariantCommandLine(unittest.TestCase):
                         output_root=root / "rejected",
                         timestamp="bad",
                         variant="v9",
+                        reaction="variant",
                     )
                 )
             self.assertEqual(str(caught.exception), VARIANT_ERROR)

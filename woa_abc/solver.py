@@ -1,12 +1,20 @@
 """Shared-population binary WOA followed by a full ABC cycle for the MKP.
 
 A complete cycle is WOA, employed bees, onlookers, then eligible scouts.
-Initialization happens once, using the WOA sign-bit initializer. Each cycle
-runs with one profile (WOA ``a``, ABC ``rho``, LB2 ``G3``; see ``profiles``).
+Initialization happens once, using the WOA sign-bit initializer.
+
+Two separate reaction modes choose the WOA ``a``, the ABC ``rho`` and the LB2
+``G3`` of every cycle (``HybridConfig.reaction``):
+
+- ``"policy"`` (default): one of the four GWO-DE policies switches or blends
+  the exploit/explore profiles (``profiles``). No variant.
+- ``"variant"``: the a/rho recovery clock of commit 8cc99f5 with one of the
+  variants v0-v4 (``variants``). No policy, no dtw_kirito.
+
 After each complete cycle the existing stagnation monitor observes the
-archived best and the policy may change the profile used from the next cycle.
-Incomplete cycles are recorded and do not update the monitor. ``a2`` stays on
-the ordinary cycle index.
+archived best and the mode's controller decides the parameters of the next
+cycle. Incomplete cycles are recorded and do not update the monitor. ``a2``
+stays on the ordinary cycle index in both modes.
 """
 
 from __future__ import annotations
@@ -20,12 +28,21 @@ from pathlib import Path
 
 import numpy as np
 
-from dtw_stagnation import StagnationConfig
+from dtw_stagnation import StagnationConfig, StagnationMonitor
 from lb2.binarization import _calcular_L1, _calcular_L2
 from mkp_core.problem import MKPInstance
 from mkp_core.repair import reparar_solucion
 
 from .best_known import resolve_reference
+from .variants import (
+    VARIANT_ERROR,
+    VARIANT_G3,
+    VARIANT_SCOUT_LIMIT,
+    VARIANTS,
+    ClockCycleRecord,
+    RecoveryClock,
+    check_variant,
+)
 from .profiles import (
     CENTER,
     EXPLOIT,
@@ -57,8 +74,19 @@ PHASES = (
 TERMINATION_ITERATIONS = "iterations"
 TERMINATION_EVALUATION_BUDGET = "evaluation_budget"
 
-VARIANTS = ("v0", "v1", "v4")
-VARIANT_ERROR = "variant must be one of v0, v1, v4"
+REACTION_POLICY = "policy"
+REACTION_VARIANT = "variant"
+REACTIONS = (REACTION_POLICY, REACTION_VARIANT)
+REACTION_ERROR = "reaction must be one of policy, variant"
+POLICY_MODE_ERROR = (
+    "variant is only valid with reaction='variant'; policy mode takes policy and dtw_kirito"
+)
+VARIANT_MODE_ERROR = (
+    "policy and dtw_kirito are only valid with reaction='policy'; variant mode takes variant"
+)
+CLI_MODE_ERROR = (
+    "--variant selects variant mode and cannot be combined with --policy or --dtw-kirito"
+)
 
 # One initialization, plus a cycle that proposes three LB2 pairs and one scout
 # for every source. This is an upper bound, not a hidden extra search.
@@ -88,7 +116,13 @@ class CycleRecord:
 
 @dataclass
 class HybridConfig:
-    """Fixed baseline controls. ``None`` budgets are resolved by ``solve``."""
+    """Fixed baseline controls. ``None`` budgets are resolved by ``solve``.
+
+    ``reaction`` selects the mode. Policy mode fills an omitted ``policy``
+    with ``binary_complex`` and rejects ``variant``. Variant mode fills an
+    omitted ``variant`` with ``v0`` and rejects ``policy`` and
+    ``dtw_kirito=True``.
+    """
 
     population_size: int = 30
     iterations: int = 300
@@ -100,11 +134,16 @@ class HybridConfig:
     scout_limit: int | None = None
     use_stagnation: bool = True
     stag_cfg: StagnationConfig | None = None
-    variant: str = "v0"
-    policy: str = POLICY
+    variant: str | None = None
+    policy: str | None = None
     dtw_kirito: bool = False
+    reaction: str = REACTION_POLICY
 
     def __post_init__(self) -> None:
+        if self.reaction == REACTION_POLICY and self.policy is None:
+            self.policy = POLICY
+        if self.reaction == REACTION_VARIANT and self.variant is None:
+            self.variant = "v0"
         _validate_config(self)
 
 
@@ -113,7 +152,9 @@ class HybridResult:
     """JSON-friendly search report. Live positions and bit rows are omitted.
 
     ``profile_changes`` lists the cycles after which the profile changed; the
-    new profile is used from the following cycle.
+    new profile is used from the following cycle. It is always empty in
+    variant mode, where ``history`` holds ``ClockCycleRecord`` rows and each
+    diagnostic says whether its fire was ``recovery_applied``.
     """
 
     best_solution: list[int]
@@ -123,7 +164,7 @@ class HybridResult:
     evaluations_by_phase: dict[str, int]
     cycles_completed: int
     termination_reason: str
-    history: list[CycleRecord]
+    history: list[CycleRecord | ClockCycleRecord]
     phases_executed: list[str]
     source_trials: list[int]
     archive_size: int
@@ -155,6 +196,7 @@ class _RunState:
     diagnostics: list = field(default_factory=list)
     by_phase: dict[str, int] = field(default_factory=dict)
     controller: ProfileController | None = None
+    clock: RecoveryClock | None = None
 
     def __post_init__(self) -> None:
         if not self.by_phase:
@@ -195,10 +237,18 @@ def _validate_config(config: HybridConfig) -> None:
         _require_int("scout_limit", config.scout_limit, 1)
     if not isinstance(config.use_stagnation, bool):
         raise ValueError("use_stagnation must be a bool")
-    _validate_variant(config.variant)
-    check_policy(config.policy)
     if not isinstance(config.dtw_kirito, bool):
         raise ValueError("dtw_kirito must be a bool")
+    if not isinstance(config.reaction, str) or config.reaction not in REACTIONS:
+        raise ValueError(REACTION_ERROR)
+    if config.reaction == REACTION_POLICY:
+        if config.variant is not None:
+            raise ValueError(POLICY_MODE_ERROR)
+        check_policy(config.policy)
+    else:
+        if config.policy is not None or config.dtw_kirito:
+            raise ValueError(VARIANT_MODE_ERROR)
+        _validate_variant(config.variant)
     if config.stag_cfg is not None:
         _validate_stagnation(config.stag_cfg)
 
@@ -229,19 +279,35 @@ def _validate_stagnation(cfg: StagnationConfig) -> None:
         raise ValueError("improvement_tol must be a finite number >= 0")
 
 
-def _fresh_controller(config: HybridConfig) -> ProfileController | None:
-    """Copy the caller's detector settings into a run-local profile controller.
+def _fresh_stagnation_config(config: HybridConfig) -> StagnationConfig | None:
+    """Copy the caller's detector settings for one run.
 
     ``stag_cfg is None`` selects the existing defaults. It does not disable
-    detection; ``use_stagnation=False`` does that and keeps the exploit
-    profile. The copy absorbs the monitor's own band normalization so the
-    user's object stays unchanged.
+    detection; ``use_stagnation=False`` does that (policy mode keeps the
+    exploit profile, variant mode keeps rho at 1). The copy absorbs the
+    monitor's own band normalization so the user's object stays unchanged.
     """
 
     if not config.use_stagnation:
         return None
-    copied = StagnationConfig() if config.stag_cfg is None else replace(config.stag_cfg)
+    return StagnationConfig() if config.stag_cfg is None else replace(config.stag_cfg)
+
+
+def _fresh_controller(config: HybridConfig) -> ProfileController | None:
+    """Run-local profile controller of policy mode, or None when detection is off."""
+
+    copied = _fresh_stagnation_config(config)
+    if copied is None:
+        return None
     return ProfileController(copied, policy=config.policy, dtw_kirito=config.dtw_kirito)
+
+
+def _fresh_clock(config: HybridConfig) -> RecoveryClock:
+    """Run-local recovery clock of variant mode; its monitor is None when detection is off."""
+
+    copied = _fresh_stagnation_config(config)
+    monitor = None if copied is None else StagnationMonitor(cfg=copied)
+    return RecoveryClock(monitor, config.variant, config.iterations)
 
 
 def _validate_instance(inst: MKPInstance) -> None:
@@ -304,21 +370,19 @@ def _resolved_max_evaluations(config: HybridConfig) -> int:
 
 
 def _validate_variant(value: object) -> str:
-    if not isinstance(value, str) or value not in VARIANTS:
-        raise ValueError(VARIANT_ERROR)
-    return value
+    return check_variant(value)
 
 
 def _resolved_scout_limit(config: HybridConfig, n_items: int) -> int:
     if config.scout_limit is None:
         if config.variant == "v1":
-            return 100
+            return VARIANT_SCOUT_LIMIT
         return config.population_size * n_items
     return config.scout_limit
 
 
 def _a2(cycle_index: int, iterations: int) -> float:
-    """WOA spiral schedule. This follows the ordinary cycle, not the profile."""
+    """WOA spiral schedule. This follows the ordinary cycle, not the profile or clock."""
 
     return -1.0 + cycle_index * (-1.0 / (iterations - 1))
 
@@ -594,20 +658,47 @@ def _run_scouts(state: _RunState) -> bool:
     return True
 
 
-def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord:
+def _run_phases(state: _RunState, a: float, rho: float, a2: float) -> bool:
+    """WOA, employed bees, onlookers, scouts. False when a phase could not finish."""
+
+    if not _run_woa(state, a, a2):
+        return False
+    if not _run_employed(state, rho):
+        return False
+    if not _run_onlookers(state, rho):
+        return False
+    return _run_scouts(state)
+
+
+def _run_clock_cycle(state: _RunState, cycle_index: int) -> ClockCycleRecord:
+    clock = state.clock
+    a, rho = clock.parameters()
+    # LB2 reads G3 from the active profile; variant mode fixes it at 0.5.
+    state.profile = Profile(clock.segment, a=a, rho=rho, G3=VARIANT_G3)
+    # a2 intentionally uses cycle_index. Recovery must not restart this draw.
+    a2 = _a2(cycle_index, state.config.iterations)
+    complete = _run_phases(state, a, rho, a2)
+    return ClockCycleRecord(
+        cycle=cycle_index,
+        schedule_index=clock.schedule_index,
+        segment=clock.segment,
+        a=float(a),
+        rho=float(rho),
+        G3=float(VARIANT_G3),
+        best=float(state.best_value),
+        evaluations=state.evaluations,
+        completeness=complete,
+    )
+
+
+def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord | ClockCycleRecord:
+    if state.clock is not None:
+        return _run_clock_cycle(state, cycle_index)
     profile = state.profile
     a, rho = profile.a, profile.rho
     # a2 intentionally uses cycle_index. Profiles do not change this draw.
     a2 = _a2(cycle_index, state.config.iterations)
-    complete = True
-    if not _run_woa(state, a, a2):
-        complete = False
-    elif not _run_employed(state, rho):
-        complete = False
-    elif not _run_onlookers(state, rho):
-        complete = False
-    elif not _run_scouts(state):
-        complete = False
+    complete = _run_phases(state, a, rho, a2)
     return CycleRecord(
         cycle=cycle_index,
         profile=profile.name,
@@ -644,14 +735,41 @@ def _status_snapshot(status: dict) -> dict:
     return snapshot
 
 
-def _after_complete_cycle(state: _RunState, record: CycleRecord) -> dict | None:
-    """Observe one complete cycle and return its diagnostic.
+def _after_complete_clock_cycle(state: _RunState, record: ClockCycleRecord) -> dict | None:
+    """Variant mode: observe one complete cycle; a fire resets only the monitor.
 
-    The archived best is passed through once. The decided profile is stored
-    on ``state`` and used from the next cycle. Population, source trials, and
-    the archive are left in place. Returns None when detection is off.
+    ``recovery_applied`` starts False; ``solve`` sets it once it knows whether
+    the next indexed cycle can run a WOA pair.
     """
 
+    status = state.clock.observe(float(record.best))
+    if status is None:
+        return None
+    diagnostic = {
+        "cycle": record.cycle,
+        "schedule_index": record.schedule_index,
+        "evaluations": record.evaluations,
+        "a": float(record.a),
+        "rho": float(record.rho),
+        "best": float(record.best),
+        "recovery_applied": False,
+    }
+    diagnostic.update(_status_snapshot(status))
+    state.diagnostics.append(diagnostic)
+    return diagnostic
+
+
+def _after_complete_cycle(state: _RunState, record: CycleRecord | ClockCycleRecord) -> dict | None:
+    """Observe one complete cycle and return its diagnostic.
+
+    The archived best is passed through once. In policy mode the decided
+    profile is stored on ``state`` and used from the next cycle; variant mode
+    is ``_after_complete_clock_cycle``. Population, source trials, and the
+    archive are left in place. Returns None when detection is off.
+    """
+
+    if state.clock is not None:
+        return _after_complete_clock_cycle(state, record)
     controller = state.controller
     if controller is None:
         return None
@@ -676,10 +794,9 @@ def _after_complete_cycle(state: _RunState, record: CycleRecord) -> dict | None:
     return diagnostic
 
 
-def _stagnation_metadata(controller: ProfileController | None) -> dict | None:
-    if controller is None:
+def _stagnation_metadata(cfg: StagnationConfig | None) -> dict | None:
+    if cfg is None:
         return None
-    cfg = controller.cfg
     return {
         "window": int(cfg.window),
         "band": int(cfg.band),
@@ -699,11 +816,29 @@ def _run_metadata(
     seed: int,
     max_evaluations: int,
     scout_limit: int,
-    controller: ProfileController | None,
+    stag_cfg: StagnationConfig | None,
     caller_metadata: dict | None,
 ) -> dict:
     metadata = dict(caller_metadata or {})
     metadata["seed"] = seed
+    if config.reaction == REACTION_VARIANT:
+        # The 8cc99f5 keys, plus the mode and the variant (v0 included).
+        metadata["config"] = {
+            "population_size": config.population_size,
+            "iterations": config.iterations,
+            "max_evaluations": max_evaluations,
+            "scout_limit": scout_limit,
+            "v_max": float(config.v_max),
+            "b": float(config.b),
+            "G1": float(config.G1),
+            "G2": float(config.G2),
+            "G3": float(VARIANT_G3),
+            "use_stagnation": config.use_stagnation,
+            "stagnation": _stagnation_metadata(stag_cfg),
+            "reaction": config.reaction,
+            "variant": config.variant,
+        }
+        return metadata
     metadata["config"] = {
         "population_size": config.population_size,
         "iterations": config.iterations,
@@ -714,14 +849,13 @@ def _run_metadata(
         "G1": float(config.G1),
         "G2": float(config.G2),
         "use_stagnation": config.use_stagnation,
-        "stagnation": _stagnation_metadata(controller),
+        "stagnation": _stagnation_metadata(stag_cfg),
+        "reaction": config.reaction,
         "policy": config.policy,
         "dtw_kirito": config.dtw_kirito,
         "policy_params": {"scale": SCALE, "k": K, "center": CENTER},
         "profiles": {"exploit": asdict(EXPLOIT), "explore": asdict(EXPLORE)},
     }
-    if config.variant != "v0":
-        metadata["config"]["variant"] = config.variant
     return metadata
 
 
@@ -751,7 +885,13 @@ def solve(
     resolved_seed = _validate_seed(seed)
     max_evaluations = _resolved_max_evaluations(config)
     scout_limit = _resolved_scout_limit(config, inst.n)
-    controller = _fresh_controller(config)
+    controller = clock = None
+    if config.reaction == REACTION_VARIANT:
+        clock = _fresh_clock(config)
+        stag_cfg = None if clock.monitor is None else clock.monitor.cfg
+    else:
+        controller = _fresh_controller(config)
+        stag_cfg = None if controller is None else controller.cfg
     state = _RunState(
         inst=inst,
         config=config,
@@ -762,12 +902,13 @@ def solve(
         trials=np.zeros(config.population_size, dtype=int),
         max_evaluations=max_evaluations,
         scout_limit=scout_limit,
-        intensity=initial_intensity(config.policy),
+        intensity=None if clock is not None else initial_intensity(config.policy),
         controller=controller,
+        clock=clock,
     )
     _initialize(state)
 
-    history: list[CycleRecord] = []
+    history: list[CycleRecord | ClockCycleRecord] = []
     profile_changes: list[int] = []
     termination_reason = TERMINATION_ITERATIONS
     for cycle_index in range(config.iterations):
@@ -777,7 +918,13 @@ def solve(
             termination_reason = TERMINATION_EVALUATION_BUDGET
             break
         diagnostic = _after_complete_cycle(state, record)
-        if diagnostic is not None and diagnostic["changed"]:
+        if clock is not None:
+            # A claimed restart requires a later cycle that can execute one LB2 pair.
+            fired = diagnostic is not None and bool(diagnostic["fire"])
+            applied = clock.advance(fired, cycle_index, _remaining(state) >= 2)
+            if diagnostic is not None:
+                diagnostic["recovery_applied"] = applied
+        elif diagnostic is not None and diagnostic["changed"]:
             profile_changes.append(cycle_index)
 
     if sum(state.by_phase.values()) != state.evaluations:
@@ -805,7 +952,7 @@ def solve(
             resolved_seed,
             max_evaluations,
             scout_limit,
-            controller,
+            stag_cfg,
             metadata,
         ),
     )
@@ -882,11 +1029,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-stagnation",
         action="store_true",
-        help="Disable the detector and keep the exploit profile for the whole run.",
+        help="Disable detection: policy keeps exploit; variant keeps the baseline clock (rho=1).",
     )
     parser.add_argument(
         "--policy",
-        default=POLICY,
+        default=None,
         choices=POLICIES,
         help=(
             "Stagnation reaction. binary_simple and binary_complex switch between the "
@@ -907,13 +1054,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--patience", type=int, default=8)
     parser.add_argument(
         "--variant",
-        default="v0",
-        metavar="{v0,v1,v4}",
+        default=None,
+        metavar="{v0,v1,v2,v3,v4}",
         help=(
-            "One additive variant. v0 is the unchanged baseline. "
-            "v1 resolves an omitted scout limit to 100. "
-            "v4 perturbs one ABC coordinate before the unchanged LB2 repair. "
-            "Default: v0."
+            "Select separate variant mode: v0 baseline clock; v1 scout limit 100; "
+            "v2 softer restart; v3 remaining horizon; v4 one ABC coordinate. "
+            "Cannot combine with --policy or --dtw-kirito. Omitted: policy mode."
         ),
     )
     return parser
@@ -934,8 +1080,19 @@ def _validate_cli_monitor(args: argparse.Namespace) -> None:
         raise ValueError("patience must be an integer >= 1")
 
 
+def reaction_options(variant=None, policy=None, dtw_kirito=False) -> dict:
+    """Resolve single-run CLI mode before loading input or allocating output."""
+    if variant is not None:
+        _validate_variant(variant)
+        if policy is not None or dtw_kirito:
+            raise ValueError(CLI_MODE_ERROR)
+        return {"reaction": REACTION_VARIANT, "variant": variant}
+    return {"reaction": REACTION_POLICY, "policy": policy or POLICY,
+            "dtw_kirito": bool(dtw_kirito)}
+
+
 def _config_from_args(args: argparse.Namespace) -> HybridConfig:
-    _validate_variant(args.variant)
+    mode = reaction_options(args.variant, args.policy, args.dtw_kirito)
     _validate_cli_monitor(args)
     stag_cfg = None
     if not args.no_stagnation:
@@ -954,9 +1111,7 @@ def _config_from_args(args: argparse.Namespace) -> HybridConfig:
         scout_limit=args.scout_limit,
         use_stagnation=not args.no_stagnation,
         stag_cfg=stag_cfg,
-        variant=args.variant,
-        policy=args.policy,
-        dtw_kirito=bool(args.dtw_kirito),
+        **mode,
     )
 
 
@@ -970,9 +1125,8 @@ def main(argv: list[str] | None = None) -> int:
         code = exc.code
         return 0 if code is None else int(code)
     try:
-        _validate_variant(args.variant)
-        path = _local_instance_file(args.instance)
         config = _config_from_args(args)
+        path = _local_instance_file(args.instance)
         instance, info = _load_local_instance(path, args.instance_index)
         result = solve(instance, config, seed=args.seed, metadata={"instance": info})
     except (ValueError, OSError) as exc:

@@ -6,6 +6,7 @@ import inspect
 import json
 import random
 import sys
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -146,7 +147,7 @@ class TestValidation(unittest.TestCase):
             {"scout_limit": -3},
             {"scout_limit": True},
             {"policy": "nope"},
-            {"policy": None},
+            {"reaction": "unknown"},
             {"dtw_kirito": 1},
         )
         for overrides in rejected:
@@ -790,12 +791,14 @@ class TestReaction(unittest.TestCase):
 
 class TestPackageBoundary(unittest.TestCase):
     def test_package_import_does_not_load_matplotlib_or_benchmark(self) -> None:
-        import woa_abc
-
-        self.assertIs(woa_abc.solve, solve)
-        self.assertNotIn("woa_abc.benchmark", sys.modules)
-        self.assertNotIn("matplotlib", sys.modules)
-        self.assertNotIn("matplotlib.pyplot", sys.modules)
+        code = ("import sys, woa_abc; from woa_abc.solver import solve; "
+                "assert woa_abc.solve is solve; "
+                "assert 'woa_abc.benchmark' not in sys.modules; "
+                "assert 'matplotlib' not in sys.modules; "
+                "assert 'matplotlib.pyplot' not in sys.modules")
+        done = subprocess.run([sys.executable, '-B', '-c', code], capture_output=True, text=True,
+                              cwd=Path(__file__).resolve().parents[1])
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, '', ''))
 
 
 class TestCommandLine(unittest.TestCase):

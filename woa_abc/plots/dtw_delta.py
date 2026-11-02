@@ -19,8 +19,7 @@ empty diagnostic with the same title, axes and size, not a skipped file.
 import math
 import os
 
-from .. import profiles as config  # PROFILE_COLORS
-from ._common import mpatches, plt, profile_turns
+from ._common import mpatches, plt, profile_turns, profile_color
 
 
 def delta_series(res: dict) -> list:
@@ -38,7 +37,6 @@ def plot_dtw_delta(res: dict, output_dir) -> str:
     """Saves the delta plot (an empty diagnostic without ready windows); returns its path."""
     dtw_deltas_global = delta_series(res)
     log_switches = profile_turns(res["profile_series"])
-    colores_mh = config.PROFILE_COLORS
 
     xs_validos = []
     ys_validos = []
@@ -65,7 +63,7 @@ def plot_dtw_delta(res: dict, output_dir) -> str:
     for mh_nombre, n_seg in log_switches:
         if n_seg == 0:
             continue
-        col = colores_mh.get(mh_nombre, "gray")
+        col = profile_color(mh_nombre)
 
         # Points of the current segment
         seg_xs = [x for x in range(offset, offset + n_seg) if x in xs_validos]

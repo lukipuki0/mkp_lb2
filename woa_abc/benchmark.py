@@ -79,6 +79,9 @@ RUN_CSV_FIELDS = (
     "termination_reason",
     "reference",
     "reference_source",
+    "reaction",
+    "variant",
+    "n_recoveries",
 )
 HISTORY_CSV_FIELDS = (
     "iteracion",
@@ -109,6 +112,8 @@ HISTORY_CSV_FIELDS = (
     "trigger_streak",
     "window_n",
     "estado_dtw",
+    "schedule_index",
+    "recovery_applied",
 )
 EXPECTED_ARTIFACTS = (
     "manifest.json",
@@ -144,10 +149,11 @@ class ExportRequest:
     scout_limit: int | None = None
     output_root: Path = field(default_factory=lambda: DEFAULT_OUTPUT_ROOT)
     timestamp: str | None = None
-    variant: str = "v0"
+    variant: str | None = None
     destination: Path | None = None
-    policy: str = POLICY
+    policy: str | None = None
     dtw_kirito: bool = False
+    reaction: str = "policy"
 
 
 @dataclass
@@ -177,6 +183,8 @@ class HistoryRow:
     completeness: bool
     profile_changed: bool | None
     diagnostic: dict | None
+    schedule_index: int | None = None
+    recovery_applied: bool | None = None
 
 
 def inherited_stagnation_config() -> StagnationConfig:
@@ -204,6 +212,7 @@ def build_hybrid_config(request: ExportRequest) -> HybridConfig:
         scout_limit=request.scout_limit,
         use_stagnation=True,
         stag_cfg=inherited_stagnation_config(),
+        reaction=request.reaction,
         variant=request.variant,
         policy=request.policy,
         dtw_kirito=request.dtw_kirito,
@@ -267,13 +276,14 @@ def join_history(history: list, diagnostics: list) -> list[HistoryRow]:
         cycle = int(_field(record, "cycle"))
         diagnostic = indexed.get(cycle)
         changed = None if diagnostic is None else bool(diagnostic.get("changed"))
-        intensity = _field(record, "intensity")
+        variant = ("schedule_index" in record) if isinstance(record, dict) else hasattr(record, "schedule_index")
+        intensity = None if variant else _field(record, "intensity")
         rows.append(
             HistoryRow(
                 cycle=cycle,
                 iteration=cycle + 1,
                 evaluations=int(_field(record, "evaluations")),
-                profile=str(_field(record, "profile")),
+                profile=str(_field(record, "segment" if variant else "profile")),
                 a=float(_field(record, "a")),
                 rho=float(_field(record, "rho")),
                 G3=float(_field(record, "G3")),
@@ -282,6 +292,9 @@ def join_history(history: list, diagnostics: list) -> list[HistoryRow]:
                 completeness=bool(_field(record, "completeness")),
                 profile_changed=changed,
                 diagnostic=diagnostic,
+                schedule_index=int(_field(record, "schedule_index")) if variant else None,
+                recovery_applied=(bool(diagnostic.get("recovery_applied"))
+                                  if variant and diagnostic is not None else None),
             )
         )
     return rows
@@ -342,6 +355,8 @@ def history_csv_row(row: HistoryRow) -> dict[str, str]:
         "trigger_streak": _diag_cell(diagnostic, "trigger_streak"),
         "window_n": _diag_cell(diagnostic, "n"),
         "estado_dtw": estado_dtw(row),
+        "schedule_index": "" if row.schedule_index is None else str(row.schedule_index),
+        "recovery_applied": "" if row.recovery_applied is None else str(row.recovery_applied),
     }
 
 
@@ -362,6 +377,9 @@ def run_csv_row(result, elapsed: float, reference: float, reference_source: str)
         "termination_reason": str(result.termination_reason),
         "reference": _number(reference),
         "reference_source": reference_source,
+        "reaction": result.metadata.get("config", {}).get("reaction", "policy"),
+        "variant": result.metadata.get("config", {}).get("variant", ""),
+        "n_recoveries": str(sum(bool(d.get("recovery_applied")) for d in result.diagnostics)),
     }
 
 
@@ -447,6 +465,10 @@ def summary_text(result, instance, display_name: str, elapsed: float, reference_
         _labeled("Detector efectivo", _detector_line(result)),
         "",
     ]
+    if config.get("reaction") == "variant":
+        lines.extend([_labeled("Variante", config.get("variant")),
+                      _labeled("n_recoveries", sum(bool(d.get("recovery_applied")) for d in result.diagnostics)),
+                      "Recovery restarts only a/rho on the next executable cycle; not an algorithm switch.", ""])
     return "\n".join(lines)
 
 
@@ -593,6 +615,7 @@ def build_manifest(
             "cycles_recorded": len(result.history),
             "n_fires": count_fires(result.diagnostics),
             "n_profile_changes": count_profile_changes(result.diagnostics),
+            "n_recoveries": sum(bool(d.get("recovery_applied")) for d in result.diagnostics),
             "n_switches": N_SWITCHES,
             "termination_reason": result.termination_reason,
             "evaluations_by_phase": dict(result.evaluations_by_phase),
@@ -663,8 +686,6 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
     """Solve once, write raw JSON, then summaries and plots. Do not rerun."""
 
     runner = solve if solver is None else solver
-    hybrid._validate_variant(request.variant)
-    check_policy(request.policy)
     _reject_url(str(request.instance), "instance")
     _reject_url(str(request.output_root), "output root")
     if request.destination is not None:
@@ -758,17 +779,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--scout-limit", type=int, default=None)
     parser.add_argument(
         "--variant",
-        default="v0",
-        metavar="{v0,v1,v4}",
-        help=(
-            "One additive variant for this single run. v0 is the unchanged "
-            "baseline. v1 uses scout limit 100 unless --scout-limit is set. "
-            "v4 changes only the ABC coordinate mutation. Default: v0."
-        ),
+        default=None,
+        metavar="{v0,v1,v2,v3,v4}",
+        help="Select separate recovery-clock variant mode (v0-v4); cannot combine with --policy or --dtw-kirito.",
     )
     parser.add_argument(
         "--policy",
-        default=POLICY,
+        default=None,
         choices=POLICIES,
         help="Stagnation reaction policy. Default: binary_complex.",
     )
@@ -782,7 +799,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _request_from_args(args: argparse.Namespace) -> ExportRequest:
-    hybrid._validate_variant(args.variant)
+    mode = hybrid.reaction_options(args.variant, args.policy, args.dtw_kirito)
     _reject_url(str(args.instance), "instance")
     _reject_url(str(args.output_root), "output root")
     return ExportRequest(
@@ -794,9 +811,7 @@ def _request_from_args(args: argparse.Namespace) -> ExportRequest:
         max_evaluations=args.max_evaluations,
         scout_limit=args.scout_limit,
         output_root=Path(args.output_root),
-        variant=args.variant,
-        policy=args.policy,
-        dtw_kirito=bool(args.dtw_kirito),
+        **mode,
     )
 
 

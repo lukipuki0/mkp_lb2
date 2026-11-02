@@ -42,6 +42,7 @@ def build_series(res: dict) -> dict:
         data[key] = np.asarray(res['parameter_series'][key], dtype=float)
     intensity = res.get('intensity_series') or [None] * count
     data['intensity'] = np.array([np.nan if v is None else v for v in intensity], dtype=float)
+    variant = res.get('reaction') == 'variant'
     resets = (res.get('policy', 'binary_complex') in BINARY_POLICIES
               and not res.get('dtw_kirito', res.get('dtw_main', False)))
     for i, fitness in enumerate(res['best_series']):
@@ -50,8 +51,9 @@ def build_series(res: dict) -> dict:
         for key, value in out.items():
             if key not in saved or not np.isclose(value, saved[key], rtol=0, atol=1e-8):
                 raise ValueError(f'Monitor mismatch at cycle {i + 1}: {key}')
-        data['s'][i] = int(saved['profile'] == 'explore')
-        data['mode_used'][i] = int(res['profile_series'][i] == 'explore')
+        active_name = 'recovery' if variant else 'explore'
+        data['s'][i] = int(saved['profile'] == active_name)
+        data['mode_used'][i] = int(res['profile_series'][i] == active_name)
         for key in ('ready', 'fire', 'no_improve_len', 'trigger_streak'):
             data[key][i] = out.get(key, 0)
         data['adaptive_threshold'][i] = bool(cfg.adapt_thresholds and len(monitor.d1_hist) >= 10)
@@ -70,7 +72,9 @@ def build_series(res: dict) -> dict:
                                    ('delta', 'delta'), ('theta_R', 'theta_r'),
                                    ('theta_C', 'theta_c'), ('theta_delta', 'theta_delta')):
                 data[target][i] = out[source]
-        if saved['changed'] and resets:
+        if variant and out['fire']:
+            monitor.reset()  # Original clock resets on every fire, even when not applied.
+        elif saved['changed'] and resets:
             monitor = StagnationMonitor(cfg)
     return data
 
@@ -113,7 +117,7 @@ def plot_temporal(res: dict, output_dir) -> str:
     data = build_series(res)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    meta = {key: res[key] for key in ('instance', 'seed', 'binarization', 'policy', 'monitor_config',
+    meta = {key: res[key] for key in ('instance', 'seed', 'binarization', 'reaction', 'variant', 'policy', 'monitor_config',
                                     'best_fitness', 'gap_pct', 'evaluations') if key in res}
     meta['notes'] = {'s': 'Decision after t, used at t+1; 0 exploit, 1 explore.',
                      'mode_used': 'Profile that generated iteration t; used for shading.',
@@ -121,6 +125,10 @@ def plot_temporal(res: dict, output_dir) -> str:
                      'parameters': 'a, rho used at t; G3 is not plotted.',
                      'intensity': 'Continuous policies: intensity of the blended profile used at t (0 exploit, 1 explore). NaN for binary policies.',
                      'window_selection': 'Rising exploit window with total rise closest to its ramp (fallback any rising); midpoint of longest flat explore run (fallback any flat). Missing categories omitted.'}
+    variant = res.get('reaction') == 'variant'
+    if variant:
+        meta['notes']['s'] = 'Recovery active after t, used at t+1; 0 base, 1 recovery. Reset monitor on every fire.'
+        meta['notes']['mode_used'] = 'Clock segment used at t; 0 base, 1 recovery.'
     np.savez_compressed(output / 'temporal_series.npz', **data)
     np.savetxt(output / 'temporal_series.csv', np.column_stack([data[k] for k in SCALARS]),
                delimiter=',', header=','.join(SCALARS), comments='')
@@ -173,7 +181,7 @@ def plot_temporal(res: dict, output_dir) -> str:
         ax_s.step(t, data['s'], where='post', color='black', label='Decision s(t), applied at t+1')
         if np.isfinite(data['intensity']).any():
             ax_s.plot(t, data['intensity'], color='tab:purple', label='Intensity used at t')
-        ax_s.set(yticks=[0, 1], yticklabels=['Exploit', 'Explore'], ylim=(-.2, 1.4), xlabel='Cycle (1..T)')
+        ax_s.set(yticks=[0, 1], yticklabels=['Base', 'Recovery'] if variant else ['Exploit', 'Explore'], ylim=(-.2, 1.4), xlabel='Cycle (1..T)')
         ax_s.legend(loc='upper right')
         # Describe parameters actually used, without plotting the fixed G3;
         # blended (continuous) profiles show their min-max range.

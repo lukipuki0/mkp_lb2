@@ -29,11 +29,13 @@ def _get(record, name: str):
     return record[name] if isinstance(record, dict) else getattr(record, name)
 
 
-def _monitor_entry(diagnostic: dict) -> dict:
+def _monitor_entry(diagnostic: dict, *, variant: bool = False, name: str = "base") -> dict:
     """GWO-DE monitor output: status keys present in the update, then the decision."""
     entry = {key: diagnostic[key] for key in STATUS_KEYS if diagnostic.get(key) is not None}
-    entry["changed"] = bool(diagnostic["changed"])
-    entry["profile"] = diagnostic["next_profile"]
+    entry["changed"] = bool(diagnostic.get("recovery_applied" if variant else "changed"))
+    entry["profile"] = ("recovery" if entry["changed"] else name) if variant else diagnostic["next_profile"]
+    if variant:
+        entry["recovery_applied"] = bool(diagnostic["recovery_applied"])
     entry["intensity"] = diagnostic.get("next_intensity")
     return entry
 
@@ -44,6 +46,7 @@ def plot_record(result, instance: Optional[str] = None,
     metadata = _get(result, "metadata") or {}
     config = metadata.get("config") or {}
     monitor_config = config.get("stagnation")
+    variant = config.get("reaction") == "variant"
     if known_optimum is None:
         known_optimum = float((metadata.get("instance") or {}).get("reference", 0.0))
     diagnostics = {int(item["cycle"]): item for item in _get(result, "diagnostics")}
@@ -54,21 +57,23 @@ def plot_record(result, instance: Optional[str] = None,
         if not _get(cycle, "completeness"):
             continue
         index = int(_get(cycle, "cycle"))
-        name = str(_get(cycle, "profile"))
+        name = str(_get(cycle, "segment" if variant else "profile"))
         best_series.append(float(_get(cycle, "best")))
         profile_series.append(name)
         for key in parameter_series:
             parameter_series[key].append(float(_get(cycle, key)))
-        intensity_series.append(_get(cycle, "intensity"))
+        intensity_series.append(None if variant else _get(cycle, "intensity"))
         if monitor_config is None:
             monitor.append({"ready": False, "changed": False, "profile": name})
         elif index in diagnostics:
-            monitor.append(_monitor_entry(diagnostics[index]))
+            monitor.append(_monitor_entry(diagnostics[index], variant=variant, name=name))
         else:
             raise ValueError(f"complete cycle {index} has no diagnostic")
 
     gap = _get(result, "gap")
     record = {
+        "reaction": config.get("reaction", "policy"),
+        "variant": config.get("variant"),
         "policy": config.get("policy"),
         "dtw_kirito": bool(config.get("dtw_kirito", False)),
         "seed": metadata.get("seed"),
@@ -85,7 +90,8 @@ def plot_record(result, instance: Optional[str] = None,
         "profile_series": profile_series,
         "parameter_series": parameter_series,
         "intensity_series": intensity_series,
-        "changes": list(_get(result, "profile_changes")),
+        "changes": ([int(d["cycle"]) for d in diagnostics.values() if d.get("recovery_applied")]
+                    if variant else list(_get(result, "profile_changes"))),
         "monitor": monitor,
     }
     if monitor_config is not None:

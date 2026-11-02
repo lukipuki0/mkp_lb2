@@ -237,7 +237,7 @@ class InheritedConfigTests(unittest.TestCase):
         self.assertEqual(args.instance_index, 0)
         self.assertIsNone(args.max_evaluations)
         self.assertIsNone(args.scout_limit)
-        self.assertEqual(args.policy, "binary_complex")
+        self.assertIsNone(args.policy)  # Resolved to binary_complex by the config builder.
         self.assertFalse(args.dtw_kirito)
         chosen = parser.parse_args(
             ["--instance", "a.txt", "--policy", "continuous_complex", "--dtw-kirito"]
@@ -479,7 +479,7 @@ class ExporterTests(unittest.TestCase):
             self.assertEqual(int(run_row[0]["n_profile_changes"]), manifest["counts"]["n_profile_changes"])
             self.assertEqual(int(run_row[0]["n_profile_changes"]), len(raw["profile_changes"]))
             self.assertEqual(run_row[0]["policy"], "binary_complex")
-            self.assertNotIn("n_recoveries", run_row[0])
+            self.assertEqual(run_row[0]['n_recoveries'], '0')
             self.assertEqual(run_row[0]["termination_reason"], raw["termination_reason"])
             self.assertEqual(float(run_row[0]["mejor_valor"]), raw["best_value"])
             self.assertLess(abs(float(run_row[0]["tiempo_s"]) - manifest["timing"]["solve_seconds"]), 0.01)

@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     defaults = inherited_stagnation_config()
     parser = argparse.ArgumentParser(
         prog="python -m woa_abc.run",
-        description="WOA-ABC hybrid for the binary MKP with the four DTW/DDTW profile policies.",
+        description="WOA-ABC: separate four-policy or five-variant group with identical plot sets.",
         allow_abbrev=False,
     )
     parser.add_argument("--instance", required=True,
@@ -68,8 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "(default: none beyond the cycle horizon)")
     parser.add_argument("--scout-limit", type=int, default=None,
                         help="ABC scout limit (default: the variant's rule)")
-    parser.add_argument("--variant", default="v0", choices=hybrid.VARIANTS,
-                        help="additive variant (default: %(default)s)")
+    parser.add_argument("--reaction", choices=hybrid.REACTIONS, default="policy",
+                        help="Separate group: four policies (default) or five recovery-clock variants.")
     parser.add_argument("--seed", type=int, default=1,
                         help="random seed (default: %(default)s)")
     parser.add_argument("--dtw-kirito", action=argparse.BooleanOptionalAction, default=False,
@@ -124,11 +124,16 @@ def main(argv=None) -> int:
         cfg = replace(inherited_stagnation_config(), window=args.window, band=args.band,
                       plateau_max=args.plateau_max, patience=args.patience,
                       use_ddtw=(args.signal == "ddtw"))
-        configs = {policy: HybridConfig(
+        if args.reaction == 'variant' and args.dtw_kirito:
+            raise ValueError('--dtw-kirito is only valid in policy mode')
+        members = hybrid.VARIANTS if args.reaction == 'variant' else POLICIES
+        configs = {member: HybridConfig(
             population_size=args.pop, iterations=args.iterations,
             max_evaluations=args.max_evaluations, scout_limit=args.scout_limit,
-            use_stagnation=True, stag_cfg=cfg, variant=args.variant,
-            policy=policy, dtw_kirito=args.dtw_kirito) for policy in POLICIES}
+            use_stagnation=True, stag_cfg=cfg, reaction=args.reaction,
+            **({'variant': member} if args.reaction == 'variant' else
+               {'policy': member, 'dtw_kirito': args.dtw_kirito})) for member in members}
+        hybrid._validate_seed(args.seed)
         path = hybrid._local_instance_file(args.instance)
         inst, info = hybrid._load_local_instance(path, args.index)
     except ValueError as exc:
@@ -143,20 +148,20 @@ def main(argv=None) -> int:
           f"pop={args.pop} iterations={args.iterations} seed={args.seed} "
           f"reference={info['reference']:.0f} reference_source={info['reference_source']}"
           + (" dtw_kirito=True" if args.dtw_kirito else "")
-          + (f" variant={args.variant}" if args.variant != "v0" else ""))
+          + f" reaction={args.reaction}")
     records = []
-    for policy in POLICIES:
-        result = solve(inst, configs[policy], seed=args.seed, metadata={"instance": info})
+    for member in members:
+        result = solve(inst, configs[member], seed=args.seed, metadata={"instance": info})
         res = plot_record(result, instance=instance)
 
         gap = res["gap_pct"]
         gap_txt = f"{gap:.2f}%" if gap is not None else "n/a"
-        print(f"policy={policy} best={res['best_fitness']:.0f} "
+        print(f"{args.reaction}={member} best={res['best_fitness']:.0f} "
               f"known_optimum={res['known_optimum']:.0f} "
               f"gap={gap_txt} evaluations={res['evaluations']} "
               f"cycles={res['cycles']} changes={len(res['changes'])}")
 
-        folder = group / policy
+        folder = group / member
         folder.mkdir()
         _write_json(folder / "result.json", asdict(result))
         save_all_plots(res, folder)
