@@ -33,7 +33,6 @@ from woa_abc.solver import (
     _clip_coordinates,
     _commit_abc,
     _commit_woa,
-    _control_parameters,
     _freeze_leader,
     _prefer_l1,
     _replace_scout,
@@ -88,7 +87,6 @@ def _config(**overrides: object) -> HybridConfig:
         "b": 1.0,
         "G1": 0.5,
         "G2": 0.5,
-        "G3": 0.5,
     }
     values.update(overrides)
     return HybridConfig(**values)  # type: ignore[arg-type]
@@ -121,10 +119,13 @@ class TestValidation(unittest.TestCase):
         self.assertIsNone(config.max_evaluations)
         self.assertEqual(config.v_max, 6.0)
         self.assertEqual(config.b, 1.0)
-        self.assertEqual((config.G1, config.G2, config.G3), (0.5, 0.5, 0.5))
+        self.assertEqual((config.G1, config.G2), (0.5, 0.5))
+        self.assertFalse(hasattr(config, "G3"))
         self.assertIsNone(config.scout_limit)
         self.assertTrue(config.use_stagnation)
         self.assertIsNone(config.stag_cfg)
+        self.assertEqual(config.policy, "binary_complex")
+        self.assertFalse(config.dtw_kirito)
 
     def test_config_rejects_malformed_numbers(self) -> None:
         rejected = (
@@ -144,6 +145,9 @@ class TestValidation(unittest.TestCase):
             {"scout_limit": 0},
             {"scout_limit": -3},
             {"scout_limit": True},
+            {"policy": "nope"},
+            {"policy": None},
+            {"dtw_kirito": 1},
         )
         for overrides in rejected:
             with self.subTest(overrides=overrides):
@@ -378,7 +382,8 @@ class TestSearchContract(unittest.TestCase):
                 self.assertEqual(result.evaluations, evaluations)
                 self.assertLess(result.evaluations, budget if budget != evaluations else budget + 1)
                 self.assertFalse(result.history[-1].completeness)
-                self.assertEqual(result.history[0].a, 2.0)
+                self.assertEqual(result.history[0].profile, "exploit")
+                self.assertEqual(result.history[0].a, 0.5)
                 self.assertEqual(result.history[0].rho, 1.0)
                 self.assertEqual(len(result.history), 1)
                 if trials is not None:
@@ -423,21 +428,33 @@ class TestSearchContract(unittest.TestCase):
         self.assertEqual(result.history[-1].best, result.best_value)
         _assert_accounting(self, result)
 
-    def test_baseline_a_endpoints_and_json_history(self) -> None:
-        result = solve(
-            _constant_instance(),
-            _config(iterations=5, scout_limit=100, max_evaluations=10_000, use_stagnation=False),
-            seed=3,
-        )
+    def test_disabled_detector_keeps_the_exploit_profile_and_json_history(self) -> None:
+        for policy in ("binary_complex", "continuous_complex"):
+            with self.subTest(policy=policy):
+                result = solve(
+                    _constant_instance(),
+                    _config(
+                        iterations=5,
+                        scout_limit=100,
+                        max_evaluations=10_000,
+                        use_stagnation=False,
+                        policy=policy,
+                    ),
+                    seed=3,
+                )
 
-        self.assertEqual(result.cycles_completed, 5)
-        self.assertEqual(result.history[0].a, 2.0)
-        self.assertEqual(result.history[-1].a, 0.0)
-        self.assertEqual([record.schedule_index for record in result.history], [0, 1, 2, 3, 4])
-        self.assertTrue(all(record.rho == 1.0 for record in result.history))
-        self.assertEqual(result.diagnostics, [])
+                self.assertEqual(result.cycles_completed, 5)
+                self.assertEqual([record.profile for record in result.history], ["exploit"] * 5)
+                self.assertEqual([record.a for record in result.history], [0.5] * 5)
+                self.assertEqual([record.rho for record in result.history], [1.0] * 5)
+                self.assertEqual([record.G3 for record in result.history], [0.5] * 5)
+                expected = None if policy == "binary_complex" else 0.0
+                self.assertEqual([record.intensity for record in result.history], [expected] * 5)
+                self.assertEqual(result.diagnostics, [])
+                self.assertEqual(result.profile_changes, [])
         payload = json.loads(json.dumps(asdict(result)))
-        self.assertEqual(payload["history"][0]["a"], 2.0)
+        self.assertEqual(payload["history"][0]["a"], 0.5)
+        self.assertEqual(payload["history"][0]["profile"], "exploit")
         self.assertEqual(payload["history"][-1]["completeness"], True)
         self.assertEqual(payload["termination_reason"], TERMINATION_ITERATIONS)
 
@@ -465,12 +482,21 @@ class TestSearchContract(unittest.TestCase):
 
 
 class TestScheduleAndAcceptance(unittest.TestCase):
-    def test_a_schedule_endpoints_and_unchanged_a2(self) -> None:
-        self.assertEqual(_control_parameters(0, 300, False), (2.0, 1.0))
-        self.assertEqual(_control_parameters(299, 300, False), (0.0, 1.0))
-        self.assertEqual(_control_parameters(0, 300, True), (2.0, 2.0))
+    def test_a2_follows_the_ordinary_cycle_across_profile_changes(self) -> None:
         self.assertEqual(_a2(0, 300), -1.0)
         self.assertEqual(_a2(299, 300), -2.0)
+        calls: list[tuple[int, int]] = []
+        real = hybrid._a2
+
+        def spy(cycle_index: int, iterations: int) -> float:
+            calls.append((cycle_index, iterations))
+            return real(cycle_index, iterations)
+
+        with patch.object(hybrid, "_a2", spy):
+            result = solve(_constant_instance(), _reaction_config(iterations=8), seed=1)
+
+        self.assertEqual(result.profile_changes, [4])
+        self.assertEqual(calls, [(index, 8) for index in range(8)])
 
     def test_woa_move_covers_leader_peer_and_spiral(self) -> None:
         position = np.array([0.0, 0.0])
@@ -549,41 +575,15 @@ class TestScheduleAndAcceptance(unittest.TestCase):
     def test_complete_cycle_hook_is_skipped_when_the_cycle_is_partial(self) -> None:
         calls: list[int] = []
 
-        def hook(state: _RunState, record: hybrid.CycleRecord) -> bool:
+        def hook(state: _RunState, record: hybrid.CycleRecord) -> None:
             del state
             calls.append(record.cycle)
-            return False
+            return None
 
         with patch.object(hybrid, "_after_complete_cycle", hook):
             solve(_constant_instance(), _config(max_evaluations=2, iterations=4), seed=0)
 
         self.assertEqual(calls, [])
-
-    def test_hook_can_restart_the_next_cycle_without_resetting_trials(self) -> None:
-        def hook(state: _RunState, record: hybrid.CycleRecord) -> bool:
-            state.diagnostics.append({"cycle": record.cycle, "best": record.best})
-            return record.cycle == 0
-
-        with patch.object(hybrid, "_after_complete_cycle", hook):
-            result = solve(
-                _constant_instance(),
-                _config(iterations=3, scout_limit=100, max_evaluations=10_000),
-                seed=0,
-            )
-
-        self.assertEqual([record.schedule_index for record in result.history], [0, 0, 1])
-        self.assertEqual(result.history[1].a, 2.0)
-        self.assertEqual(result.history[1].rho, 2.0)
-        self.assertEqual(result.history[2].a, 1.0)
-        self.assertEqual(result.history[2].rho, 1.5)
-        self.assertEqual(
-            result.diagnostics,
-            [
-                {"cycle": record.cycle, "best": record.best}
-                for record in result.history
-            ],
-        )
-        self.assertGreater(sum(result.source_trials), 0)
 
 
 def _state_with_source(bits: list[int], fitness: float, trials: int) -> _RunState:
@@ -618,7 +618,7 @@ def _flat_monitor(**overrides: object) -> StagnationConfig:
     return StagnationConfig(**values)  # type: ignore[arg-type]
 
 
-def _recovery_config(**overrides: object) -> HybridConfig:
+def _reaction_config(**overrides: object) -> HybridConfig:
     values: dict[str, object] = {
         "population_size": 2,
         "iterations": 12,
@@ -631,51 +631,55 @@ def _recovery_config(**overrides: object) -> HybridConfig:
     return HybridConfig(**values)  # type: ignore[arg-type]
 
 
-class TestRecovery(unittest.TestCase):
-    def test_flat_detector_restarts_next_cycle_and_keeps_the_same_slope(self) -> None:
+class TestReaction(unittest.TestCase):
+    def test_flat_detector_switches_to_explore_next_cycle_with_a_fresh_window(self) -> None:
         snapshots: list[int] = []
         real = hybrid._after_complete_cycle
 
-        def spy(state: _RunState, record: hybrid.CycleRecord) -> bool:
+        def spy(state: _RunState, record: hybrid.CycleRecord) -> dict | None:
             positions = state.positions.copy()
             trials = state.trials.copy()
             bits = [list(row) for row in state.bits]
+            fitness = list(state.fitness)
             best = state.best_value
-            fired = real(state, record)
-            if fired:
+            best_solution = list(state.best_solution)
+            evaluations = state.evaluations
+            diagnostic = real(state, record)
+            if diagnostic is not None and diagnostic["changed"]:
                 self.assertTrue(np.array_equal(state.positions, positions))
                 self.assertTrue(np.array_equal(state.trials, trials))
                 self.assertEqual(state.bits, bits)
+                self.assertEqual(state.fitness, fitness)
                 self.assertEqual(state.best_value, best)
+                self.assertEqual(state.best_solution, best_solution)
+                self.assertEqual(state.evaluations, evaluations)
                 snapshots.append(record.cycle)
-            return fired
+            return diagnostic
 
         with patch.object(hybrid, "_after_complete_cycle", spy):
-            result = solve(_constant_instance(), _recovery_config(), seed=1)
+            result = solve(_constant_instance(), _reaction_config(), seed=1)
 
-        self.assertEqual(snapshots, [4, 9])
+        self.assertEqual(snapshots, [4])
+        self.assertEqual(result.profile_changes, [4])
         self.assertEqual(result.cycles_completed, 12)
         self.assertEqual(result.termination_reason, TERMINATION_ITERATIONS)
-        self.assertEqual([item["cycle"] for item in result.diagnostics if item["fire"]], [4, 9])
-        self.assertTrue(result.diagnostics[4]["recovery_applied"])
-        self.assertTrue(result.diagnostics[9]["recovery_applied"])
-        self.assertEqual(result.history[0].rho, 1.0)
-        self.assertEqual(result.history[4].rho, 1.0)
-        self.assertEqual(result.history[5].a, 2.0)
-        self.assertEqual(result.history[5].rho, 2.0)
-        self.assertEqual(result.history[5].schedule_index, 0)
-        self.assertEqual(result.history[10].a, 2.0)
-        self.assertEqual(result.history[10].rho, 2.0)
-        slope = -2.0 / 11.0
-        self.assertAlmostEqual(result.history[6].a - result.history[5].a, slope)
-        self.assertAlmostEqual(result.history[7].a - result.history[6].a, slope)
-        self.assertAlmostEqual(result.history[11].a - result.history[10].a, slope)
-        self.assertAlmostEqual(result.history[6].rho, 2.0 - 1.0 / 11.0)
+        self.assertEqual(result.diagnostics[4]["fire"], True)
+        self.assertTrue(result.diagnostics[4]["changed"])
+        self.assertEqual(result.diagnostics[4]["profile"], "exploit")
+        self.assertEqual(result.diagnostics[4]["next_profile"], "explore")
+        self.assertEqual([record.profile for record in result.history], ["exploit"] * 5 + ["explore"] * 7)
+        self.assertEqual([(record.a, record.rho, record.G3) for record in result.history[:5]], [(0.5, 1.0, 0.5)] * 5)
+        self.assertEqual([(record.a, record.rho, record.G3) for record in result.history[5:]], [(2.0, 2.0, 0.5)] * 7)
+        self.assertTrue(all(record.intensity is None for record in result.history))
+        # Fresh window after the change: no decision until W new observations.
         for offset in (5, 6, 7):
             self.assertFalse(result.diagnostics[offset]["ready"])
             self.assertEqual(result.diagnostics[offset]["n"], offset - 4)
         self.assertTrue(result.diagnostics[8]["ready"])
-        self.assertFalse(result.diagnostics[8]["fire"])
+        self.assertEqual(result.diagnostics[8]["n"], 4)
+        # Still stagnant in explore: no_improve_len >= plateau_max keeps explore.
+        self.assertGreaterEqual(result.diagnostics[8]["no_improve_len"], 2)
+        self.assertFalse(any(item["changed"] for item in result.diagnostics[5:]))
         self.assertEqual(result.diagnostics[4]["D1_vs_ramp"], 12.0)
         self.assertEqual(result.diagnostics[4]["D2_vs_const"], 0.0)
         self.assertEqual(result.diagnostics[4]["trigger_streak"], 2)
@@ -684,55 +688,36 @@ class TestRecovery(unittest.TestCase):
         self.assertTrue(all(trial >= 12 for trial in result.source_trials))
         _assert_accounting(self, result)
 
-    def test_ddtw_uses_the_same_rearm_cadence_with_derivative_distance(self) -> None:
+    def test_ddtw_uses_the_same_cadence_with_derivative_distance(self) -> None:
         result = solve(
             _constant_instance(),
-            _recovery_config(stag_cfg=_flat_monitor(use_ddtw=True)),
+            _reaction_config(stag_cfg=_flat_monitor(use_ddtw=True)),
             seed=1,
         )
 
         self.assertTrue(result.metadata["config"]["stagnation"]["use_ddtw"])
-        self.assertEqual([item["cycle"] for item in result.diagnostics if item["fire"]], [4, 9])
+        self.assertEqual(result.profile_changes, [4])
         self.assertEqual(result.diagnostics[4]["D1_vs_ramp"], 6.0)
         self.assertEqual(result.diagnostics[5]["n"], 1)
         self.assertFalse(result.diagnostics[5]["ready"])
 
-    def test_last_cycle_fire_is_not_marked_applied(self) -> None:
+    def test_change_on_the_last_cycle_is_recorded_but_no_cycle_uses_it(self) -> None:
         result = solve(
             _constant_instance(),
-            _recovery_config(iterations=5),
+            _reaction_config(iterations=5),
             seed=1,
         )
 
         self.assertEqual(result.cycles_completed, 5)
         self.assertTrue(result.diagnostics[4]["fire"])
-        self.assertFalse(result.diagnostics[4]["recovery_applied"])
-        self.assertEqual([record.schedule_index for record in result.history], [0, 1, 2, 3, 4])
-        self.assertTrue(all(record.rho == 1.0 for record in result.history))
-        self.assertEqual(result.history[-1].a, 0.0)
+        self.assertTrue(result.diagnostics[4]["changed"])
+        self.assertEqual(result.profile_changes, [4])
+        self.assertEqual([record.profile for record in result.history], ["exploit"] * 5)
 
-    def test_terminal_remainder_does_not_claim_an_unexecuted_recovery(self) -> None:
-        for budget in (62, 63):
-            with self.subTest(budget=budget):
-                result = solve(
-                    _constant_instance(),
-                    _recovery_config(iterations=6, max_evaluations=budget),
-                    seed=1,
-                )
-                self.assertEqual(result.evaluations, 62)
-                self.assertEqual(result.cycles_completed, 5)
-                self.assertEqual(result.phases_executed.count(PHASE_WOA), 5)
-                self.assertFalse(result.history[-1].completeness)
-                self.assertEqual(result.history[-1].a, 0.0)
-                self.assertEqual(result.history[-1].rho, 1.0)
-                self.assertEqual(result.diagnostics[-1]["cycle"], 4)
-                self.assertTrue(result.diagnostics[-1]["fire"])
-                self.assertFalse(result.diagnostics[-1]["recovery_applied"])
-                _assert_accounting(self, result)
-
+    def test_change_applies_to_a_partial_next_cycle_which_is_not_observed(self) -> None:
         executed = solve(
             _constant_instance(),
-            _recovery_config(iterations=6, max_evaluations=64),
+            _reaction_config(iterations=6, max_evaluations=64),
             seed=1,
         )
         self.assertEqual(executed.evaluations, 64)
@@ -740,17 +725,17 @@ class TestRecovery(unittest.TestCase):
         self.assertEqual(executed.phases_executed.count(PHASE_WOA), 6)
         self.assertEqual(executed.evaluations_by_phase[PHASE_WOA], 22)
         self.assertFalse(executed.history[-1].completeness)
-        self.assertEqual(executed.history[-1].schedule_index, 0)
+        self.assertEqual(executed.history[-1].profile, "explore")
         self.assertEqual(executed.history[-1].a, 2.0)
         self.assertEqual(executed.history[-1].rho, 2.0)
-        self.assertTrue(executed.diagnostics[4]["fire"])
-        self.assertTrue(executed.diagnostics[4]["recovery_applied"])
+        self.assertEqual(executed.profile_changes, [4])
+        self.assertEqual([item["cycle"] for item in executed.diagnostics], [0, 1, 2, 3, 4])
         _assert_accounting(self, executed)
 
     def test_partial_cycle_does_not_update_the_detector(self) -> None:
         result = solve(
             _constant_instance(),
-            _recovery_config(iterations=3, max_evaluations=14),
+            _reaction_config(iterations=3, max_evaluations=14),
             seed=1,
         )
 
@@ -779,19 +764,19 @@ class TestRecovery(unittest.TestCase):
         self.assertEqual(baseline.diagnostics, [])
         self.assertIsNone(baseline.metadata["config"]["stagnation"])
         self.assertEqual([record.rho for record in baseline.history], [1.0, 1.0])
-        self.assertEqual([record.schedule_index for record in baseline.history], [0, 1])
+        self.assertEqual([record.profile for record in baseline.history], ["exploit", "exploit"])
 
     def test_two_solves_do_not_share_or_mutate_the_monitor_config(self) -> None:
         stag_cfg = _flat_monitor()
         stag_cfg.band = 0
-        config = _recovery_config(stag_cfg=stag_cfg)
+        config = _reaction_config(stag_cfg=stag_cfg)
         first = solve(_constant_instance(), config, seed=3)
         second = solve(_constant_instance(), config, seed=3)
 
         self.assertEqual(stag_cfg.band, 0)
         self.assertEqual(asdict(first), asdict(second))
         self.assertEqual(first.metadata["config"]["stagnation"]["band"], 1)
-        self.assertEqual([item["cycle"] for item in first.diagnostics if item["fire"]], [4, 9])
+        self.assertEqual(first.profile_changes, [4])
 
     def test_invalid_monitor_options_are_rejected_without_mutating_the_object(self) -> None:
         stag_cfg = StagnationConfig(window=4, band=1, min_slope=2.0, plateau_max=2, patience=2)
@@ -837,8 +822,13 @@ class TestCommandLine(unittest.TestCase):
             "--min-slope",
             "--plateau-max",
             "--patience",
+            "--policy",
+            "--dtw-kirito",
         ):
             self.assertIn(flag, text)
+        for policy in ("binary_simple", "binary_complex", "continuous_simple", "continuous_complex"):
+            self.assertIn(policy, text)
+        self.assertNotIn("recovery", text)
 
     def test_cli_json_uses_only_a_local_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -874,6 +864,42 @@ class TestCommandLine(unittest.TestCase):
         self.assertEqual(payload["metadata"]["instance"]["reference"], 9.0)
         self.assertEqual(sum(payload["evaluations_by_phase"].values()), payload["evaluations"])
         self.assertEqual(payload["cycles_completed"], 2)
+        self.assertEqual(payload["metadata"]["config"]["policy"], "binary_complex")
+        self.assertFalse(payload["metadata"]["config"]["dtw_kirito"])
+        self.assertEqual(payload["profile_changes"], [])
+
+    def test_cli_policy_and_dtw_kirito_reach_the_solver(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tiny.dat"
+            path.write_text("1\n3 1 9\n5 4 3\n2 2 2\n4\n", encoding="utf-8")
+            base = [
+                "--instance", str(path), "--seed", "1", "--population-size", "2",
+                "--iterations", "2", "--max-evaluations", "40",
+            ]
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                code = main([*base, "--policy", "continuous_complex"])
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["metadata"]["config"]["policy"], "continuous_complex")
+            self.assertEqual(payload["history"][0]["intensity"], 0.0)
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                code = main([*base, "--policy", "binary_simple", "--dtw-kirito"])
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["metadata"]["config"]["policy"], "binary_simple")
+            self.assertTrue(payload["metadata"]["config"]["dtw_kirito"])
+            self.assertIsNone(payload["history"][0]["intensity"])
+
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = main([*base, "--policy", "nope"])
+            self.assertEqual(code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("--policy", stderr.getvalue())
 
     def test_cli_rejects_urls_missing_files_and_invalid_monitor_options(self) -> None:
         def fail_if_called(_path: Path) -> list[dict]:

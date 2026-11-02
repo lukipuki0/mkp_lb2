@@ -1,6 +1,6 @@
 """Sequential campaign for indices 0, 1, and 2 of the nine OR-Library files.
 
-One export per variant v0–v4 is 135 runs. Results are grouped by the loaded
+One export per variant v0, v1 and v4 is 81 runs, all with the same policy. Results are grouped by the loaded
 item count: mknapcb1/4/7 are 100, mknapcb2/5/8 are 250, and mknapcb3/6/9 are
 500. This is not a 31-run study, it does not download data, and n=1 claims
 no superiority.
@@ -26,6 +26,7 @@ from .benchmark import (
     build_hybrid_config,
     export_single_run,
 )
+from .profiles import POLICIES, POLICY, check_policy
 
 
 DEFAULT_SEED = 43
@@ -35,7 +36,7 @@ DEFAULT_MAX_EVALUATIONS = 180030
 DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parent / "resultados"
 
 INDICES = (0, 1, 2)
-VARIANTS = ("v0", "v1", "v2", "v3", "v4")
+VARIANTS = ("v0", "v1", "v4")
 FILES = tuple(f"mknapcb{number}.txt" for number in range(1, 10))
 GROUP_BY_FILE = {
     "mknapcb1.txt": 100,
@@ -48,8 +49,8 @@ GROUP_BY_FILE = {
     "mknapcb6.txt": 500,
     "mknapcb9.txt": 500,
 }
-PLANNED_RUNS = 135
-GROUP_RUNS = 45
+PLANNED_RUNS = 81
+GROUP_RUNS = 27
 RESULT_FIELDS = (
     "status",
     "variant",
@@ -64,7 +65,8 @@ RESULT_FIELDS = (
     "evaluations",
     "cycles_completed",
     "scouts",
-    "recoveries",
+    "profile_changes",
+    "policy",
     "elapsed",
     "scout_limit",
     "output_path",
@@ -138,8 +140,16 @@ def destination_for(campaign: Path, selection: Selection) -> Path:
     )
 
 
-def _validate_settings(seed: int, population_size: int, iterations: int, max_evaluations: int) -> None:
+def _validate_settings(
+    seed: int,
+    population_size: int,
+    iterations: int,
+    max_evaluations: int,
+    policy: str = POLICY,
+    dtw_kirito: bool = False,
+) -> None:
     hybrid._validate_seed(seed)
+    check_policy(policy)
     build_hybrid_config(
         ExportRequest(
             instance=Path("."),
@@ -148,6 +158,8 @@ def _validate_settings(seed: int, population_size: int, iterations: int, max_eva
             iterations=iterations,
             max_evaluations=max_evaluations,
             variant="v0",
+            policy=policy,
+            dtw_kirito=dtw_kirito,
         )
     )
 
@@ -193,7 +205,7 @@ def _selections(instances_dir: Path) -> list[Selection]:
     for item in found:
         counts[item.n] = counts.get(item.n, 0) + 1
     if len(found) != PLANNED_RUNS or any(counts.get(n) != GROUP_RUNS for n in (100, 250, 500)):
-        raise CampaignError("selection count does not match 27 instances, 5 variants, and 45 runs per group")
+        raise CampaignError("selection count does not match 27 instances, 3 variants, and 27 runs per group")
     return found
 
 
@@ -219,6 +231,7 @@ def _outcome_row(selection: Selection, destination: Path, outcome: ExportOutcome
     counts = (manifest or {}).get("counts") or {}
     timing = (manifest or {}).get("timing") or {}
     phase = (raw or {}).get("evaluations_by_phase") or {}
+    raw_config = ((raw or {}).get("metadata") or {}).get("config") or {}
     return {
         "status": "completed" if completed else "failed",
         "variant": selection.variant,
@@ -232,7 +245,8 @@ def _outcome_row(selection: Selection, destination: Path, outcome: ExportOutcome
         "evaluations": None if raw is None else raw.get("evaluations"),
         "cycles_completed": None if raw is None else raw.get("cycles_completed"),
         "scouts": phase.get("scouts"),
-        "recoveries": counts.get("n_recoveries"),
+        "profile_changes": counts.get("n_profile_changes"),
+        "policy": raw_config.get("policy"),
         "elapsed": timing.get("solve_seconds"),
         "scout_limit": None if raw is None else raw.get("scout_limit"),
         "output_path": str(destination),
@@ -284,6 +298,8 @@ def _documents(campaign: Path, selections: list[Selection], settings: dict) -> t
         "population_size": settings["population_size"],
         "iterations": settings["iterations"],
         "max_evaluations": settings["max_evaluations"],
+        "policy": settings["policy"],
+        "dtw_kirito": settings["dtw_kirito"],
     }
     return experiment, summary
 
@@ -335,10 +351,12 @@ def run_campaign(
     iterations: int = DEFAULT_ITERATIONS,
     max_evaluations: int = DEFAULT_MAX_EVALUATIONS,
     timestamp: str | None = None,
+    policy: str = POLICY,
+    dtw_kirito: bool = False,
 ) -> CampaignOutcome:
     """Validate every selected instance, then export one run at a time."""
 
-    _validate_settings(seed, population_size, iterations, max_evaluations)
+    _validate_settings(seed, population_size, iterations, max_evaluations, policy, dtw_kirito)
     selections = _selections(Path(instances_dir))
     root = DEFAULT_OUTPUT_ROOT if output_root is None else Path(output_root)
     campaign = _allocate(root, timestamp)
@@ -350,6 +368,8 @@ def run_campaign(
         "indices": list(INDICES),
         "variants": list(VARIANTS),
         "files": list(FILES),
+        "policy": policy,
+        "dtw_kirito": dtw_kirito,
     }
     experiment, summary = _documents(campaign, selections, settings)
     rows: list[dict] = []
@@ -370,6 +390,8 @@ def run_campaign(
             output_root=root,
             variant=selection.variant,
             destination=destination,
+            policy=policy,
+            dtw_kirito=dtw_kirito,
         )
         try:
             outcome = export_single_run(request)
@@ -423,9 +445,10 @@ def build_parser() -> argparse.ArgumentParser:
         prog="woa_abc.campaign",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
-            "Run 135 sequential binary WOA-ABC exports: indices 0, 1, and 2 of "
-            "mknapcb1.txt through mknapcb9.txt, for variants v0, v1, v2, v3, and v4. "
-            "Loaded sizes form three groups of 45 (100, 250, and 500). "
+            "Run 81 sequential binary WOA-ABC exports: indices 0, 1, and 2 of "
+            "mknapcb1.txt through mknapcb9.txt, for variants v0, v1, and v4, "
+            "all with one stagnation policy. "
+            "Loaded sizes form three groups of 27 (100, 250, and 500). "
             "Each selection is one run. This does not download data and claims no superiority."
         ),
     )
@@ -460,6 +483,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_EVALUATIONS,
         help="Explicit shared evaluation cap. This does not require all cycles to run.",
     )
+    parser.add_argument(
+        "--policy",
+        default=POLICY,
+        choices=POLICIES,
+        help="Stagnation reaction policy used by every run.",
+    )
+    parser.add_argument(
+        "--dtw-kirito",
+        action="store_true",
+        help="Binary policies only: keep one monitor and decide on every ready observation.",
+    )
     return parser
 
 
@@ -478,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
             population_size=args.population_size,
             iterations=args.iterations,
             max_evaluations=args.max_evaluations,
+            policy=args.policy,
+            dtw_kirito=bool(args.dtw_kirito),
         )
     except (CampaignError, ExportError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)

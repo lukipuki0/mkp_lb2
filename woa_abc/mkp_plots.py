@@ -33,8 +33,9 @@ DELTA_SIZE = (14, 5)
 PARAMETER_SIZE = (14, 6)
 BOX_SIZE = (6, 5)
 SERIES_COLOR = "#1565C0"
-RECOVERY_COLOR = "#FF5722"
-FIRE_COLOR = "#FF9800"
+CHANGE_COLOR = "#FF5722"
+PROFILE_COLORS = {"exploit": "#1f77b4", "explore": "#ff7f0e"}
+CHANGE_LABEL = "profile change"
 SEGMENT_NAME = "WOA\u2013ABC"
 
 EMPTY_DELTA_LABEL = (
@@ -350,62 +351,72 @@ def _style_copied_axes(ax, title: str, xlabel: str, ylabel: str) -> None:
     ax.grid(True, alpha=0.3)
 
 
-def draw_parameters(ax, rows: list) -> None:
-    """a/rho clock. No MKP source plot exists; the Gantt chart is not reused.
+def _profile_segments(rows: list) -> list[tuple[str, int, int]]:
+    """Runs of consecutive cycles with the same profile: (name, first, last)."""
 
-    Recovery markers stay on this axes only. Convergence and delta no longer
-    draw them, because those copied renderers mark algorithm segments.
+    segments: list[tuple[str, int, int]] = []
+    for row in rows:
+        if segments and segments[-1][0] == row.profile:
+            name, first, _last = segments[-1]
+            segments[-1] = (name, first, row.cycle)
+        else:
+            segments.append((row.profile, row.cycle, row.cycle))
+    return segments
+
+
+def draw_parameters(ax, rows: list) -> None:
+    """a and rho per cycle over the profile used. No MKP source plot exists.
+
+    The background is shaded by profile. A change decided after cycle g is
+    marked at g + 0.5, because the new profile is used from cycle g + 1.
+    Convergence and delta do not draw these markers, because those copied
+    renderers mark algorithm segments.
     """
 
     cycles = [row.cycle for row in rows]
-    ax.plot(cycles, [row.a for row in rows], color=SERIES_COLOR, linewidth=2.5, label="a")
-    ax.plot(cycles, [row.rho for row in rows], color="#2E7D32", linewidth=2.5, label="rho")
-    recovery_x = []
-    recovery_y = []
+    labelled: set[str] = set()
+    for name, first, last in _profile_segments(rows):
+        label = None if name in labelled else name
+        labelled.add(name)
+        ax.axvspan(
+            first - 0.5,
+            last + 0.5,
+            color=PROFILE_COLORS.get(name, "gray"),
+            alpha=0.15,
+            linewidth=0,
+            label=label,
+        )
+    ax.step(cycles, [row.a for row in rows], where="mid", color=SERIES_COLOR, linewidth=2.5, label="a")
+    ax.step(cycles, [row.rho for row in rows], where="mid", color="#2E7D32", linewidth=2.5, label="rho")
+    change_x = []
+    change_y = []
     for row in rows:
-        if not row.recovery_applied:
+        if not row.profile_changed:
             continue
-        recovery_x.append(row.cycle)
-        recovery_y.append(row.a)
-    if recovery_x:
-        if len(recovery_x) < 50:
-            for cycle in recovery_x:
+        change_x.append(row.cycle + 0.5)
+        change_y.append(row.a)
+    if change_x:
+        if len(change_x) < 50:
+            for x in change_x:
                 ax.axvline(
-                    cycle,
-                    color=RECOVERY_COLOR,
+                    x,
+                    color=CHANGE_COLOR,
                     linestyle="--",
                     linewidth=1.5,
                     alpha=0.5,
                 )
         ax.scatter(
-            recovery_x,
-            recovery_y,
+            change_x,
+            change_y,
             marker="^",
             s=90,
-            color=RECOVERY_COLOR,
+            color=CHANGE_COLOR,
             zorder=5,
-            label="parameter recovery",
-        )
-    fire_x = []
-    fire_y = []
-    for row in rows:
-        fired = bool(row.diagnostic and row.diagnostic.get("fire"))
-        if fired and not row.recovery_applied:
-            fire_x.append(row.cycle)
-            fire_y.append(row.a)
-    if fire_x:
-        ax.scatter(
-            fire_x,
-            fire_y,
-            marker="x",
-            s=80,
-            color=FIRE_COLOR,
-            zorder=5,
-            label="fire without recovery",
+            label=CHANGE_LABEL,
         )
     _style_copied_axes(
         ax,
-        "WOA\u2013ABC a/rho clock and recovery markers",
+        "WOA\u2013ABC a/rho per profile and profile changes",
         "Hybrid cycles",
         "Parameter value",
     )

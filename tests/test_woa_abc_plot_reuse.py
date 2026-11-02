@@ -171,17 +171,19 @@ def _sync_and_pixels(original_fig, our_fig) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _row(cycle, best, diagnostic) -> HistoryRow:
-    applied = None if diagnostic is None else bool(diagnostic.get("recovery_applied"))
+    changed = None if diagnostic is None else bool(diagnostic.get("changed"))
     return HistoryRow(
         cycle=cycle,
         iteration=cycle + 1,
         evaluations=10 + cycle,
-        a=2.0 - cycle,
+        profile="exploit",
+        a=0.5,
         rho=1.0,
-        schedule_index=0,
+        G3=0.5,
+        intensity=None,
         best=best,
         completeness=cycle != 1,
-        recovery_applied=applied,
+        profile_changed=changed,
         diagnostic=diagnostic,
     )
 
@@ -203,10 +205,10 @@ class SourceReuseTests(unittest.TestCase):
 
     def test_convergence_entrypoint_matches_one_source_segment(self) -> None:
         rows = [
-            _row(0, 1.0, {"cycle": 0, "delta": 1.5, "recovery_applied": False, "fire": False}),
+            _row(0, 1.0, {"cycle": 0, "delta": 1.5, "changed": False, "fire": False}),
             _row(1, 2.0, None),
-            _row(2, 2.0, {"cycle": 2, "delta": float("nan"), "recovery_applied": True, "fire": True}),
-            _row(3, 4.0, {"cycle": 3, "delta": -2.0, "recovery_applied": False, "fire": False}),
+            _row(2, 2.0, {"cycle": 2, "delta": float("nan"), "changed": True, "fire": True}),
+            _row(3, 4.0, {"cycle": 3, "delta": -2.0, "changed": False, "fire": False}),
         ]
         held = _capture(
             self.convergence,
@@ -216,8 +218,8 @@ class SourceReuseTests(unittest.TestCase):
         fig, ax = plt.subplots(figsize=(14, 6))
         draw_convergence(ax, rows, 12.0)
         try:
-            self.assertNotIn("parameter recovery", [text.get_text() for text in ax.get_legend().get_texts()])
-            self.assertFalse(any("recovery" in label.lower() for label in ax.get_legend_handles_labels()[1]))
+            self.assertNotIn("profile change", [text.get_text() for text in ax.get_legend().get_texts()])
+            self.assertFalse(any("profile" in label.lower() for label in ax.get_legend_handles_labels()[1]))
             self.assertEqual(len(ax.collections), 0)
             _assert_same_artists(self, held["ax"], ax)
             self.assertEqual(tuple(held["fig"].get_size_inches()), (14, 6))
@@ -228,10 +230,10 @@ class SourceReuseTests(unittest.TestCase):
 
     def test_delta_entrypoint_matches_one_source_segment_and_keeps_holes(self) -> None:
         rows = [
-            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "recovery_applied": False}),
+            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "changed": False}),
             _row(1, 2.0, None),
-            _row(2, 3.0, {"cycle": 2, "delta": float("inf"), "recovery_applied": True, "fire": True}),
-            _row(3, 5.0, {"cycle": 3, "delta": -1.0, "recovery_applied": False}),
+            _row(2, 3.0, {"cycle": 2, "delta": float("inf"), "changed": True, "fire": True}),
+            _row(3, 5.0, {"cycle": 3, "delta": -1.0, "changed": False}),
         ]
         held = _capture(
             self.delta,
@@ -242,7 +244,7 @@ class SourceReuseTests(unittest.TestCase):
         draw_delta(ax, rows)
         try:
             labels = [text.get_text() for text in ax.get_legend().get_texts()]
-            self.assertNotIn("parameter recovery", labels)
+            self.assertNotIn("profile change", labels)
             self.assertNotIn("delta 0", labels)
             self.assertEqual(len(ax.collections), 0)
             plotted = [line for line in ax.lines if line.get_linestyle() == "-"]
@@ -297,7 +299,7 @@ class SourceReuseTests(unittest.TestCase):
             convergence_source = inspect.getsource(plots.draw_convergence)
             self.assertIn("_paint_convergencia", convergence_source)
             self.assertNotIn("scatter", convergence_source)
-            self.assertNotIn("recovery", convergence_source)
+            self.assertNotIn("profile_changed", convergence_source)
             self.assertIn("_paint_dtw_delta", inspect.getsource(plots.draw_delta))
         finally:
             plt.close("all")
@@ -345,8 +347,8 @@ class SourceReuseTests(unittest.TestCase):
 
     def test_delta_title_fits_inside_the_figure_at_150_dpi(self) -> None:
         rows = [
-            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "recovery_applied": False}),
-            _row(1, 2.0, {"cycle": 1, "delta": -1.0, "recovery_applied": False}),
+            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "changed": False}),
+            _row(1, 2.0, {"cycle": 1, "delta": -1.0, "changed": False}),
         ]
         fig, ax = plt.subplots(figsize=(14, 5), dpi=150)
         try:
@@ -372,8 +374,8 @@ class SourceReuseTests(unittest.TestCase):
 
     def test_plot_helpers_honor_requested_filenames(self) -> None:
         rows = [
-            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "recovery_applied": False}),
-            _row(1, 3.0, {"cycle": 1, "delta": -2.0, "recovery_applied": True}),
+            _row(0, 1.0, {"cycle": 0, "delta": 4.0, "changed": False}),
+            _row(1, 3.0, {"cycle": 1, "delta": -2.0, "changed": True}),
         ]
         sentinel_convergence = self.output / "fitness_convergence.png"
         sentinel_delta = self.output / "dtw_delta.png"
@@ -438,7 +440,7 @@ class SourceReuseTests(unittest.TestCase):
         history = (outcome.output_dir / "best_run_01" / "historial_dtw.csv").read_text(encoding="utf-8")
         self.assertIn("fitness_best", history)
         self.assertNotIn("ESTANCAMIENTO", history)
-        for name in ("fitness_convergence.png", "dtw_delta.png", "parameter_recovery.png"):
+        for name in ("fitness_convergence.png", "dtw_delta.png", "parameter_profiles.png"):
             self.assertTrue((outcome.output_dir / "best_run_01" / name).is_file())
         self.assertTrue((outcome.output_dir / "boxplot_runs.png").is_file())
 

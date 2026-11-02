@@ -1,6 +1,7 @@
-"""Additive v0–v4 regressions for the shared-population WOA-ABC hybrid.
+"""Additive v0, v1 and v4 regressions for the shared-population WOA-ABC hybrid.
 
-v0 is the unchanged baseline. Each later variant changes one control only.
+v0 is the unchanged baseline. Each later variant changes one control only and
+keeps the stagnation reaction.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from unittest.mock import patch
 import numpy as np
 
 import woa_abc.solver as hybrid
-from dtw_stagnation import StagnationMonitor
+from dtw_stagnation import StagnationConfig
 from mkp_core.problem import MKPInstance
 from woa_abc.solver import (
     PHASE_EMPLOYED,
@@ -25,12 +26,11 @@ from woa_abc.solver import (
     PHASE_WOA,
     HybridConfig,
     _abc_step,
-    _control_parameters,
     main,
     solve,
 )
 
-VARIANT_ERROR = "variant must be one of v0, v1, v2, v3, v4"
+VARIANT_ERROR = "variant must be one of v0, v1, v4"
 CLI_VARIANT_ERROR = f"error: {VARIANT_ERROR}\n"
 
 
@@ -62,42 +62,6 @@ def _strip_variant(payload: dict) -> dict:
     return payload
 
 
-def _fire_update(cycles: set[int]):
-    cursor = {"cycle": 0}
-
-    def update(self, new_best: float) -> dict:
-        del self, new_best
-        cycle = cursor["cycle"]
-        cursor["cycle"] += 1
-        return {
-            "ready": True,
-            "fire": cycle in cycles,
-            "no_improve_len": 0,
-            "trigger_streak": 0,
-            "n": 1,
-            "D1_vs_ramp": 0.0,
-            "D2_vs_const": 0.0,
-            "delta": 0.0,
-            "theta_c": 0.0,
-            "theta_r": 0.0,
-            "theta_delta": 0.0,
-        }
-
-    return update
-
-
-def _solve_with_fires(variant: str, iterations: int, fires: set[int], **overrides: object):
-    config = _config(
-        variant=variant,
-        iterations=iterations,
-        use_stagnation=True,
-        scout_limit=100,
-        **overrides,
-    )
-    with patch.object(StagnationMonitor, "update", _fire_update(fires)):
-        return solve(_instance(), config, seed=1)
-
-
 class TestVariantSelection(unittest.TestCase):
     def test_default_and_explicit_v0_match_and_omit_variant_metadata(self) -> None:
         inst = _instance()
@@ -111,7 +75,7 @@ class TestVariantSelection(unittest.TestCase):
         self.assertEqual(HybridConfig().variant, "v0")
 
     def test_invalid_variant_is_rejected_without_mutating_other_fields(self) -> None:
-        for value in ("v5", "V1", "", None, True, 1):
+        for value in ("v2", "v3", "v5", "V1", "", None, True, 1):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError) as caught:
                     _config(variant=value)
@@ -120,7 +84,7 @@ class TestVariantSelection(unittest.TestCase):
     def test_nonbaseline_metadata_names_only_the_selected_variant(self) -> None:
         inst = _instance()
         baseline = solve(inst, _config(scout_limit=100), seed=2)
-        for variant in ("v1", "v2", "v3", "v4"):
+        for variant in ("v1", "v4"):
             with self.subTest(variant=variant):
                 result = solve(inst, _config(variant=variant, scout_limit=100), seed=2)
                 self.assertEqual(result.metadata["config"]["variant"], variant)
@@ -171,133 +135,6 @@ class TestV1ScoutLimit(unittest.TestCase):
         self.assertEqual(v1.scout_limit, 1)
         self.assertGreater(v1.evaluations_by_phase["scouts"], 0)
         self.assertEqual(_strip_variant(asdict(v1)), asdict(v0))
-
-
-class TestV2PostfireAmplitudes(unittest.TestCase):
-    def test_v2_matches_v0_until_the_first_fire_then_uses_amplitudes_1_and_1_5(self) -> None:
-        v0 = _solve_with_fires("v0", 6, {0, 3})
-        v2 = _solve_with_fires("v2", 6, {0, 3})
-
-        self.assertEqual(
-            [record.a for record in v2.history[:1]],
-            [record.a for record in v0.history[:1]],
-        )
-        self.assertEqual(asdict(v2.history[0]), asdict(v0.history[0]))
-        self.assertEqual(v2.history[0].a, 2.0)
-        self.assertEqual(v2.history[0].rho, 1.0)
-        self.assertEqual(v2.scout_limit, v0.scout_limit)
-
-        span = 5
-        expected = []
-        for schedule in range(5):
-            expected.append(
-                (
-                    max(0.0, 1.0 - 2.0 * schedule / span),
-                    max(1.0, 1.5 - schedule / span),
-                )
-            )
-        # Fire on cycle 0 restarts the next cycle. A second fire on cycle 3 restarts again.
-        self.assertEqual(
-            [(record.a, record.rho, record.schedule_index) for record in v2.history[1:4]],
-            [
-                (expected[0][0], expected[0][1], 0),
-                (expected[1][0], expected[1][1], 1),
-                (expected[2][0], expected[2][1], 2),
-            ],
-        )
-        self.assertEqual(
-            [(record.a, record.rho, record.schedule_index) for record in v2.history[4:]],
-            [
-                (expected[0][0], expected[0][1], 0),
-                (expected[1][0], expected[1][1], 1),
-            ],
-        )
-        self.assertAlmostEqual(v2.history[2].a - v2.history[1].a, -2.0 / span)
-        self.assertAlmostEqual(v2.history[2].rho - v2.history[1].rho, -1.0 / span)
-        self.assertAlmostEqual(v2.history[3].a, 1.0 - 4.0 / span)
-        self.assertAlmostEqual(v2.history[3].rho, 1.5 - 2.0 / span)
-        self.assertEqual(v0.history[1].a, 2.0)
-        self.assertEqual(v0.history[1].rho, 2.0)
-        self.assertEqual(v2.metadata["config"]["iterations"], 6)
-        self.assertTrue(v2.diagnostics[0]["recovery_applied"])
-        self.assertTrue(v2.diagnostics[3]["recovery_applied"])
-
-    def test_v2_control_formula_clamps_and_ignores_recovery_before_the_fire(self) -> None:
-        self.assertEqual(_control_parameters(0, 6, False, "v2"), (2.0, 1.0))
-        self.assertEqual(_control_parameters(0, 6, True, "v2"), (1.0, 1.5))
-        self.assertEqual(_control_parameters(4, 6, True, "v2"), (0.0, 1.0))
-        self.assertAlmostEqual(_control_parameters(2, 6, True, "v2")[0], 1.0 - 4.0 / 5.0)
-        self.assertAlmostEqual(_control_parameters(2, 6, True, "v2")[1], 1.5 - 2.0 / 5.0)
-
-
-class TestV3RemainingHorizon(unittest.TestCase):
-    def test_v3_restarts_over_the_cycles_still_left_and_resets_after_another_fire(self) -> None:
-        result = _solve_with_fires("v3", 6, {1, 3})
-        calls: list[tuple[int, int]] = []
-        real = hybrid._a2
-
-        def spy(cycle_index: int, iterations: int) -> float:
-            calls.append((cycle_index, iterations))
-            return real(cycle_index, iterations)
-
-        with patch.object(hybrid, "_a2", spy):
-            again = _solve_with_fires("v3", 6, {1, 3})
-
-        self.assertEqual(calls, [(index, 6) for index in range(6)])
-        self.assertEqual(
-            [(record.a, record.rho) for record in again.history],
-            [(record.a, record.rho) for record in result.history],
-        )
-        self.assertEqual(result.history[0].a, 2.0)
-        self.assertEqual(result.history[0].rho, 1.0)
-        self.assertEqual(result.history[1].a, 2.0 - 2.0 / 5.0)
-        self.assertEqual(result.history[1].rho, 1.0)
-        # After cycle 1, four cycles remain, so the span is 3.
-        self.assertEqual(
-            [(record.schedule_index, record.a, record.rho) for record in result.history[2:4]],
-            [
-                (0, 2.0, 2.0),
-                (1, 2.0 - 2.0 / 3.0, 2.0 - 1.0 / 3.0),
-            ],
-        )
-        # The fire on cycle 3 leaves two cycles, so the span is 1.
-        self.assertEqual(
-            [(record.schedule_index, record.a, record.rho) for record in result.history[4:]],
-            [(0, 2.0, 2.0), (1, 0.0, 1.0)],
-        )
-        self.assertEqual(result.history[-1].a, 0.0)
-        self.assertEqual(result.history[-1].rho, 1.0)
-        self.assertTrue(result.diagnostics[1]["recovery_applied"])
-        self.assertTrue(result.diagnostics[3]["recovery_applied"])
-
-    def test_v3_one_remaining_cycle_is_terminal_and_does_not_divide_by_zero(self) -> None:
-        result = _solve_with_fires("v3", 4, {2})
-        baseline = _solve_with_fires("v0", 4, {2})
-
-        self.assertEqual(result.cycles_completed, 4)
-        self.assertEqual(
-            (result.history[3].schedule_index, result.history[3].a, result.history[3].rho),
-            (0, 0.0, 1.0),
-        )
-        self.assertEqual(baseline.history[3].a, 2.0)
-        self.assertEqual(baseline.history[3].rho, 2.0)
-        self.assertTrue(result.diagnostics[2]["recovery_applied"])
-        self.assertEqual(_control_parameters(0, 4, True, "v3", 0), (0.0, 1.0))
-
-    def test_v3_does_not_apply_recovery_without_a_following_executable_pair(self) -> None:
-        last = _solve_with_fires("v3", 4, {3})
-        self.assertFalse(last.diagnostics[3]["recovery_applied"])
-        self.assertEqual([record.schedule_index for record in last.history], [0, 1, 2, 3])
-        self.assertEqual(last.history[-1].rho, 1.0)
-
-        blocked = _solve_with_fires("v3", 3, {0}, population_size=2, max_evaluations=15)
-        self.assertEqual(blocked.evaluations, 14)
-        self.assertEqual(blocked.cycles_completed, 1)
-        self.assertFalse(blocked.diagnostics[0]["recovery_applied"])
-        self.assertEqual(blocked.history[1].schedule_index, 1)
-        self.assertEqual(blocked.history[1].a, 1.0)
-        self.assertEqual(blocked.history[1].rho, 1.0)
-        self.assertFalse(blocked.history[1].completeness)
 
 
 class TestV4SingleCoordinate(unittest.TestCase):
@@ -386,8 +223,8 @@ class TestV4SingleCoordinate(unittest.TestCase):
         self.assertEqual(result.scout_limit, 2 * inst.n)
         self.assertEqual(baseline.scout_limit, 2 * inst.n)
         self.assertEqual(
-            [(record.a, record.rho, record.schedule_index) for record in result.history],
-            [(record.a, record.rho, record.schedule_index) for record in baseline.history],
+            [(record.profile, record.a, record.rho, record.G3) for record in result.history],
+            [(record.profile, record.a, record.rho, record.G3) for record in baseline.history],
         )
         self.assertEqual(sum(result.evaluations_by_phase.values()), result.evaluations)
         self.assertGreater(result.evaluations_by_phase[PHASE_EMPLOYED], 0)
@@ -417,6 +254,38 @@ class TestV4SingleCoordinate(unittest.TestCase):
         )
 
 
+class TestVariantsKeepTheReaction(unittest.TestCase):
+    def test_v1_and_v4_change_profile_on_the_same_cycles_as_v0(self) -> None:
+        # Every repair fills the knapsack, so the archived best is constant
+        # whatever the variant draws.
+        constant = MKPInstance(
+            n=3,
+            m=1,
+            valor_optimo=6.0,
+            p=np.array([1.0, 2.0, 3.0]),
+            r=np.array([[1.0, 1.0, 1.0]]),
+            b=np.array([10.0]),
+        )
+        monitor = dict(window=4, band=1, min_slope=2.0, plateau_max=2, patience=2, adapt_thresholds=False)
+        results = {}
+        for variant in ("v0", "v1", "v4"):
+            config = _config(
+                variant=variant,
+                iterations=8,
+                scout_limit=100,
+                use_stagnation=True,
+                stag_cfg=StagnationConfig(**monitor),
+            )
+            results[variant] = solve(constant, config, seed=1)
+        for variant, result in results.items():
+            with self.subTest(variant=variant):
+                self.assertEqual(result.profile_changes, [4])
+                self.assertEqual(
+                    [record.profile for record in result.history],
+                    ["exploit"] * 5 + ["explore"] * 3,
+                )
+
+
 class TestVariantCommandLine(unittest.TestCase):
     def _file(self, directory: str) -> Path:
         path = Path(directory) / "tiny.dat"
@@ -429,6 +298,8 @@ class TestVariantCommandLine(unittest.TestCase):
             self.assertEqual(main(["--help"]), 0)
         self.assertIn("--variant", stdout.getvalue())
         self.assertIn("v0", stdout.getvalue())
+        self.assertNotIn("v2", stdout.getvalue())
+        self.assertNotIn("v3", stdout.getvalue())
 
         with tempfile.TemporaryDirectory() as directory:
             path = self._file(directory)

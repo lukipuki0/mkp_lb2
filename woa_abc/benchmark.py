@@ -45,6 +45,7 @@ from .mkp_plots import (
     plot_delta,
     plot_parameters,
 )
+from .profiles import POLICIES, POLICY, check_policy
 from .solver import HybridConfig, solve
 from dtw_stagnation import StagnationConfig
 
@@ -89,7 +90,8 @@ RUN_CSV_FIELDS = (
     "evaluations",
     "cycles_completed",
     "n_fires",
-    "n_recoveries",
+    "n_profile_changes",
+    "policy",
     "termination_reason",
 )
 HISTORY_CSV_FIELDS = (
@@ -101,10 +103,13 @@ HISTORY_CSV_FIELDS = (
     "fitness_best",
     "fitness_instantaneo",
     "evaluations",
+    "profile",
     "a",
     "rho",
-    "schedule_index",
-    "recovery_applied",
+    "G3",
+    "intensity",
+    "profile_changed",
+    "next_profile",
     "completeness",
     "dtw_ready",
     "dtw_fire",
@@ -130,7 +135,7 @@ EXPECTED_ARTIFACTS = (
     "best_run_01/historial_dtw_detalle.txt",
     "best_run_01/fitness_convergence.png",
     "best_run_01/dtw_delta.png",
-    "best_run_01/parameter_recovery.png",
+    "best_run_01/parameter_profiles.png",
 )
 
 
@@ -151,6 +156,8 @@ class ExportRequest:
     timestamp: str | None = None
     variant: str = "v0"
     destination: Path | None = None
+    policy: str = POLICY
+    dtw_kirito: bool = False
 
 
 @dataclass
@@ -162,17 +169,23 @@ class ExportOutcome:
 
 @dataclass
 class HistoryRow:
-    """One history cycle joined to the diagnostic with the same cycle, if any."""
+    """One history cycle joined to the diagnostic with the same cycle, if any.
+
+    ``profile_changed`` is the decision taken after this cycle; the new
+    profile is used from the next cycle. None when the cycle has no diagnostic.
+    """
 
     cycle: int
     iteration: int
     evaluations: int
+    profile: str
     a: float
     rho: float
-    schedule_index: int
+    G3: float
+    intensity: float | None
     best: float
     completeness: bool
-    recovery_applied: bool | None
+    profile_changed: bool | None
     diagnostic: dict | None
 
 
@@ -202,6 +215,8 @@ def build_hybrid_config(request: ExportRequest) -> HybridConfig:
         use_stagnation=True,
         stag_cfg=inherited_stagnation_config(),
         variant=request.variant,
+        policy=request.policy,
+        dtw_kirito=request.dtw_kirito,
     )
 
 
@@ -242,8 +257,8 @@ def count_fires(diagnostics: list) -> int:
     return sum(1 for item in diagnostics if item.get("fire"))
 
 
-def count_recoveries(diagnostics: list) -> int:
-    return sum(1 for item in diagnostics if item.get("recovery_applied"))
+def count_profile_changes(diagnostics: list) -> int:
+    return sum(1 for item in diagnostics if item.get("changed"))
 
 
 def join_history(history: list, diagnostics: list) -> list[HistoryRow]:
@@ -261,18 +276,21 @@ def join_history(history: list, diagnostics: list) -> list[HistoryRow]:
     for record in history:
         cycle = int(_field(record, "cycle"))
         diagnostic = indexed.get(cycle)
-        applied = None if diagnostic is None else bool(diagnostic.get("recovery_applied"))
+        changed = None if diagnostic is None else bool(diagnostic.get("changed"))
+        intensity = _field(record, "intensity")
         rows.append(
             HistoryRow(
                 cycle=cycle,
                 iteration=cycle + 1,
                 evaluations=int(_field(record, "evaluations")),
+                profile=str(_field(record, "profile")),
                 a=float(_field(record, "a")),
                 rho=float(_field(record, "rho")),
-                schedule_index=int(_field(record, "schedule_index")),
+                G3=float(_field(record, "G3")),
+                intensity=None if intensity is None else float(intensity),
                 best=float(_field(record, "best")),
                 completeness=bool(_field(record, "completeness")),
-                recovery_applied=applied,
+                profile_changed=changed,
                 diagnostic=diagnostic,
             )
         )
@@ -304,7 +322,7 @@ def _diag_cell(diagnostic: dict | None, key: str, *, as_bool: bool = False) -> s
 
 def history_csv_row(row: HistoryRow) -> dict[str, str]:
     diagnostic = row.diagnostic
-    applied = "" if row.recovery_applied is None else ("True" if row.recovery_applied else "False")
+    changed = "" if row.profile_changed is None else ("True" if row.profile_changed else "False")
     return {
         "iteracion": str(row.iteration),
         "epoch": "",
@@ -314,10 +332,13 @@ def history_csv_row(row: HistoryRow) -> dict[str, str]:
         "fitness_best": _number(row.best),
         "fitness_instantaneo": "",
         "evaluations": str(row.evaluations),
+        "profile": row.profile,
         "a": _number(row.a),
         "rho": _number(row.rho),
-        "schedule_index": str(row.schedule_index),
-        "recovery_applied": applied,
+        "G3": _number(row.G3),
+        "intensity": "" if row.intensity is None else _number(row.intensity),
+        "profile_changed": changed,
+        "next_profile": "" if diagnostic is None else str(diagnostic.get("next_profile") or ""),
         "completeness": "True" if row.completeness else "False",
         "dtw_ready": _diag_cell(diagnostic, "ready", as_bool=True),
         "dtw_fire": _diag_cell(diagnostic, "fire", as_bool=True),
@@ -346,7 +367,8 @@ def run_csv_row(result, elapsed: float) -> dict[str, str]:
         "evaluations": str(result.evaluations),
         "cycles_completed": str(result.cycles_completed),
         "n_fires": str(count_fires(result.diagnostics)),
-        "n_recoveries": str(count_recoveries(result.diagnostics)),
+        "n_profile_changes": str(count_profile_changes(result.diagnostics)),
+        "policy": _policy_label(result),
         "termination_reason": str(result.termination_reason),
     }
 
@@ -384,6 +406,14 @@ def _detector_line(result) -> str:
     )
 
 
+def _policy_label(result) -> str:
+    config = result.metadata.get("config") or {}
+    policy = config.get("policy", "")
+    if policy and config.get("dtw_kirito"):
+        return f"{policy}+dtw_kirito"
+    return str(policy)
+
+
 def _gap_line(reference: float, gap: float | None) -> str:
     if reference <= 0.0 or gap is None:
         return "desconocido (referencia almacenada; no se reemplaza)"
@@ -395,12 +425,12 @@ def summary_text(result, instance, display_name: str, elapsed: float) -> str:
     ceiling = config.get("max_evaluations")
     reference = float(instance.valor_optimo)
     fires = count_fires(result.diagnostics)
-    recoveries = count_recoveries(result.diagnostics)
+    changes = count_profile_changes(result.diagnostics)
     lines = [
         SUMMARY_BANNER,
         "No es una comparación de rendimiento.",
         "n_switches cuenta rotaciones de algoritmo. Este run no rota algoritmos.",
-        "n_recoveries cuenta reinicios del reloj a/rho, no switches.",
+        "n_profile_changes cuenta cambios de perfil exploit/explore, no switches.",
         "Un solo run no tiene dispersión interpretable ni prueba inferencial.",
         "Tiempos de Gantt: no se inventan; no hay rotación de metaheurísticas.",
         "",
@@ -412,7 +442,8 @@ def summary_text(result, instance, display_name: str, elapsed: float) -> str:
         _labeled("Gap", _gap_line(reference, result.gap)),
         _labeled("n_switches", N_SWITCHES),
         _labeled("n_fires", fires),
-        _labeled("n_recoveries", recoveries),
+        _labeled("n_profile_changes", changes),
+        _labeled("Politica", _policy_label(result)),
         _labeled("Ciclos completos", result.cycles_completed),
         _labeled("Ciclos registrados", len(result.history)),
         _labeled("Evaluaciones", result.evaluations),
@@ -451,7 +482,7 @@ def write_plots(output_dir: Path, rows: list[HistoryRow], reference: float, name
     best = output_dir / "best_run_01"
     plot_convergence(rows, reference, best / "fitness_convergence.png")
     plot_delta(rows, best / "dtw_delta.png")
-    plot_parameters(rows, best / "parameter_recovery.png")
+    plot_parameters(rows, best / "parameter_profiles.png")
     plot_boxplot(best_value, name, reference, output_dir / "boxplot_runs.png")
 
 
@@ -513,7 +544,8 @@ def build_manifest(
         "solver_rerun": False,
         "note": (
             "Single-run functional validation. n_switches is 0 because the "
-            "algorithm does not rotate. n_recoveries counts a/rho clock restarts. "
+            "algorithm does not rotate. n_profile_changes counts exploit/explore "
+            "profile changes. "
             "evaluation_ceiling is the resolved cap, not evaluations consumed. "
             "A stored reference of 0 is unknown and is not replaced."
         ),
@@ -551,7 +583,7 @@ def build_manifest(
             "cycles_completed": result.cycles_completed,
             "cycles_recorded": len(result.history),
             "n_fires": count_fires(result.diagnostics),
-            "n_recoveries": count_recoveries(result.diagnostics),
+            "n_profile_changes": count_profile_changes(result.diagnostics),
             "n_switches": N_SWITCHES,
             "termination_reason": result.termination_reason,
             "evaluations_by_phase": dict(result.evaluations_by_phase),
@@ -623,6 +655,7 @@ def export_single_run(request: ExportRequest, solver=None) -> ExportOutcome:
 
     runner = solve if solver is None else solver
     hybrid._validate_variant(request.variant)
+    check_policy(request.policy)
     _reject_url(str(request.instance), "instance")
     _reject_url(str(request.output_root), "output root")
     if request.destination is not None:
@@ -716,13 +749,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--variant",
         default="v0",
-        metavar="{v0,v1,v2,v3,v4}",
+        metavar="{v0,v1,v4}",
         help=(
             "One additive variant for this single run. v0 is the unchanged "
             "baseline. v1 uses scout limit 100 unless --scout-limit is set. "
-            "v2, v3, and v4 change only post-fire amplitudes, the remaining-cycle "
-            "recovery horizon, or the ABC coordinate mutation. Default: v0."
+            "v4 changes only the ABC coordinate mutation. Default: v0."
         ),
+    )
+    parser.add_argument(
+        "--policy",
+        default=POLICY,
+        choices=POLICIES,
+        help="Stagnation reaction policy. Default: binary_complex.",
+    )
+    parser.add_argument(
+        "--dtw-kirito",
+        action="store_true",
+        help="Binary policies only: keep one monitor and decide on every ready observation.",
     )
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     return parser
@@ -742,6 +785,8 @@ def _request_from_args(args: argparse.Namespace) -> ExportRequest:
         scout_limit=args.scout_limit,
         output_root=Path(args.output_root),
         variant=args.variant,
+        policy=args.policy,
+        dtw_kirito=bool(args.dtw_kirito),
     )
 
 

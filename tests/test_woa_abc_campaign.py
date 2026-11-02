@@ -1,4 +1,4 @@
-"""Checks for the 135-run additive campaign. Exporter plots are mocked except one smoke."""
+"""Checks for the 81-run additive campaign. Exporter plots are mocked except one smoke."""
 
 from __future__ import annotations
 
@@ -75,7 +75,10 @@ def _write_stub(request: ExportRequest, *, status: str = "completed") -> None:
     destination = Path(request.destination)
     destination.mkdir(parents=True, exist_ok=True)
     cycles = 1 if request.variant == "v1" else 3
-    fitness = {"v0": 1.0, "v1": 2.0, "v2": 3.0, "v3": 4.0, "v4": 5.0}[request.variant]
+    fitness = {"v0": 1.0, "v1": 2.0, "v4": 5.0}[request.variant]
+    config = {"policy": request.policy}
+    if request.variant != "v0":
+        config["variant"] = request.variant
     raw = {
         "best_value": fitness,
         "gap": None if request.instance_index != 1 else 1.25,
@@ -83,14 +86,14 @@ def _write_stub(request: ExportRequest, *, status: str = "completed") -> None:
         "cycles_completed": cycles,
         "scout_limit": 100 if request.variant == "v1" else 30,
         "evaluations_by_phase": {"scouts": 4},
-        "metadata": {"seed": request.seed, "config": {} if request.variant == "v0" else {"variant": request.variant}},
+        "metadata": {"seed": request.seed, "config": config},
     }
     manifest = {
         "status": status,
         "counts": {
             "evaluations": raw["evaluations"],
             "cycles_completed": cycles,
-            "n_recoveries": 2 if request.variant == "v2" else 0,
+            "n_profile_changes": 2 if request.variant == "v4" else 0,
         },
         "timing": {"solve_seconds": 0.5},
     }
@@ -115,7 +118,7 @@ class CampaignPlanTests(unittest.TestCase):
         with patch("woa_abc.campaign.export_single_run", exporter):
             return run_campaign(instances, output, timestamp="plan", **kwargs)
 
-    def test_selects_27_instances_and_five_variants_in_three_groups(self) -> None:
+    def test_selects_27_instances_and_three_variants_in_three_groups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             instances = root / "instances"
@@ -130,14 +133,14 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(outcome.code, 0, outcome.message)
             log = stdout.getvalue()
             self.assertTrue(log.startswith("start variant=v0 file=mknapcb1.txt index=0 n=100\n"))
-            self.assertEqual(log.count("start variant="), 135)
-            self.assertEqual(log.count("completed variant="), 135)
+            self.assertEqual(log.count("start variant="), 81)
+            self.assertEqual(log.count("completed variant="), 81)
             self.assertIn("completed variant=v4 file=mknapcb9.txt index=2 n=500", log)
             self.assertEqual(len(calls), PLANNED_RUNS)
-            self.assertEqual(PLANNED_RUNS, 135)
+            self.assertEqual(PLANNED_RUNS, 81)
             self.assertEqual(len(FILES), 9)
             self.assertEqual(INDICES, (0, 1, 2))
-            self.assertEqual(VARIANTS, ("v0", "v1", "v2", "v3", "v4"))
+            self.assertEqual(VARIANTS, ("v0", "v1", "v4"))
             keys = [(call.instance.name, call.instance_index, call.variant) for call in calls]
             expected = [
                 (name, index, variant)
@@ -153,23 +156,28 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(calls[0].max_evaluations, DEFAULT_MAX_EVALUATIONS)
             self.assertIsNone(calls[0].scout_limit)
             self.assertEqual(calls[0].max_evaluations, 180030)
+            self.assertEqual({call.policy for call in calls}, {"binary_complex"})
+            self.assertEqual({call.dtw_kirito for call in calls}, {False})
             campaign = output / "campaign_plan"
             self.assertEqual(outcome.output_dir, campaign)
             experiment = json.loads((campaign / "experiment.json").read_text(encoding="utf-8"))
             summary = json.loads((campaign / "campaign_summary.json").read_text(encoding="utf-8"))
-            self.assertEqual(experiment["runs_planned"], 135)
+            self.assertEqual(experiment["runs_planned"], 81)
+            self.assertEqual(experiment["settings"]["policy"], "binary_complex")
+            self.assertFalse(experiment["settings"]["dtw_kirito"])
             self.assertEqual(experiment["status"], "completed")
             self.assertEqual(summary["status"], "completed")
             self.assertFalse(experiment["superiority_claim"])
             self.assertFalse(summary["superiority_claim"])
-            self.assertEqual(summary["runs_completed"], 135)
+            self.assertEqual(summary["runs_completed"], 81)
+            self.assertEqual(summary["policy"], "binary_complex")
             self.assertEqual(summary["runs_failed"], 0)
             self.assertIsNone(summary["failed_selection"])
             self.assertIn("no superiority", summary["note"])
-            self.assertEqual(summary["groups"], {"100": 45, "250": 45, "500": 45})
-            self.assertEqual(GROUP_RUNS, 45)
+            self.assertEqual(summary["groups"], {"100": 27, "250": 27, "500": 27})
+            self.assertEqual(GROUP_RUNS, 27)
             selections = experiment["selections"]
-            self.assertEqual(len(selections), 135)
+            self.assertEqual(len(selections), 81)
             by_index = {(item["file"], item["index"]): item["reference"] for item in selections}
             self.assertEqual(by_index[("mknapcb1.txt", 0)], 0.0)
             self.assertEqual(by_index[("mknapcb1.txt", 1)], 99.0)
@@ -177,7 +185,7 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertNotIn(24381, {item["reference"] for item in selections})
             rows = _read_csv(campaign / "campaign_results.csv")
             self.assertEqual(list(rows[0]), list(RESULT_FIELDS))
-            self.assertEqual(len(rows), 135)
+            self.assertEqual(len(rows), 81)
             index1 = [row for row in rows if row["file"] == "mknapcb2.txt" and row["index"] == "1"]
             index2 = [row for row in rows if row["file"] == "mknapcb2.txt" and row["index"] == "2"]
             self.assertEqual({row["reference"] for row in index1}, {"99"})
@@ -190,7 +198,10 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(v0["evaluations"], "10")
             self.assertEqual(v0["cycles_completed"], "3")
             self.assertEqual(v0["scouts"], "4")
-            self.assertEqual(v0["recoveries"], "0")
+            self.assertEqual(v0["profile_changes"], "0")
+            self.assertEqual(v0["policy"], "binary_complex")
+            v4 = [row for row in rows if row["variant"] == "v4"][0]
+            self.assertEqual(v4["profile_changes"], "2")
             self.assertEqual(v0["elapsed"], "0.5")
             self.assertEqual(v0["seed"], "43")
             self.assertEqual(v0["n"], "100")
@@ -200,6 +211,31 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(v1["scout_limit"], "100")
             self.assertEqual(v1["status"], "completed")
             self.assertEqual((instances / "counter.txt").read_text(encoding="utf-8"), "0")
+
+    def test_policy_and_dtw_kirito_reach_every_export(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            instances = root / "instances"
+            instances.mkdir()
+            _populate(instances)
+            calls: list[ExportRequest] = []
+            with patch("sys.stdout", StringIO()):
+                outcome = self._run(
+                    instances,
+                    root / "out",
+                    calls,
+                    policy="binary_simple",
+                    dtw_kirito=True,
+                )
+            self.assertEqual(outcome.code, 0, outcome.message)
+            self.assertEqual(len(calls), 81)
+            self.assertEqual({call.policy for call in calls}, {"binary_simple"})
+            self.assertEqual({call.dtw_kirito for call in calls}, {True})
+            summary = json.loads((outcome.output_dir / "campaign_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["policy"], "binary_simple")
+            self.assertTrue(summary["dtw_kirito"])
+            rows = _read_csv(outcome.output_dir / "campaign_results.csv")
+            self.assertEqual({row["policy"] for row in rows}, {"binary_simple"})
 
     def test_groups_use_loaded_n_and_exact_folders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -224,8 +260,8 @@ class CampaignPlanTests(unittest.TestCase):
                     sorted(path.name for path in group.iterdir() if path.is_dir()),
                     [f"mknapcb{number}" for number in numbers],
                 )
-                self.assertEqual(len(list(group.glob("mknapcb*/inst_*/v*"))), 45)
-                self.assertEqual(len(_read_csv(group / "group_summary.csv")), 45)
+                self.assertEqual(len(list(group.glob("mknapcb*/inst_*/v*"))), 27)
+                self.assertEqual(len(_read_csv(group / "group_summary.csv")), 27)
             for call in calls:
                 self.assertEqual(
                     call.destination,
@@ -317,10 +353,10 @@ class FailureTests(unittest.TestCase):
             self.assertEqual(outcome.code, 1)
             self.assertEqual(
                 outcome.message,
-                "stopped on mknapcb1.txt index 0 variant v2; solver was not rerun",
+                "stopped on mknapcb1.txt index 0 variant v4; solver was not rerun",
             )
             self.assertEqual(len(calls), 3)
-            self.assertEqual([call.variant for call in calls], ["v0", "v1", "v2"])
+            self.assertEqual([call.variant for call in calls], ["v0", "v1", "v4"])
             self.assertEqual(exporter.rows_before, 2)
             self.assertEqual(exporter.status_before, "running")
             campaign = outcome.output_dir
@@ -332,7 +368,7 @@ class FailureTests(unittest.TestCase):
             self.assertNotEqual(summary["status"], "completed")
             self.assertEqual(summary["runs_completed"], 2)
             self.assertEqual(summary["runs_failed"], 1)
-            self.assertEqual(summary["failed_selection"]["variant"], "v2")
+            self.assertEqual(summary["failed_selection"]["variant"], "v4")
             self.assertEqual(summary["failed_selection"]["file"], "mknapcb1.txt")
             self.assertEqual(summary["failed_selection"]["index"], 0)
             raw = calls[2].destination / "runs" / "run_01.json"
@@ -383,6 +419,11 @@ class PreflightTests(unittest.TestCase):
                     run_campaign(instances, root / "seed-out", seed=-1, timestamp="seed")
                 self.assertEqual(str(seed_error.exception), "seed must be a nonnegative integer")
                 self.assertFalse((root / "seed-out").exists())
+
+                with self.assertRaises(ValueError) as policy_error:
+                    run_campaign(instances, root / "policy-out", policy="nope", timestamp="policy")
+                self.assertIn("policy must be one of", str(policy_error.exception))
+                self.assertFalse((root / "policy-out").exists())
                 self.assertEqual(calls, [])
                 self.assertEqual((instances / "counter.txt").read_text(encoding="utf-8"), "0")
 
@@ -395,14 +436,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(args.population_size, 30)
         self.assertEqual(args.iterations, 1000)
         self.assertEqual(args.max_evaluations, 180030)
+        self.assertEqual(args.policy, "binary_complex")
+        self.assertFalse(args.dtw_kirito)
         self.assertEqual(args.output_root, DEFAULT_OUTPUT_ROOT)
         self.assertEqual(DEFAULT_OUTPUT_ROOT, BENCHMARK_OUTPUT_ROOT)
         self.assertFalse(hasattr(args, "runs"))
         help_text = " ".join(parser.format_help().split())
-        self.assertIn("135", help_text)
-        self.assertIn("45", help_text)
+        self.assertIn("81", help_text)
+        self.assertIn("27", help_text)
         self.assertIn("v0", help_text)
         self.assertIn("v4", help_text)
+        self.assertNotIn("v2", help_text)
+        self.assertNotIn("v3", help_text)
+        self.assertIn("--policy", help_text)
+        self.assertIn("--dtw-kirito", help_text)
         self.assertIn("180030", help_text)
         self.assertIn("(default: 43)", help_text)
         self.assertIn("(default: 30)", help_text)
@@ -416,7 +463,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(stderr.getvalue(), "")
         self.assertIn("usage: woa_abc.campaign", stdout.getvalue())
-        self.assertIn("135", stdout.getvalue())
+        self.assertIn("81", stdout.getvalue())
 
         stdout = StringIO()
         stderr = StringIO()
@@ -453,7 +500,8 @@ class CliTests(unittest.TestCase):
 
         text = (Path(__file__).resolve().parents[1] / "woa_abc" / "README.md").read_text(encoding="utf-8")
         self.assertIn("python -m woa_abc.campaign --instances-dir instancias", text)
-        self.assertIn("135", text)
+        self.assertIn("81", text)
+        self.assertNotIn("135", text)
         self.assertIn("180030", text)
         self.assertIn("mknapcb1", text)
         self.assertIn("100", text)

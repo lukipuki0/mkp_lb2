@@ -97,18 +97,34 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def _cycle(cycle: int, profile: str, best: float, evaluations: int, complete: bool) -> CycleRecord:
+    a, rho = (0.5, 1.0) if profile == "exploit" else (2.0, 2.0)
+    return CycleRecord(
+        cycle=cycle,
+        profile=profile,
+        a=a,
+        rho=rho,
+        G3=0.5,
+        intensity=None,
+        best=best,
+        evaluations=evaluations,
+        completeness=complete,
+    )
+
+
 def _synthetic_result() -> HybridResult:
     history = [
-        CycleRecord(0, 0, 2.0, 1.0, 5.0, 10, True),
-        CycleRecord(1, 1, 1.5, 1.0, 8.0, 20, True),
-        CycleRecord(2, 2, 1.0, 1.0, 8.0, 22, False),
+        _cycle(0, "exploit", 5.0, 10, True),
+        _cycle(1, "explore", 8.0, 20, True),
+        _cycle(2, "explore", 8.0, 22, False),
     ]
     diagnostics = [
         {
             "cycle": 0,
             "ready": True,
             "fire": True,
-            "recovery_applied": True,
+            "changed": True,
+            "next_profile": "explore",
             "delta": 4.0,
             "D1_vs_ramp": 6.0,
             "D2_vs_const": 2.0,
@@ -123,7 +139,8 @@ def _synthetic_result() -> HybridResult:
             "cycle": 2,
             "ready": False,
             "fire": True,
-            "recovery_applied": False,
+            "changed": False,
+            "next_profile": "explore",
             "delta": 9.0,
             "D1_vs_ramp": 1.0,
             "D2_vs_const": 1.0,
@@ -143,6 +160,7 @@ def _synthetic_result() -> HybridResult:
         source_trials=[1, 0],
         archive_size=22,
         scout_limit=4,
+        profile_changes=[0],
         diagnostics=diagnostics,
         metadata={
             "seed": 7,
@@ -153,6 +171,8 @@ def _synthetic_result() -> HybridResult:
                 "max_evaluations": 40,
                 "scout_limit": 4,
                 "use_stagnation": True,
+                "policy": "binary_complex",
+                "dtw_kirito": False,
                 "stagnation": {
                     "window": 40,
                     "band": 4,
@@ -210,6 +230,13 @@ class InheritedConfigTests(unittest.TestCase):
         self.assertEqual(hybrid._resolved_max_evaluations(hybrid_config), 210030)
         self.assertEqual(hybrid_config.population_size, 30)
         self.assertEqual(hybrid_config.iterations, 1000)
+        self.assertEqual(hybrid_config.policy, "binary_complex")
+        self.assertFalse(hybrid_config.dtw_kirito)
+        chosen = build_hybrid_config(
+            ExportRequest(instance=Path("unused.txt"), policy="continuous_simple", dtw_kirito=True)
+        )
+        self.assertEqual(chosen.policy, "continuous_simple")
+        self.assertTrue(chosen.dtw_kirito)
 
     def test_parser_defaults_reject_runs_and_help_is_one_run(self) -> None:
         parser = build_parser()
@@ -220,6 +247,15 @@ class InheritedConfigTests(unittest.TestCase):
         self.assertEqual(args.instance_index, 0)
         self.assertIsNone(args.max_evaluations)
         self.assertIsNone(args.scout_limit)
+        self.assertEqual(args.policy, "binary_complex")
+        self.assertFalse(args.dtw_kirito)
+        chosen = parser.parse_args(
+            ["--instance", "a.txt", "--policy", "continuous_complex", "--dtw-kirito"]
+        )
+        self.assertEqual(chosen.policy, "continuous_complex")
+        self.assertTrue(chosen.dtw_kirito)
+        with self.assertRaises(SystemExit), patch("sys.stderr", StringIO()):
+            parser.parse_args(["--instance", "a.txt", "--policy", "nope"])
         self.assertFalse(hasattr(args, "runs"))
         with self.assertRaises(SystemExit):
             parser.parse_args(["--instance", "a.txt", "--runs", "31"])
@@ -265,12 +301,21 @@ class JoinTests(unittest.TestCase):
         self.assertEqual([row.cycle for row in rows], [0, 1, 2])
         self.assertEqual(rows[0].diagnostic["delta"], 4.0)
         self.assertIsNone(rows[1].diagnostic)
-        self.assertIsNone(rows[1].recovery_applied)
+        self.assertIsNone(rows[1].profile_changed)
         self.assertEqual(rows[2].diagnostic["delta"], 9.0)
         self.assertFalse(rows[2].completeness)
-        self.assertTrue(rows[0].recovery_applied)
-        self.assertFalse(rows[2].recovery_applied)
-        stray = list(result.diagnostics) + [{"cycle": 9, "delta": 99.0, "fire": True, "recovery_applied": True}]
+        self.assertTrue(rows[0].profile_changed)
+        self.assertFalse(rows[2].profile_changed)
+        self.assertEqual([row.profile for row in rows], ["exploit", "explore", "explore"])
+        cells = bench.history_csv_row(rows[0])
+        self.assertEqual(cells["profile"], "exploit")
+        self.assertEqual(cells["a"], "0.5")
+        self.assertEqual(cells["G3"], "0.5")
+        self.assertEqual(cells["intensity"], "")
+        self.assertEqual(cells["profile_changed"], "True")
+        self.assertEqual(cells["next_profile"], "explore")
+        self.assertEqual(bench.history_csv_row(rows[1])["profile_changed"], "")
+        stray = list(result.diagnostics) + [{"cycle": 9, "delta": 99.0, "fire": True, "changed": True}]
         self.assertEqual(len(join_history(result.history, stray)), 3)
         with self.assertRaises(bench.ExportError):
             join_history(result.history, [{"delta": 1.0}])
@@ -438,7 +483,10 @@ class ExporterTests(unittest.TestCase):
             self.assertEqual(int(run_row[0]["evaluations"]), raw["evaluations"])
             self.assertEqual(int(run_row[0]["cycles_completed"]), raw["cycles_completed"])
             self.assertEqual(int(run_row[0]["n_fires"]), manifest["counts"]["n_fires"])
-            self.assertEqual(int(run_row[0]["n_recoveries"]), manifest["counts"]["n_recoveries"])
+            self.assertEqual(int(run_row[0]["n_profile_changes"]), manifest["counts"]["n_profile_changes"])
+            self.assertEqual(int(run_row[0]["n_profile_changes"]), len(raw["profile_changes"]))
+            self.assertEqual(run_row[0]["policy"], "binary_complex")
+            self.assertNotIn("n_recoveries", run_row[0])
             self.assertEqual(run_row[0]["termination_reason"], raw["termination_reason"])
             self.assertEqual(float(run_row[0]["mejor_valor"]), raw["best_value"])
             self.assertLess(abs(float(run_row[0]["tiempo_s"]) - manifest["timing"]["solve_seconds"]), 0.01)
@@ -459,7 +507,9 @@ class ExporterTests(unittest.TestCase):
             for text in (summary, best):
                 self.assertIn(bench.SUMMARY_BANNER, text)
                 self.assertRegex(text, r"n_switches\s*:\s*0\b")
-                self.assertIn("n_recoveries", text)
+                self.assertIn("n_profile_changes", text)
+                self.assertNotIn("n_recoveries", text)
+                self.assertIn("binary_complex", text)
                 self.assertIn("no es el consumo", text)
                 self.assertIn("desconocido", text)
                 self.assertIn("band=4", text)
@@ -539,7 +589,7 @@ class ExporterTests(unittest.TestCase):
             self.assertIn("boxplot_runs.png", manifest["output_completeness"]["missing"])
             self.assertEqual(raw_path.read_text(encoding="utf-8").count("best_solution"), 1)
 
-    def test_synthetic_recoveries_do_not_become_switches(self) -> None:
+    def test_synthetic_profile_changes_do_not_become_switches(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             instance = root / "synth.txt"
@@ -554,7 +604,7 @@ class ExporterTests(unittest.TestCase):
             row = _read_csv(outcome.output_dir / "runs_resultados.csv")[0]
             self.assertEqual(row["n_switches"], "0")
             self.assertEqual(row["n_fires"], "2")
-            self.assertEqual(row["n_recoveries"], "1")
+            self.assertEqual(row["n_profile_changes"], "1")
             self.assertEqual(row["gap_pct"], "")
             history = _read_csv(outcome.output_dir / "best_run_01" / "historial_dtw.csv")
             self.assertEqual(history[0]["dtw_delta"], "4")
@@ -565,10 +615,10 @@ class ExporterTests(unittest.TestCase):
             manifest = json.loads((outcome.output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["effective_config"], result.metadata["config"])
             self.assertEqual(manifest["counts"]["n_switches"], 0)
-            self.assertEqual(manifest["counts"]["n_recoveries"], 1)
+            self.assertEqual(manifest["counts"]["n_profile_changes"], 1)
             text = (outcome.output_dir / "resumen_pipeline.txt").read_text(encoding="utf-8")
             self.assertRegex(text, r"n_switches\s*:\s*0\b")
-            self.assertRegex(text, r"n_recoveries\s*:\s*1\b")
+            self.assertRegex(text, r"n_profile_changes\s*:\s*1\b")
             self.assertIn("no switches", text)
 
 
@@ -576,7 +626,7 @@ class PlotTests(unittest.TestCase):
     def _rows(self) -> list[HistoryRow]:
         return join_history(_synthetic_result().history, _synthetic_result().diagnostics)
 
-    def test_fonts_recovery_markers_and_empty_delta_label(self) -> None:
+    def test_fonts_profile_change_markers_and_empty_delta_label(self) -> None:
         rows = self._rows()
         fig, ax = matplotlib.pyplot.subplots()
         draw_convergence(ax, rows, 0.0)
@@ -587,12 +637,12 @@ class PlotTests(unittest.TestCase):
         self.assertEqual(ax.legend_.get_texts()[0].get_fontsize(), 15)
         labels = [text.get_text() for text in ax.get_legend().get_texts()]
         self.assertIn("WOA\u2013ABC", labels)
-        self.assertNotIn("parameter recovery", labels)
+        self.assertNotIn("profile change", labels)
         self.assertNotIn("Optimum (0)", labels)
         matplotlib.pyplot.close(fig)
 
         fig, ax = matplotlib.pyplot.subplots()
-        draw_delta(ax, [HistoryRow(0, 1, 1, 2.0, 1.0, 0, 1.0, True, None, None)])
+        draw_delta(ax, [HistoryRow(0, 1, 1, "exploit", 0.5, 1.0, 0.5, None, 1.0, True, None, None)])
         drawn = " ".join(text.get_text() for text in ax.texts)
         self.assertIn("Empty diagnostic", drawn)
         self.assertIn("Not evidence of improvement", drawn)
@@ -606,12 +656,16 @@ class PlotTests(unittest.TestCase):
         by_label = dict(zip(labels, handles))
         self.assertIn("a", by_label)
         self.assertIn("rho", by_label)
-        self.assertIn("parameter recovery", by_label)
-        self.assertIn("fire without recovery", by_label)
-        recovery_path = by_label["parameter recovery"].get_paths()[0]
-        fire_path = by_label["fire without recovery"].get_paths()[0]
-        self.assertNotEqual(recovery_path.vertices.tolist(), fire_path.vertices.tolist())
-        self.assertNotEqual(recovery_path.codes.tolist(), fire_path.codes.tolist())
+        self.assertIn("exploit", by_label)
+        self.assertIn("explore", by_label)
+        self.assertIn("profile change", by_label)
+        self.assertFalse(any("recovery" in label for label in labels))
+        change_points = by_label["profile change"].get_offsets().tolist()
+        self.assertEqual(change_points, [[0.5, 0.5]])
+        a_line = by_label["a"]
+        self.assertEqual(list(a_line.get_ydata()), [0.5, 2.0, 2.0])
+        self.assertEqual(list(by_label["rho"].get_ydata()), [1.0, 2.0, 2.0])
+        self.assertIn("profile", ax.get_title())
         matplotlib.pyplot.close(fig)
 
         fig, ax = matplotlib.pyplot.subplots(figsize=(6, 5))
@@ -626,9 +680,9 @@ class PlotTests(unittest.TestCase):
         self.assertIn("n = 1", BOX_TITLE)
         self.assertIn("Empty diagnostic", EMPTY_DELTA_LABEL)
 
-    def test_mkp_style_uses_one_segment_and_keeps_recovery_on_parameters(self) -> None:
+    def test_mkp_style_uses_one_segment_and_keeps_profile_changes_on_parameters(self) -> None:
         rows = self._rows()
-        expected = [row.cycle for row in rows if row.recovery_applied]
+        expected = [row.cycle + 0.5 for row in rows if row.profile_changed]
         self.assertTrue(expected)
 
         def boundaries(ax):
@@ -650,7 +704,7 @@ class PlotTests(unittest.TestCase):
                         self.assertNotEqual(line.get_color(), "#FF5722")
                     labels = [text.get_text() for text in ax.legend_.get_texts()]
                     self.assertIn("WOA\u2013ABC", labels)
-                    self.assertNotIn("parameter recovery", labels)
+                    self.assertNotIn("profile change", labels)
                     handle = ax.legend_.legend_handles[labels.index("WOA\u2013ABC")]
                     self.assertIsInstance(handle, matplotlib.patches.Patch)
                     self.assertEqual(ax.get_xlabel(), "Hybrid cycles")
@@ -661,7 +715,7 @@ class PlotTests(unittest.TestCase):
         try:
             draw_parameters(ax, rows)
             self.assertEqual([line.get_xdata()[0] for line in boundaries(ax)], expected)
-            self.assertIn("parameter recovery", ax.get_legend_handles_labels()[1])
+            self.assertIn("profile change", ax.get_legend_handles_labels()[1])
             self.assertNotIn("switch", " ".join(ax.get_legend_handles_labels()[1]).lower())
         finally:
             matplotlib.pyplot.close(fig)
@@ -669,7 +723,7 @@ class PlotTests(unittest.TestCase):
         try:
             draw_convergence(ax, rows * 50, 0.0)
             self.assertEqual(len(boundaries(ax)), 1)
-            self.assertNotIn("parameter recovery", ax.get_legend_handles_labels()[1])
+            self.assertNotIn("profile change", ax.get_legend_handles_labels()[1])
         finally:
             matplotlib.pyplot.close(fig)
 
@@ -683,7 +737,7 @@ class PlotTests(unittest.TestCase):
             expected = {
                 "best_run_01/fitness_convergence.png": CONVERGENCE_SIZE,
                 "best_run_01/dtw_delta.png": DELTA_SIZE,
-                "best_run_01/parameter_recovery.png": PARAMETER_SIZE,
+                "best_run_01/parameter_profiles.png": PARAMETER_SIZE,
                 "boxplot_runs.png": (6, 5),
             }
             for relative, size in expected.items():
@@ -720,9 +774,12 @@ class DocumentTests(unittest.TestCase):
             "resumen_pipeline.txt",
             "boxplot_runs.png",
             "best_run_01/",
-            "parameter_recovery.png",
+            "parameter_profiles.png",
         ):
             self.assertIn(name, text)
+        self.assertNotIn("parameter_recovery.png", text)
+        for phrase in ("--policy", "--dtw-kirito", "binary_simple", "continuous_complex"):
+            self.assertIn(phrase, text)
         self.assertIn("run_ddtw_", text)
 
 

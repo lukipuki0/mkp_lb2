@@ -1,10 +1,12 @@
 """Shared-population binary WOA followed by a full ABC cycle for the MKP.
 
 A complete cycle is WOA, employed bees, onlookers, then eligible scouts.
-Initialization happens once, using the WOA sign-bit initializer. After each
-complete cycle the existing stagnation monitor may restart only the ``a`` and
-``rho`` clock. Incomplete cycles are recorded and do not update the monitor.
-``a2`` stays on the ordinary cycle index.
+Initialization happens once, using the WOA sign-bit initializer. Each cycle
+runs with one profile (WOA ``a``, ABC ``rho``, LB2 ``G3``; see ``profiles``).
+After each complete cycle the existing stagnation monitor observes the
+archived best and the policy may change the profile used from the next cycle.
+Incomplete cycles are recorded and do not update the monitor. ``a2`` stays on
+the ordinary cycle index.
 """
 
 from __future__ import annotations
@@ -18,10 +20,24 @@ from pathlib import Path
 
 import numpy as np
 
-from dtw_stagnation import StagnationConfig, StagnationMonitor
+from dtw_stagnation import StagnationConfig
 from lb2.binarization import _calcular_L1, _calcular_L2
 from mkp_core.problem import MKPInstance
 from mkp_core.repair import reparar_solucion
+
+from .profiles import (
+    CENTER,
+    EXPLOIT,
+    EXPLORE,
+    K,
+    POLICIES,
+    POLICY,
+    SCALE,
+    Profile,
+    ProfileController,
+    check_policy,
+    initial_intensity,
+)
 
 
 PHASE_INITIALIZATION = "initialization"
@@ -40,8 +56,8 @@ PHASES = (
 TERMINATION_ITERATIONS = "iterations"
 TERMINATION_EVALUATION_BUDGET = "evaluation_budget"
 
-VARIANTS = ("v0", "v1", "v2", "v3", "v4")
-VARIANT_ERROR = "variant must be one of v0, v1, v2, v3, v4"
+VARIANTS = ("v0", "v1", "v4")
+VARIANT_ERROR = "variant must be one of v0, v1, v4"
 
 # One initialization, plus a cycle that proposes three LB2 pairs and one scout
 # for every source. This is an upper bound, not a hidden extra search.
@@ -52,16 +68,18 @@ _EVALUATIONS_PER_SOURCE_PER_CYCLE = 7
 class CycleRecord:
     """One ordinary cycle, including a cycle stopped at a phase boundary.
 
-    ``evaluations`` is the cumulative objective count when the record is
-    closed. ``schedule_index`` is the clock used for ``a`` and ``rho``; it
-    matches ``cycle`` until a future recovery resets it. ``a2`` is not stored
-    because it follows ``cycle`` and is not part of the controlled pair.
+    ``profile``, ``a``, ``rho``, ``G3`` and ``intensity`` are the profile used
+    by this cycle. ``intensity`` is None for binary policies. ``evaluations``
+    is the cumulative objective count when the record is closed. ``a2`` is not
+    stored because it follows ``cycle`` and is not part of the profile.
     """
 
     cycle: int
-    schedule_index: int
+    profile: str
     a: float
     rho: float
+    G3: float
+    intensity: float | None
     best: float
     evaluations: int
     completeness: bool
@@ -78,11 +96,12 @@ class HybridConfig:
     b: float = 1.0
     G1: float = 0.5
     G2: float = 0.5
-    G3: float = 0.5
     scout_limit: int | None = None
     use_stagnation: bool = True
     stag_cfg: StagnationConfig | None = None
     variant: str = "v0"
+    policy: str = POLICY
+    dtw_kirito: bool = False
 
     def __post_init__(self) -> None:
         _validate_config(self)
@@ -90,7 +109,11 @@ class HybridConfig:
 
 @dataclass
 class HybridResult:
-    """JSON-friendly search report. Live positions and bit rows are omitted."""
+    """JSON-friendly search report. Live positions and bit rows are omitted.
+
+    ``profile_changes`` lists the cycles after which the profile changed; the
+    new profile is used from the following cycle.
+    """
 
     best_solution: list[int]
     best_value: float
@@ -104,6 +127,7 @@ class HybridResult:
     source_trials: list[int]
     archive_size: int
     scout_limit: int
+    profile_changes: list[int] = field(default_factory=list)
     diagnostics: list = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
@@ -121,16 +145,15 @@ class _RunState:
     trials: np.ndarray
     max_evaluations: int
     scout_limit: int
-    schedule_index: int = 0
-    recovery_active: bool = False
-    recovery_span: int | None = None
+    profile: Profile = EXPLOIT
+    intensity: float | None = None
     evaluations: int = 0
     best_value: float = float("-inf")
     best_solution: list[int] = field(default_factory=list)
     phases_executed: list[str] = field(default_factory=list)
     diagnostics: list = field(default_factory=list)
     by_phase: dict[str, int] = field(default_factory=dict)
-    monitor: StagnationMonitor | None = None
+    controller: ProfileController | None = None
 
     def __post_init__(self) -> None:
         if not self.by_phase:
@@ -167,12 +190,14 @@ def _validate_config(config: HybridConfig) -> None:
     _require_finite("b", config.b)
     _require_finite("G1", config.G1)
     _require_finite("G2", config.G2)
-    _require_finite("G3", config.G3)
     if config.scout_limit is not None:
         _require_int("scout_limit", config.scout_limit, 1)
     if not isinstance(config.use_stagnation, bool):
         raise ValueError("use_stagnation must be a bool")
     _validate_variant(config.variant)
+    check_policy(config.policy)
+    if not isinstance(config.dtw_kirito, bool):
+        raise ValueError("dtw_kirito must be a bool")
     if config.stag_cfg is not None:
         _validate_stagnation(config.stag_cfg)
 
@@ -203,18 +228,19 @@ def _validate_stagnation(cfg: StagnationConfig) -> None:
         raise ValueError("improvement_tol must be a finite number >= 0")
 
 
-def _fresh_monitor(config: HybridConfig) -> StagnationMonitor | None:
-    """Copy the caller's detector settings into a run-local monitor.
+def _fresh_controller(config: HybridConfig) -> ProfileController | None:
+    """Copy the caller's detector settings into a run-local profile controller.
 
     ``stag_cfg is None`` selects the existing defaults. It does not disable
-    detection; ``use_stagnation=False`` does that. The copy absorbs the
-    monitor's own band normalization so the user's object stays unchanged.
+    detection; ``use_stagnation=False`` does that and keeps the exploit
+    profile. The copy absorbs the monitor's own band normalization so the
+    user's object stays unchanged.
     """
 
     if not config.use_stagnation:
         return None
     copied = StagnationConfig() if config.stag_cfg is None else replace(config.stag_cfg)
-    return StagnationMonitor(cfg=copied)
+    return ProfileController(copied, policy=config.policy, dtw_kirito=config.dtw_kirito)
 
 
 def _validate_instance(inst: MKPInstance) -> None:
@@ -290,47 +316,8 @@ def _resolved_scout_limit(config: HybridConfig, n_items: int) -> int:
     return config.scout_limit
 
 
-def _control_parameters(
-    schedule_index: int,
-    iterations: int,
-    recovery_active: bool,
-    variant: str = "v0",
-    recovery_span: int | None = None,
-) -> tuple[float, float]:
-    """Return ``(a, rho)`` for the current clock.
-
-    Before any recovery, rho stays 1. After a hook reset, the next cycle is
-    called with schedule index 0 and ``recovery_active`` so rho restarts at 2
-    on v0. v2 changes only the post-fire amplitudes. v3 changes only the
-    post-fire horizon. v1 and v4 keep this baseline clock.
-    """
-
-    if recovery_active and variant == "v2":
-        span = iterations - 1
-        return (
-            max(0.0, 1.0 - 2.0 * schedule_index / span),
-            max(1.0, 1.5 - schedule_index / span),
-        )
-    if recovery_active and variant == "v3":
-        if recovery_span is None:
-            raise RuntimeError("v3 recovery is missing its remaining-cycle span")
-        if recovery_span == 0:
-            return 0.0, 1.0
-        return (
-            max(0.0, 2.0 - 2.0 * schedule_index / recovery_span),
-            max(1.0, 2.0 - schedule_index / recovery_span),
-        )
-    span = iterations - 1
-    a = max(0.0, 2.0 - 2.0 * schedule_index / span)
-    if recovery_active:
-        rho = max(1.0, 2.0 - schedule_index / span)
-    else:
-        rho = 1.0
-    return a, rho
-
-
 def _a2(cycle_index: int, iterations: int) -> float:
-    """WOA spiral schedule. This follows the ordinary cycle, not the a/rho clock."""
+    """WOA spiral schedule. This follows the ordinary cycle, not the profile."""
 
     return -1.0 + cycle_index * (-1.0 / (iterations - 1))
 
@@ -432,8 +419,9 @@ def _lb2_pair(
     if _remaining(state) < 2:
         raise RuntimeError("an LB2 proposal needs two remaining evaluations")
     config = state.config
-    probabilities_l1 = _calcular_L1(position, config.v_max, config.G1, config.G2, config.G3)
-    probabilities_l2 = _calcular_L2(position, config.v_max, config.G1, config.G2, config.G3)
+    G3 = state.profile.G3
+    probabilities_l1 = _calcular_L1(position, config.v_max, config.G1, config.G2, G3)
+    probabilities_l2 = _calcular_L2(position, config.v_max, config.G1, config.G2, G3)
     draws_l1 = state.rng.random(state.inst.n)
     draws_l2 = state.rng.random(state.inst.n)
     candidate_l1 = _flip_candidate(current_bits, probabilities_l1, draws_l1)
@@ -606,14 +594,9 @@ def _run_scouts(state: _RunState) -> bool:
 
 
 def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord:
-    a, rho = _control_parameters(
-        state.schedule_index,
-        state.config.iterations,
-        state.recovery_active,
-        state.config.variant,
-        state.recovery_span,
-    )
-    # a2 intentionally uses cycle_index. Recovery must not restart this draw.
+    profile = state.profile
+    a, rho = profile.a, profile.rho
+    # a2 intentionally uses cycle_index. Profiles do not change this draw.
     a2 = _a2(cycle_index, state.config.iterations)
     complete = True
     if not _run_woa(state, a, a2):
@@ -626,9 +609,11 @@ def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord:
         complete = False
     return CycleRecord(
         cycle=cycle_index,
-        schedule_index=state.schedule_index,
+        profile=profile.name,
         a=float(a),
         rho=float(rho),
+        G3=float(profile.G3),
+        intensity=None if state.intensity is None else float(state.intensity),
         best=float(state.best_value),
         evaluations=state.evaluations,
         completeness=complete,
@@ -636,7 +621,7 @@ def _run_cycle(state: _RunState, cycle_index: int) -> CycleRecord:
 
 
 def _status_snapshot(status: dict) -> dict:
-    """Copy detector fields before ``reset`` clears the monitor."""
+    """Copy detector fields before a fresh monitor replaces the old one."""
 
     snapshot: dict[str, object] = {
         "ready": bool(status.get("ready", False)),
@@ -658,39 +643,42 @@ def _status_snapshot(status: dict) -> dict:
     return snapshot
 
 
-def _after_complete_cycle(state: _RunState, record: CycleRecord) -> bool:
-    """Observe one complete cycle. Return True when the next cycle should restart.
+def _after_complete_cycle(state: _RunState, record: CycleRecord) -> dict | None:
+    """Observe one complete cycle and return its diagnostic.
 
-    The archived best is passed through once. A fire resets only the monitor.
-    Population, source trials, and the archive are left in place. ``solve``
-    marks ``recovery_applied`` only when the next indexed cycle can run a WOA pair.
+    The archived best is passed through once. The decided profile is stored
+    on ``state`` and used from the next cycle. Population, source trials, and
+    the archive are left in place. Returns None when detection is off.
     """
 
-    monitor = state.monitor
-    if monitor is None:
-        return False
-    status = monitor.update(float(record.best))
+    controller = state.controller
+    if controller is None:
+        return None
+    out = controller.observe(float(record.best))
+    state.profile = controller.profile
+    state.intensity = controller.intensity
     diagnostic = {
         "cycle": record.cycle,
-        "schedule_index": record.schedule_index,
         "evaluations": record.evaluations,
+        "best": float(record.best),
+        "profile": record.profile,
         "a": float(record.a),
         "rho": float(record.rho),
-        "best": float(record.best),
-        "recovery_applied": False,
+        "G3": float(record.G3),
+        "intensity": record.intensity,
     }
-    diagnostic.update(_status_snapshot(status))
+    diagnostic.update(_status_snapshot(out))
+    diagnostic["changed"] = bool(out["changed"])
+    diagnostic["next_profile"] = out["profile"]
+    diagnostic["next_intensity"] = None if out["intensity"] is None else float(out["intensity"])
     state.diagnostics.append(diagnostic)
-    if diagnostic["fire"]:
-        monitor.reset()
-        return True
-    return False
+    return diagnostic
 
 
-def _stagnation_metadata(monitor: StagnationMonitor | None) -> dict | None:
-    if monitor is None:
+def _stagnation_metadata(controller: ProfileController | None) -> dict | None:
+    if controller is None:
         return None
-    cfg = monitor.cfg
+    cfg = controller.cfg
     return {
         "window": int(cfg.window),
         "band": int(cfg.band),
@@ -710,7 +698,7 @@ def _run_metadata(
     seed: int,
     max_evaluations: int,
     scout_limit: int,
-    monitor: StagnationMonitor | None,
+    controller: ProfileController | None,
     caller_metadata: dict | None,
 ) -> dict:
     metadata = dict(caller_metadata or {})
@@ -724,9 +712,12 @@ def _run_metadata(
         "b": float(config.b),
         "G1": float(config.G1),
         "G2": float(config.G2),
-        "G3": float(config.G3),
         "use_stagnation": config.use_stagnation,
-        "stagnation": _stagnation_metadata(monitor),
+        "stagnation": _stagnation_metadata(controller),
+        "policy": config.policy,
+        "dtw_kirito": config.dtw_kirito,
+        "policy_params": {"scale": SCALE, "k": K, "center": CENTER},
+        "profiles": {"exploit": asdict(EXPLOIT), "explore": asdict(EXPLORE)},
     }
     if config.variant != "v0":
         metadata["config"]["variant"] = config.variant
@@ -759,7 +750,7 @@ def solve(
     resolved_seed = _validate_seed(seed)
     max_evaluations = _resolved_max_evaluations(config)
     scout_limit = _resolved_scout_limit(config, inst.n)
-    monitor = _fresh_monitor(config)
+    controller = _fresh_controller(config)
     state = _RunState(
         inst=inst,
         config=config,
@@ -770,11 +761,13 @@ def solve(
         trials=np.zeros(config.population_size, dtype=int),
         max_evaluations=max_evaluations,
         scout_limit=scout_limit,
-        monitor=monitor,
+        intensity=initial_intensity(config.policy),
+        controller=controller,
     )
     _initialize(state)
 
     history: list[CycleRecord] = []
+    profile_changes: list[int] = []
     termination_reason = TERMINATION_ITERATIONS
     for cycle_index in range(config.iterations):
         record = _run_cycle(state, cycle_index)
@@ -782,23 +775,9 @@ def solve(
         if not record.completeness:
             termination_reason = TERMINATION_EVALUATION_BUDGET
             break
-        fired = _after_complete_cycle(state, record)
-        # A claimed restart requires a later cycle that can execute one LB2 pair.
-        recovery_applied = bool(
-            fired
-            and cycle_index + 1 < config.iterations
-            and _remaining(state) >= 2
-        )
-        if state.diagnostics and "recovery_applied" in state.diagnostics[-1]:
-            state.diagnostics[-1]["recovery_applied"] = recovery_applied
-        if recovery_applied:
-            state.schedule_index = 0
-            state.recovery_active = True
-            if config.variant == "v3":
-                remaining_cycles = config.iterations - (cycle_index + 1)
-                state.recovery_span = remaining_cycles - 1
-        else:
-            state.schedule_index += 1
+        diagnostic = _after_complete_cycle(state, record)
+        if diagnostic is not None and diagnostic["changed"]:
+            profile_changes.append(cycle_index)
 
     if sum(state.by_phase.values()) != state.evaluations:
         raise RuntimeError("evaluation accounting diverged from the phase counts")
@@ -818,13 +797,14 @@ def solve(
         source_trials=[int(trial) for trial in state.trials],
         archive_size=state.evaluations,
         scout_limit=scout_limit,
+        profile_changes=profile_changes,
         diagnostics=list(state.diagnostics),
         metadata=_run_metadata(
             config,
             resolved_seed,
             max_evaluations,
             scout_limit,
-            monitor,
+            controller,
             metadata,
         ),
     )
@@ -896,7 +876,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--iterations", type=int, default=300, help="Fixed cycle horizon T.")
     parser.add_argument("--max-evaluations", type=int, default=None)
     parser.add_argument("--scout-limit", type=int, default=None)
-    parser.add_argument("--no-stagnation", action="store_true", help="Disable detector recovery and keep rho at 1.")
+    parser.add_argument(
+        "--no-stagnation",
+        action="store_true",
+        help="Disable the detector and keep the exploit profile for the whole run.",
+    )
+    parser.add_argument(
+        "--policy",
+        default=POLICY,
+        choices=POLICIES,
+        help=(
+            "Stagnation reaction. binary_simple and binary_complex switch between the "
+            "exploit and explore profiles; continuous_simple and continuous_complex "
+            "blend them. Default: binary_complex."
+        ),
+    )
+    parser.add_argument(
+        "--dtw-kirito",
+        action="store_true",
+        help="Binary policies only: keep one monitor and decide on every ready observation.",
+    )
     parser.add_argument("--ddtw", action="store_true", help="Use derivative DTW instead of DTW.")
     parser.add_argument("--window", type=int, default=40)
     parser.add_argument("--band", type=int, default=0, help="Sakoe-Chiba band. 0 selects the monitor default.")
@@ -906,12 +905,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--variant",
         default="v0",
-        metavar="{v0,v1,v2,v3,v4}",
+        metavar="{v0,v1,v4}",
         help=(
             "One additive variant. v0 is the unchanged baseline. "
             "v1 resolves an omitted scout limit to 100. "
-            "v2 restarts post-fire a at 1 and rho at 1.5 on the original horizon. "
-            "v3 restarts post-fire a/rho over the cycles still left. "
             "v4 perturbs one ABC coordinate before the unchanged LB2 repair. "
             "Default: v0."
         ),
@@ -955,6 +952,8 @@ def _config_from_args(args: argparse.Namespace) -> HybridConfig:
         use_stagnation=not args.no_stagnation,
         stag_cfg=stag_cfg,
         variant=args.variant,
+        policy=args.policy,
+        dtw_kirito=bool(args.dtw_kirito),
     )
 
 
