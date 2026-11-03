@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -277,11 +278,16 @@ class InheritedConfigTests(unittest.TestCase):
                 os.chdir(previous)
 
     def test_import_does_not_pull_scipy_or_legacy_batch(self) -> None:
-        self.assertEqual(matplotlib.get_backend().lower(), "agg")
-        self.assertFalse(any(name == "scipy" or name.startswith("scipy.") for name in sys.modules))
-        self.assertNotIn("hybrid_mkp.batch_benchmark", sys.modules)
-        self.assertNotIn("hybrid_mkp.orchestrator", sys.modules)
-        self.assertNotIn("mh.woa", sys.modules)
+        # A fresh interpreter, so modules other tests imported cannot leak in.
+        code = ("import sys, matplotlib, woa_abc.benchmark; "
+                "assert matplotlib.get_backend().lower() == 'agg'; "
+                "assert not any(n == 'scipy' or n.startswith('scipy.') for n in sys.modules); "
+                "assert 'hybrid_mkp.batch_benchmark' not in sys.modules; "
+                "assert 'hybrid_mkp.orchestrator' not in sys.modules; "
+                "assert 'mh.woa' not in sys.modules")
+        done = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True,
+                              cwd=Path(__file__).resolve().parents[1])
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""))
 
 
 class JoinTests(unittest.TestCase):
