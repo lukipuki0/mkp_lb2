@@ -91,6 +91,73 @@ class CampaignTests(unittest.TestCase):
             self.assertEqual(len(campaign._selections(INSTANCES, reaction='policy')), 108)
             self.assertEqual({s.policy for s in campaign._selections(INSTANCES, reaction='policy')}, set(POLICIES))
 
+    def test_single_instance_policy_campaign(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(campaign, 'export_single_run', side_effect=stub_export) as export, contextlib.redirect_stdout(io.StringIO()):
+                result = campaign.run_campaign(INSTANCES, Path(tmp), reaction='policy',
+                    files=['mknapcb1.txt'], indices=[2], seed=7, timestamp='subset')
+            self.assertEqual(result.code, 0, result.message)
+            calls = [call.args[0] for call in export.call_args_list]
+            self.assertEqual([(r.instance.name, r.instance_index, r.policy) for r in calls],
+                             [('mknapcb1.txt', 2, p) for p in POLICIES])
+            for request in calls:
+                self.assertEqual(request.destination.relative_to(result.output_dir).parts,
+                                 ('100', 'mknapcb1', 'inst_02', request.policy))
+                self.assertTrue((request.destination / 'manifest.json').is_file())
+            experiment = json.loads((result.output_dir / 'experiment.json').read_text())
+            self.assertEqual(experiment['runs_planned'], 4)
+            self.assertEqual(experiment['runs_completed'], 4)
+            self.assertEqual(experiment['groups'], {'100': 4, '250': 0, '500': 0})
+            self.assertEqual(experiment['settings']['files'], ['mknapcb1.txt'])
+            self.assertEqual(experiment['settings']['indices'], [2])
+
+    def test_cli_subset_uses_files_order_and_sorted_indices(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with patch.object(campaign, 'export_single_run', side_effect=stub_export) as export, contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = campaign.main(['--instances-dir', str(INSTANCES), '--output-root', tmp,
+                    '--reaction', 'policy', '--policy', 'binary_simple',
+                    '--files', 'mknapcb7.txt', 'mknapcb2.txt', 'mknapcb1.txt', '--indices', '2', '0'])
+            self.assertEqual(code, 0, stderr.getvalue())
+            self.assertEqual(stderr.getvalue(), '')
+            calls = [call.args[0] for call in export.call_args_list]
+            self.assertEqual([(r.instance.name, r.instance_index) for r in calls],
+                [(f, i) for f in ('mknapcb1.txt', 'mknapcb2.txt', 'mknapcb7.txt') for i in (0, 2)])
+            experiment = json.loads((calls[0].destination.parents[3] / 'experiment.json').read_text())
+            self.assertEqual(experiment['settings']['files'], ['mknapcb1.txt', 'mknapcb2.txt', 'mknapcb7.txt'])
+            self.assertEqual(experiment['settings']['indices'], [0, 2])
+
+    def test_cli_invalid_subset_refused_before_allocation(self):
+        cases = [
+            (['--files', 'unknown.txt'], 'files must be basenames from mknapcb1.txt through mknapcb9.txt'),
+            (['--files', 'dir/mknapcb1.txt'], 'files must be basenames from mknapcb1.txt through mknapcb9.txt'),
+            (['--files', 'mknapcb1.txt', 'mknapcb1.txt'], 'files must not contain duplicates'),
+            (['--indices', '-1'], 'indices must be nonnegative integers'),
+            (['--indices', '0', '0'], 'indices must not contain duplicates'),
+            (['--indices', '999999'], 'instance index must be in 0..29'),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            for options, message in cases:
+                with self.subTest(options=options):
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with patch.object(campaign, 'export_single_run') as export, contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                        code = campaign.main(['--instances-dir', str(INSTANCES), '--output-root', tmp] + options)
+                    self.assertEqual(code, 1)
+                    self.assertEqual(stdout.getvalue(), '')
+                    self.assertEqual(stderr.getvalue(), f'error: {message}\n')
+                    export.assert_not_called()
+                    self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_api_noninteger_indices_refused_before_allocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'out'
+            for index in (True, 1.5, '2'):
+                with self.subTest(index=index), patch.object(campaign, 'export_single_run') as export:
+                    with self.assertRaisesRegex(campaign.CampaignError, 'indices must be nonnegative integers'):
+                        campaign.run_campaign(INSTANCES, out, indices=[index])
+                    export.assert_not_called()
+                    self.assertFalse(out.exists())
+
     def test_failed_export_stops_without_retry_and_retains_raw(self):
         with tempfile.TemporaryDirectory() as tmp:
             calls = []

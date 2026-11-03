@@ -1,6 +1,7 @@
-"""Sequential campaign for indices 0, 1, and 2 of the nine OR-Library files.
+"""Sequential campaign over selected OR-Library files and indices.
 
-Separate modes: five recovery-clock variants (135 runs) or four policies (108 runs). Results are grouped by the loaded
+Defaults: all nine files, indices 0, 1, and 2; five recovery-clock variants
+(135 runs) or four policies (108 runs). Results are grouped by the loaded
 item count: mknapcb1/4/7 are 100, mknapcb2/5/8 are 250, and mknapcb3/6/9 are
 500. This is not a 31-run study, it does not download data, and n=1 claims
 no superiority.
@@ -183,7 +184,25 @@ def _reject_local(value: object, label: str) -> None:
         raise CampaignError(str(exc)) from exc
 
 
-def _selections(instances_dir: Path, reaction: str = "variant", policy: str | None = None) -> list[Selection]:
+def _selection_inputs(files=None, indices=None) -> tuple[list[str], list[int]]:
+    names = list(FILES if files is None else files)
+    selected_indices = list(INDICES if indices is None else indices)
+    if any(name not in FILES for name in names):
+        raise CampaignError("files must be basenames from mknapcb1.txt through mknapcb9.txt")
+    if len(set(names)) != len(names):
+        raise CampaignError("files must not contain duplicates")
+    if any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in selected_indices):
+        raise CampaignError("indices must be nonnegative integers")
+    if len(set(selected_indices)) != len(selected_indices):
+        raise CampaignError("indices must not contain duplicates")
+    return [name for name in FILES if name in names], sorted(selected_indices)
+
+
+def _selections(
+    instances_dir: Path, reaction: str = "variant", policy: str | None = None,
+    *, files=None, indices=None,
+) -> list[Selection]:
+    files, indices = _selection_inputs(files, indices)
     _reject_local(instances_dir, "instances dir")
     directory = Path(instances_dir)
     if not directory.is_dir():
@@ -196,13 +215,13 @@ def _selections(instances_dir: Path, reaction: str = "variant", policy: str | No
         check_policy(policy)
     members = VARIANTS if reaction == 'variant' else ((policy,) if policy else POLICIES)
     found: list[Selection] = []
-    for name in FILES:
+    for name in files:
         path = directory / name
         if not path.is_file():
             raise CampaignError(f"missing instance file: {name}")
         expected = GROUP_BY_FILE[name]
         loaded: list[tuple[int, dict]] = []
-        for index in INDICES:
+        for index in indices:
             _instance, info = hybrid._load_local_instance(path, index)
             if info["n"] != expected:
                 raise CampaignError(f"{name} index {index} loaded n={info['n']}; expected {expected}")
@@ -225,7 +244,11 @@ def _selections(instances_dir: Path, reaction: str = "variant", policy: str | No
     counts: dict[int, int] = {}
     for item in found:
         counts[item.n] = counts.get(item.n, 0) + 1
-    if len(found) != 27 * len(members) or any(counts.get(n) != 9 * len(members) for n in (100, 250, 500)):
+    expected_total = len(files) * len(indices) * len(members)
+    if len(found) != expected_total or any(
+        counts.get(n, 0) != sum(GROUP_BY_FILE[name] == n for name in files) * len(indices) * len(members)
+        for n in (100, 250, 500)
+    ):
         raise CampaignError("selection count does not match the selected reaction group")
     return found
 
@@ -379,11 +402,14 @@ def run_campaign(
     policy: str | None = None,
     dtw_kirito: bool = False,
     reaction: str = "variant",
+    files=None,
+    indices=None,
 ) -> CampaignOutcome:
     """Validate every selected instance, then export one run at a time."""
 
     _validate_settings(seed, population_size, iterations, max_evaluations, policy, dtw_kirito, reaction)
-    selections = _selections(Path(instances_dir), reaction, policy)
+    files, indices = _selection_inputs(files, indices)
+    selections = _selections(Path(instances_dir), reaction, policy, files=files, indices=indices)
     root = DEFAULT_OUTPUT_ROOT if output_root is None else Path(output_root)
     campaign = _allocate(root, timestamp)
     settings = {
@@ -391,10 +417,10 @@ def run_campaign(
         "population_size": population_size,
         "iterations": iterations,
         "max_evaluations": max_evaluations,
-        "indices": list(INDICES),
+        "indices": indices,
         "variants": list(VARIANTS) if reaction == 'variant' else [],
         "reaction": reaction,
-        "files": list(FILES),
+        "files": files,
         "policy": policy,
         "dtw_kirito": dtw_kirito,
     }
@@ -473,10 +499,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="woa_abc.campaign",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
-            "Run 135 sequential WOA-ABC exports: indices 0, 1, and 2 of "
-            "mknapcb1.txt through mknapcb9.txt, for separate variants v0-v4. "
-            "Variant mode has three groups of 45 (100, 250, 500). "
-            "Policy mode instead runs all four policies (108 runs), or --policy selects one (27). "
+            "Run sequential WOA-ABC exports over selected files and indices. "
+            "Defaults: indices 0, 1, and 2 of mknapcb1.txt through mknapcb9.txt; "
+            "separate variants v0-v4 (135 runs, three groups of 45 for 100, 250, 500). "
+            "With default files/indices, policy mode runs all four policies (108 runs), "
+            "or --policy selects one (27 runs). "
             "Each selection is one run. This does not download data and claims no superiority."
         ),
     )
@@ -484,13 +511,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--instances-dir",
         type=Path,
         required=True,
-        help="Local directory containing mknapcb1.txt through mknapcb9.txt.",
+        help="Local directory containing the selected instance files.",
     )
     parser.add_argument(
         "--output-root",
         type=Path,
         default=DEFAULT_OUTPUT_ROOT,
         help="Directory that receives a new campaign_<timestamp> folder.",
+    )
+    parser.add_argument(
+        "--files", nargs="+", default=None,
+        help="Instance basenames, without duplicates; default all mknapcb1.txt through mknapcb9.txt in that order.",
+    )
+    parser.add_argument(
+        "--indices", nargs="+", type=int, default=None,
+        help="Nonnegative instance indices, without duplicates, sorted ascending; default 0 1 2.",
     )
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="RNG seed.")
     parser.add_argument(
@@ -512,7 +547,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit shared evaluation cap. This does not require all cycles to run.",
     )
     parser.add_argument('--reaction', choices=hybrid.REACTIONS, default='variant',
-                        help='Separate campaign mode; default variant (135 runs).')
+                        help='Separate campaign mode; default variant (135 runs with default files/indices).')
     parser.add_argument(
         "--policy",
         default=None,
@@ -545,6 +580,8 @@ def main(argv: list[str] | None = None) -> int:
             policy=args.policy,
             reaction=args.reaction,
             dtw_kirito=bool(args.dtw_kirito),
+            files=args.files,
+            indices=args.indices,
         )
     except (CampaignError, ExportError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)

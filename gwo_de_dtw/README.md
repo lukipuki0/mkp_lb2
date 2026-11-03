@@ -270,6 +270,20 @@ Best run = highest `best_fitness`; ties go to the lower seed, whatever the `--se
 
 Tests: `python -m unittest tests.test_gwo_de_policies tests.test_gwo_de_dtw tests.test_gwo_de_temporal tests.test_gwo_de_control_switch tests.test_gwo_de_grouped_output tests.test_gwo_de_campaign tests.test_gwo_de_sequential` from the repository root.
 
+## Cluster (Slurm)
+
+`run_gwo_de_hpc.sh` at the repository root runs this campaign on the cluster as one job with the header of `run_parallel_hpc.sh` (CPU partition, 9 CPUs, 32G, QOS long). From the repository root:
+
+```bash
+mkdir -p .hpc/logs .hpc/errors        # once; Slurm does not create them
+bash run_gwo_de_hpc.sh --dry-run      # print the 27 instances and commands
+sbatch run_gwo_de_hpc.sh
+```
+
+The job runs the sizes in order 100, 250, 500. For each size it starts nine processes in parallel, one per instance (the three files of that size, indices 0, 1 and 2), and waits for all nine before the next size. Each process calls this campaign with `--files <file> --indices <i> --seeds 1 .. 31`, so it runs 124 runs and keeps the best run of each policy. Seeds stay in one process because the best run is chosen among the seeds of one invocation. A failed instance does not stop the others or the next size; the job exits 1 at the end and lists the failed instances.
+
+Output: `resultados/gwo_de_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/` with `runs.csv`, `statistics.csv`, `convergence_comparison.png/.pdf`, `campaign_config.json`, `resumen.txt`, `run.log` and `<policy>/best_run/`. Each process runs in `resultados/gwo_de_<SLURM_JOB_ID>/.staging/mknapcb<F>_inst_<II>/` and moves its `mknapcb<F>/inst_<II>/` into the experiment when it ends well (the campaign root `summary.csv` and `statistics.csv` of a one-instance campaign repeat the instance files and are dropped). A failed instance keeps its `.staging` folder with `run.log`. Job log: `.hpc/logs/gwo_de_<jobid>.log`, errors in `.hpc/errors/`. There is no resume. `MKP_CONDA_SH` sets the path of `conda.sh` (environment `mkp_env`). Tests: `python -m unittest tests.test_hpc_campaign_scripts`.
+
 ## Experimental evidence and delivery scope
 
 These are exploratory runs on mknapcb1[0], not a completed multi-seed benchmark.

@@ -1,0 +1,3 @@
+# Slurm scripts run on Linux: keep LF even on Windows checkouts.
+run_gwo_de_hpc.sh text eol=lf
+run_woa_abc_hpc.sh text eol=lf

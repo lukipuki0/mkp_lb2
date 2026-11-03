@@ -2,7 +2,7 @@
 
 Shared-population solver for the multidimensional knapsack problem. One population is initialized once. Every complete cycle then runs whale optimization, employed bees, onlookers, and eligible scouts, in that order. Two separate reaction modes are available: the four GWO–DE policies (default), or the original recovery-clock variants v0–v4. They never combine. It does not abort the run, reset the population, or choose another algorithm.
 
-The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the four policies side by side with `python -m woa_abc.run`, or five variants with `--reaction variant`. Run the 135-selection variant campaign with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
+The code is the `woa_abc` package. Run the solver with `python -m woa_abc`. Save one functional run with `python -m woa_abc.benchmark`. Run the four policies side by side with `python -m woa_abc.run`, or five variants with `--reaction variant`. Run the variant campaign (135 selections by default) with `python -m woa_abc.campaign`. Results default to `woa_abc/resultados/`, beside this package, not the process working directory.
 
 This document describes the implementation. It does not claim that the hybrid improves on any published method.
 
@@ -245,13 +245,60 @@ PYTHONDONTWRITEBYTECODE=1 python -m woa_abc.run --reaction variant --instance in
 
 This runs v0, v1, v2, v3, v4 separately with the same seed/settings. Each `<variant>/` contains `result.json` and exactly the same plot suite as a policy folder (including ALWAYS `dtw_delta.png`, even before window readiness), plus `convergence_comparison.png/.pdf` at group level. No policy is run or combined. Both modes preserve the optimum reference.
 
-## Campaign of 135 runs
+## Campaign (135 runs by default)
 
-One command runs indices 0, 1, and 2 of `mknapcb1.txt` through `mknapcb9.txt` for separate variants `v0`–`v4`, without policies. That is 135 sequential runs (27 instances × 5 variants), one run per selection, in three groups of 45. It does not download data, repeat a selection 31 times, and it claims no superiority from n=1.
+By default, one command runs indices 0, 1, and 2 of `mknapcb1.txt` through `mknapcb9.txt` for separate variants `v0`–`v4`, without policies. That is 135 sequential runs (27 instances × 5 variants), one run per selection, in three groups of 45. It does not download data, repeat a selection 31 times, and it claims no superiority from n=1.
 
 ```text
 python -m woa_abc.campaign --instances-dir instancias
 ```
+
+Use `--files` with one or more basenames from `mknapcb1.txt` through `mknapcb9.txt`, and `--indices` with one or more nonnegative, zero-based indices. Files always follow the default file order; indices are sorted ascending. Duplicates, invalid names, and indices absent from a selected file are refused before creating a campaign folder. Omitting either option keeps its defaults (all nine files or indices 0, 1, 2).
+
+For example, run exactly four policies on one instance:
+
+```text
+python -B -u -m woa_abc.campaign --instances-dir instancias --output-root woa_abc/resultados --seed 7 --reaction policy --files mknapcb1.txt --indices 2
+```
+
+## Seed campaign (31 seeds, best run per policy)
+
+`python -m woa_abc.seed_campaign` runs every selected file × index × seed × policy in policy mode and keeps only the best run of each policy, with the layout and CSV columns of `gwo_de_dtw.campaign`. Defaults: the nine files, indices 0 1 2, seeds 1..31, the four policies, population 30, 1000 cycles, 180030 evaluations. `woa_abc.campaign` is unchanged.
+
+```text
+python -B -u -m woa_abc.seed_campaign --instances-dir instancias --files mknapcb1.txt --indices 0 --out woa_abc/resultados/seeds_mknapcb1_0
+```
+
+```text
+<out>/
+  campaign_config.json        settings, selection, total_runs, completed_runs, status, error
+  summary.csv                 every run of every instance
+  statistics.csv              one row per instance and policy
+  mknapcb1/inst_00/
+    runs.csv                  31 seeds x 4 policies = 124 rows
+    statistics.csv            4 rows, one per policy
+    convergence_comparison.png/.pdf   best run of each policy, labeled with its seed
+    binary_simple/best_run/   full single-run export of the winning seed
+    ...
+```
+
+`runs.csv` columns: `file, index, policy, seed, status, best_fitness, known_optimum, gap_pct, evaluations, generations, changes, elapsed_s` (`generations` is the number of completed cycles, `changes` the number of profile changes). `statistics.csv` columns: `file, index, policy, runs, best_fitness, worst_fitness, mean_fitness, median_fitness, std_fitness, best_seed, known_optimum, best_gap_pct, mean_gap_pct, mean_elapsed_s`; sample standard deviation, blank with one seed; gap columns blank when the reference is unknown.
+
+Best run = highest `best_fitness`; ties go to the lower seed. Each run is exported into `<out>/.runs/`; a beaten run is deleted at once, and the four winners move to `<policy>/best_run/` when the instance ends, so no temporary folder remains. Every check (file names, duplicates, negative seeds, indices present in every file, budget, `--out` absent or empty) runs before the first write and exits 2 with `error: ...`. `--dry-run` prints the run count and stops. A failing run stops the campaign: a `failed` row, `status: failed`, `error: ...` on stderr, exit 1; finished rows stay and the failed export is kept under `.runs/`. There is no resume.
+
+## Cluster (Slurm)
+
+`run_woa_abc_hpc.sh` at the repository root runs the seed campaign (policy mode, 31 seeds) on the cluster as one job with the header of `run_parallel_hpc.sh` (CPU partition, 9 CPUs, 32G, QOS long). From the repository root:
+
+```bash
+mkdir -p .hpc/logs .hpc/errors        # once; Slurm does not create them
+bash run_woa_abc_hpc.sh --dry-run     # print the 27 instances and commands
+sbatch run_woa_abc_hpc.sh
+```
+
+The job runs the sizes in order 100, 250, 500. For each size it starts nine processes in parallel, one per instance (the three files of that size, indices 0, 1 and 2), and waits for all nine before the next size. Each process calls `python -m woa_abc.seed_campaign --files <file> --indices <i> --seeds 1 .. 31` (see Seed campaign), so it runs 124 runs and keeps the best run of each policy. A failed instance does not stop the others or the next size; the job exits 1 at the end and lists the failed instances.
+
+Output: `resultados/woa_abc_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/` with `runs.csv`, `statistics.csv`, `convergence_comparison.png/.pdf`, `campaign_config.json`, `run.log` and `<policy>/best_run/`. Each process runs in `resultados/woa_abc_<SLURM_JOB_ID>/.staging/mknapcb<F>_inst_<II>/` and moves its `mknapcb<F>/inst_<II>/` into the experiment when it ends well (the campaign root `summary.csv` and `statistics.csv` repeat the instance files and are dropped). A failed instance keeps its `.staging` folder with `run.log`. Job log: `.hpc/logs/woa_abc_<jobid>.log`, errors in `.hpc/errors/`. There is no resume. `MKP_CONDA_SH` sets the path of `conda.sh` (environment `mkp_env`). Tests: `python -m unittest tests.test_hpc_campaign_scripts`.
 
 ## Quick path
 
@@ -259,13 +306,13 @@ python -m woa_abc.campaign --instances-dir instancias
 python -B -m woa_abc.campaign --instances-dir instancias
 ```
 
-Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation cap of 180030, and reaction `variant`. Mixed policy flags are rejected before allocation. For a separate policy campaign use `--reaction policy` (all four, 108 runs), or also `--policy binary_complex` (one policy, 27 runs); `--dtw-kirito` is policy-only. Output is a new `woa_abc/resultados/campaign_<timestamp>/` directory. Old result folders are left in place.
+Defaults are seed 43, population 30, 1000 hybrid cycles, an explicit evaluation cap of 180030, and reaction `variant`. Mixed policy flags are rejected before allocation. For a separate policy campaign use `--reaction policy` (all four, 108 runs with default files/indices), or also `--policy binary_complex` (one policy, 27 runs with default files/indices); `--dtw-kirito` is policy-only. Output is a new `woa_abc/resultados/campaign_<timestamp>/` directory. Old result folders are left in place.
 
 ## Details
 
 | Topic | Decision |
 |-------|----------|
-| Files | `mknapcb1.txt` … `mknapcb9.txt`, indices 0, 1, and 2 only |
+| Files | Default `mknapcb1.txt` … `mknapcb9.txt`, indices 0, 1, and 2; narrow with `--files` / `--indices` |
 | Variants | `v0`–`v4`, one export each; reaction and variant are recorded even for v0 |
 | Policy | Separate `--reaction policy` campaign only; no variants |
 | Groups | Loaded `n`, checked against the file: 1, 4, 7 → 100; 2, 5, 8 → 250; 3, 6, 9 → 500 |
@@ -278,8 +325,8 @@ Each variant folder holds the single-run artifacts directly: `manifest.json`, `r
 
 ## Checklist
 
-- [ ] 135 start lines and 135 completion lines, or a failed stop with the raw JSON still present
-- [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after 135 variant completions
+- [ ] One start and completion line per selection (135 for default variants), or a failed stop with the raw JSON still present
+- [ ] `campaign_summary.json` says `"superiority_claim": false` and `"status": "completed"` only after all planned selections complete
 - [ ] Each run's manifest shows the resolved `reference` and its `reference_source`
 
 ## Next step
