@@ -1,0 +1,38 @@
+"""Defaults for the sequential GWO then DE search."""
+
+INSTANCE = "instancias/mknapcb1.txt"
+INDEX = 0
+
+POP_SIZE = 30
+ITERATIONS = 1000
+SEED = 1
+
+BINARIZATION = "lb2"
+V_MAX = 100.0
+SIGMOID_V_MAX = 6.0
+G1 = 0.5
+G2 = 0.5
+EXPLOIT_G3 = 0.1
+EXPLORE_G3 = 0.1
+
+EXPLOIT_A, EXPLOIT_F, EXPLOIT_CR = 0.5, 0.5, 0.9
+EXPLORE_A, EXPLORE_F, EXPLORE_CR = 2.0, 0.9, 0.3
+
+POLICY = "binary_complex"
+SCALE = 2.0
+K = 5.0
+CENTER = 0.5
+DTW_KIRITO = False
+
+WINDOW = 40
+BAND = 0
+MIN_SLOPE = 2.0
+PLATEAU_MAX = 15
+PATIENCE = 8
+USE_DDTW = True
+ADAPT_THRESHOLDS = True
+P_LOW = 40.0
+P_HIGH = 60.0
+IMPROVEMENT_TOL = 0.0
+
+SCHEDULE = "gwo_then_de"

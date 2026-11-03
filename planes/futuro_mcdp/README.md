@@ -8,6 +8,8 @@ Esta carpeta contiene todo el material MCDP retirado del flujo activo:
 - `resultados/`: corridas y tablas generadas previamente;
 - `README_WOA_ABC_HISTORICO.md`: documentación histórica del híbrido.
 
-El paquete activo `woa_abc` ya no importa este código. Para retomarlo en el
-futuro, trabajar desde `planes/futuro_mcdp/codigo/` y crear una integración
-explícita, sin mezclar sus resultados con CEC2022 o HRES2.
+La integración activa `woa_abc` fue retirada del repositorio. Este archivo
+histórico no se importa desde los pipelines ni se incluye en sus tests. Sus
+scripts no son comandos vigentes: para retomarlos, trabajar desde
+`planes/futuro_mcdp/codigo/` y crear una integración explícita, sin mezclar sus
+resultados con CEC2022 o HRES2.

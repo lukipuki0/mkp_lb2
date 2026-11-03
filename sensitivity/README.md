@@ -1,6 +1,6 @@
 # Rotational DTW/DDTW sensitivity campaigns
 
-Run isolated, reproducible sensitivity pilots for the manuscript's **rotational** MKP, CEC2022 and HRES2-H2 framework. This module reuses existing solvers; it does not run the separate WOA–ABC variant experiment or change its configuration.
+Run isolated, reproducible sensitivity pilots for the manuscript's **rotational** MKP, CEC2022 and HRES2-H2 framework. This module reuses existing independent solvers. The broken active WOA–ABC integration has been retired; archived MCDP material is not part of these campaigns.
 
 ## Quick path
 
@@ -24,6 +24,8 @@ python -B -m unittest discover -s tests -p "test_sensitivity*.py" -v
 ```
 
 Before launching the real pilot, review its case selection and settings. The 31-seed pilot can be expensive; execution is manual, never started by dry-run. Use `--limit N` to attempt only N pending tasks, then `--resume` to continue. Do not change source code or the protocol during a campaign: resume rejects incompatible provenance.
+
+The WOA–ABC cleanup changes the source fingerprint. Start a new campaign after this code change; do not rewrite historical manifests to force a resume.
 
 Use `-B` as shown: this repository already tracks some bytecode files, so ordinary imports can otherwise create unrelated working-tree changes despite the ignore rule. If an interrupted process leaves `.campaign.lock`, verify that no worker is running before removing only that stale lock; the runner deliberately does not guess that an existing worker is dead.
 

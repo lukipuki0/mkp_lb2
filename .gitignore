@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 # Local Pi runtime state
 .atl/
+# Overleaf clone metadata kept local so the decks can live in this repo.
+.overleaf-local/

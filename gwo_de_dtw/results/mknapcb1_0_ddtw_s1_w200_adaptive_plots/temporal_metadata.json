@@ -1,0 +1,27 @@
+{
+  "instance": "mknapcb1.txt[0]",
+  "seed": 1,
+  "binarization": "lb2",
+  "monitor_config": {
+    "window": 200,
+    "band": 20,
+    "min_slope": 2.0,
+    "plateau_max": 15,
+    "patience": 8,
+    "use_ddtw": true,
+    "adapt_thresholds": true,
+    "p_low": 30.0,
+    "p_high": 70.0,
+    "improvement_tol": 0.0
+  },
+  "best_fitness": 24106.0,
+  "gap_pct": 1.1279274845166318,
+  "evaluations": 120030,
+  "notes": {
+    "s": "Decision after t, used at t+1; 0 exploit, 1 explore.",
+    "mode_used": "Profile that generated iteration t; used for shading.",
+    "X": "Monitor-filtered window; NaN while warming up after each reset.",
+    "parameters": "a, F, CR used at t; G3 is not plotted.",
+    "window_selection": "First rising exploit window (fallback any rising); midpoint of longest flat explore run (fallback any flat). Missing categories omitted."
+  }
+}

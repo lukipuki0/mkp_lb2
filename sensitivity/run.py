@@ -22,7 +22,7 @@ from sensitivity.design import (
 )
 
 
-SOURCE_DIRS = ("hybrid_mkp", "continuous_benchmark", "HRES2-H2", "mkp_core", "mh", "lb2", "woa_abc")
+SOURCE_DIRS = ("hybrid_mkp", "continuous_benchmark", "HRES2-H2", "mkp_core", "mh", "lb2")
 POSTPROCESSING = {"analysis.py", "plots.py"}
 
 

@@ -1,0 +1,112 @@
+% Visual contract copied from presentacion_conferencia/main.tex.
+% Do not restyle. Replace \talkfooter in the deck; do not leave this placeholder.
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{spanish.ldf}{%
+  \usepackage[spanish,es-noshorthands]{babel}%
+  \spanishdecimal{.}%
+}{%
+  \usepackage[english]{babel}%
+}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array,colortbl}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,arrows.meta,positioning,calc,fit,patterns,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.15}
+\usepackage{csquotes}
+\usepackage[
+  backend=biber,
+  style=authoryear-comp,
+  maxcitenames=2,
+  maxbibnames=8,
+  giveninits=true,
+  uniquename=init,
+  doi=false,
+  url=false,
+  isbn=false
+]{biblatex}
+\addbibresource{referencias.bib}
+
+\definecolor{primary}{RGB}{15,76,110}
+\definecolor{accent}{RGB}{224,122,40}
+\definecolor{best}{RGB}{0,128,64}
+\definecolor{warn}{RGB}{183,65,14}
+\definecolor{inkgray}{RGB}{55,55,60}
+\definecolor{lightbg}{RGB}{236,242,246}
+
+\colorlet{PUCVBlue}{primary}
+\colorlet{PUCVBlueDark}{primary}
+\colorlet{PUCVLight}{lightbg}
+\colorlet{PUCVRed}{warn}
+\colorlet{GreenH}{best}
+\colorlet{WarmGold}{accent}
+\colorlet{Ink}{inkgray}
+\colorlet{Muted}{inkgray!78}
+\colorlet{PaleGray}{lightbg}
+
+\usetheme{default}
+\useinnertheme{circles}
+\setbeamercolor{normal text}{fg=inkgray}
+\setbeamercolor{structure}{fg=primary}
+\setbeamercolor{title}{fg=primary}
+\setbeamercolor{subtitle}{fg=inkgray}
+\setbeamercolor{frametitle}{fg=white,bg=primary}
+\setbeamercolor{block title}{fg=white,bg=primary}
+\setbeamercolor{block body}{fg=inkgray,bg=lightbg}
+\setbeamercolor{block title alerted}{fg=white,bg=warn}
+\setbeamercolor{block body alerted}{fg=inkgray,bg=warn!8}
+\setbeamercolor{block title example}{fg=white,bg=best}
+\setbeamercolor{block body example}{fg=inkgray,bg=best!8}
+\setbeamercolor{itemize item}{fg=accent}
+\setbeamercolor{itemize subitem}{fg=accent}
+\setbeamercolor{section in toc}{fg=primary}
+\setbeamercolor{author in head/foot}{fg=white,bg=primary!85}
+\setbeamercolor{bibliography entry author}{fg=inkgray}
+\setbeamercolor{bibliography entry title}{fg=inkgray!78}
+\setbeamercolor{bibliography entry location}{fg=inkgray!78}
+\setbeamercolor{bibliography entry note}{fg=inkgray!78}
+
+\setbeamerfont{title}{series=\bfseries,size=\LARGE}
+\setbeamerfont{subtitle}{size=\normalsize}
+\setbeamerfont{frametitle}{series=\bfseries,size=\large}
+\setbeamerfont{footline}{size=\scriptsize}
+
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{bibliography item}{\raisebox{0.2ex}{\tiny$\blacksquare$}}
+
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,ht=3.0ex,dp=1.2ex,leftskip=0.35cm,rightskip=0.35cm]{frametitle}%
+    \usebeamerfont{frametitle}\insertframetitle%
+  \end{beamercolorbox}%
+}
+
+\providecommand{\talkfooter}{Tema de la charla}
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.72\paperwidth,ht=2.4ex,dp=1.1ex,leftskip=0.35cm]{author in head/foot}%
+      \usebeamerfont{footline}\talkfooter%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.28\paperwidth,ht=2.4ex,dp=1.1ex,rightskip=0.35cm]{author in head/foot}%
+      \usebeamerfont{footline}\hfill\insertframenumber\,/\,\inserttotalframenumber%
+    \end{beamercolorbox}%
+  }%
+}
+
+\newcommand{\smallcite}[1]{{\scriptsize\color{inkgray!72}\parencite{#1}}}
+\newcommand{\key}[1]{\textcolor{primary}{\textbf{#1}}}
+\newcommand{\risk}[1]{\textcolor{warn}{\textbf{#1}}}
+\newcommand{\good}[1]{\textcolor{best}{\textbf{#1}}}
+\newcommand{\destacado}[1]{\textcolor{primary}{\textbf{#1}}}
+\newcommand{\gcell}{\cellcolor{primary!78}\color{white}\bfseries X}
+\newcommand{\hcell}{\cellcolor{accent!24}\color{accent!70!black}\bfseries $\star$}

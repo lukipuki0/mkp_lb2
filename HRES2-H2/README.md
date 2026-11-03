@@ -103,3 +103,25 @@ O dentro de un entorno Jupyter/Colab:
 ```python
 !pip -q install requests pandas numpy matplotlib scipy tqdm
 ```
+
+---
+
+## Benchmark reproducible (`benchmark_hres2.py`)
+
+No hay un wrapper `reproduce_campaign.py`. Los defaults del monitor nominal son W=40, band=4, patience=8, min_slope=0.1, plateau=15, adaptativo y percentiles 30/70. El protocolo de paper es 31 runs y 1000 iteraciones nominales, en modos `dtw` y `ddtw`, con nueve baselines ejecutados una sola vez: PSO, GWO, WOA, EHO, ACO, ILS, SA, TS y VNS. ABC permanece en el portafolio híbrido y no es un baseline del paper.
+
+Para usar el botón **Run** del editor, abrí `HRES2-H2/benchmark_hres2.py` y ejecutalo sin argumentos. Inicia la campaña completa: DTW y DDTW, 31 runs por método, 1000 iteraciones nominales y los nueve baselines una sola vez. Crea automáticamente una carpeta nueva bajo `HRES2-H2/resultados/`; no hace falta escribir comandos. Es una ejecución completa, no una prueba pequeña.
+
+```bash
+python HRES2-H2/benchmark_hres2.py --help
+python HRES2-H2/benchmark_hres2.py --nonpaper --output HRES2-H2/resultados/nonpaper_smoke_t4
+python HRES2-H2/benchmark_hres2.py --modes dtw,ddtw --output HRES2-H2/resultados/paper_campaign_fresh
+```
+
+`--help` no lanza simulaciones. `--nonpaper` es un smoke explícito de 1 run y 1 iteración nominal, modo `dtw` y baseline `PSO`, salvo que `--modes`, `--baselines`, `--runs` o `--iterations` lo acoten. Esos overrides se honran. La salida estadística de un smoke n=1 no es significativa (`not meaningful`). No es un framework genérico. Un destino existente se rechaza con `refusing to overwrite existing output destination` y no se sobrescribe. Si no se pasa `--output`, se elige un directorio nuevo bajo `HRES2-H2/resultados/`.
+
+`runs.jsonl` se vuelca y se hace flush después de cada run. Guarda run, método, modo y semilla; el objetivo de optimización aparte del LCOE/LCOH/AGSR físico y de `feasible`; el vector final y las capacidades/H2 decodificadas; iteraciones nominales, iteraciones reales y overshoot; y el tiempo cuando está disponible. Una métrica física no finita queda en `null`. Una penalización del objetivo no se reporta como LCOE físico. Repetir la semilla no demuestra por sí sola condiciones iniciales pareadas: cada solver consume el RNG de forma distinta y el clima se construye antes de sembrar. `manifest.json` guarda monitor efectivo, configuración, modelo, procedencia del clima, runtime y evidencia de fuente. `completion.json` solo aparece si la campaña termina.
+
+La inferencia promovida es Mann-Whitney bilateral de muestras independientes con Holm. Solo se calcula si la referencia y el comparador tienen todos los registros esperados con LCOE físico finito y factible. Si falta un run o hay registros no factibles, se conservan todos los registros, los conteos y la media descriptiva de los factibles, pero esa comparación se omite con motivo explícito: no hay p ni W/T/L, no se imputa y no se promueve superioridad del subconjunto factible. Si la referencia está incompleta, se omiten todas las comparaciones. Wilcoxon y Friedman no se usan: no hay pareo justificado, tampoco entre DTW y DDTW. Con `dtw,ddtw`, cada híbrido se compara solo con los baselines de paper elegidos; el otro híbrido no entra en esa familia Holm. Los baselines se optimizan una vez y `runs.jsonl` los guarda una vez. Los resúmenes de cada modo van a `analisis_dtw/` y `analisis_ddtw/` para no sobrescribirse. En un solo modo se mantienen las claves de retorno anteriores y `stat_results` apunta a ese híbrido; `stat_results_by_hybrid` mapea cada variante. En el resumen, `best` es el mínimo y va separado de la mediana. Un resultado DDTW se etiqueta `Hybrid DDTW`, no `Hybrid DTW`.
+
+El presupuesto nominal no cambia la semántica de las épocas: `max_epoch_iters` no se fuerza, así que una iteración nominal puede registrar un overshoot real. El smoke `--nonpaper` de 1 iteración nominal sigue pudiendo ejecutar una época híbrida completa.

@@ -10,9 +10,15 @@ from __future__ import annotations
 
 import os
 import csv
+import json
+import math
 import random
+import argparse
 import datetime
+import platform
+import subprocess
 import sys
+import time
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -27,7 +33,6 @@ from dtw_stagnation import StagnationConfig
 import importlib
 wpeb_model = importlib.import_module("HRES2-H2.wpeb_model")
 HRES2Function = wpeb_model.HRES2Function
-decode_solution = wpeb_model.decode_solution
 
 import importlib.util as _ilu_orch
 _orch_spec = _ilu_orch.spec_from_file_location(
@@ -76,34 +81,260 @@ OUTPUT_BASE = os.path.join(os.path.dirname(__file__), "resultados")
 
 # Parámetros del Monitor DTW
 STAG_WINDOW      = 40
-STAG_BAND        = 0
-STAG_MIN_SLOPE   = 0.0
+STAG_BAND        = 4
+STAG_MIN_SLOPE   = 0.1
 STAG_PLATEAU_MAX = 15
-STAG_PATIENCE    = 3
+STAG_PATIENCE    = 8
 STAG_USE_DDTW    = True
 STAG_ADAPT       = True
 STAG_P_LOW       = 30.0
 STAG_P_HIGH      = 70.0
+PAPER_BASELINES = ["PSO", "GWO", "WOA", "EHO", "ACO", "ILS", "SA", "TS", "VNS"]
+SEED_NOTE = (
+    "A repeated seed does not by itself prove paired initial conditions; "
+    "solvers consume the RNG differently and weather is constructed first."
+)
+ITERATION_NOTE = (
+    "nominal_iterations is the requested max_iters budget, not an evaluation budget; "
+    "actual_iterations may overshoot because epoch length is unchanged and max_epoch_iters is not forced."
+)
+
+
+def parse_modes(text: str) -> list[str]:
+    modes = [part.strip().lower() for part in text.split(",") if part.strip()]
+    if not modes or any(mode not in ("dtw", "ddtw") for mode in modes):
+        raise ValueError("modes must be a comma list of dtw and/or ddtw")
+    return modes
+
+
+def parse_baselines(text: str) -> list[str]:
+    names = [part.strip().upper() for part in text.split(",") if part.strip()]
+    unknown = [name for name in names if name not in PAPER_BASELINES]
+    if unknown:
+        raise ValueError(
+            "baselines must be chosen from " + ",".join(PAPER_BASELINES)
+            + "; ABC stays in the hybrid portfolio and is not a paper baseline"
+        )
+    return names
+
+
+def hybrid_method(mode: str) -> str:
+    if mode == "dtw":
+        return "Hybrid DTW"
+    if mode == "ddtw":
+        return "Hybrid DDTW"
+    raise ValueError(f"unknown distance mode: {mode}")
+
+
+def campaign_seed(seed_base: int, method: str, run: int) -> int:
+    offset = 0 if method.startswith("Hybrid") else 1000 * (PAPER_BASELINES.index(method) + 1)
+    return int(seed_base) + int(run) + offset
+
+
+def _seed_globals(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def monitor_dict(use_ddtw: bool) -> dict:
+    return {
+        "window": STAG_WINDOW, "band": STAG_BAND, "min_slope": STAG_MIN_SLOPE,
+        "plateau_max": STAG_PLATEAU_MAX, "patience": STAG_PATIENCE, "use_ddtw": use_ddtw,
+        "adapt_thresholds": STAG_ADAPT, "p_low": STAG_P_LOW, "p_high": STAG_P_HIGH,
+    }
+
+
+def make_stag(use_ddtw: bool) -> StagnationConfig:
+    return StagnationConfig(**monitor_dict(use_ddtw))
+
+
+def finite_or_none(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def json_safe(value):
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, (float, np.floating)):
+        return finite_or_none(value)
+    if isinstance(value, (np.bool_, bool)) or value is None or isinstance(value, (str, int)):
+        return bool(value) if isinstance(value, (np.bool_, bool)) else value
+    return str(value)
+
+
+def write_json(path: str, payload: dict) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(json_safe(payload), handle, indent=2, allow_nan=False)
+        handle.write("\n")
+
+
+def _source_evidence() -> dict:
+    sha, error = None, None
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(os.path.dirname(__file__), ".."),
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        sha = proc.stdout.strip() if proc.returncode == 0 and proc.stdout.strip() else None
+        error = None if sha else (proc.stderr.strip() or f"git exit {proc.returncode}")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        error = str(exc)
+    return {"benchmark_path": os.path.abspath(__file__), "git_sha": sha, "git_error": error}
+
+
+class _CanonicalWriter:
+    def __init__(self, path: str):
+        self.handle = open(path, "a", encoding="utf-8", newline="\n")
+
+    def write(self, record: dict) -> None:
+        self.handle.write(json.dumps(json_safe(record), allow_nan=False) + "\n")
+        self.handle.flush()
+        os.fsync(self.handle.fileno())
+
+    def close(self) -> None:
+        self.handle.close()
+
+
+def resolve_output_dir(output_dir: str | None, label: str) -> str:
+    if output_dir is None:
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        candidate = os.path.join(OUTPUT_BASE, f"run_{label}_{stamp}")
+        while os.path.exists(candidate):
+            candidate += "_fresh"
+        return candidate
+    if os.path.exists(output_dir):
+        raise FileExistsError("refusing to overwrite existing output destination: " + str(output_dir))
+    return output_dir
+
+
+def solution_from_result(result) -> list[float]:
+    solution = getattr(result, "mejor_solucion", None)
+    if solution is None:
+        solution = getattr(result, "mejor_solucion_global", None)
+    if solution is None:
+        raise ValueError("optimization result has no mejor_solucion")
+    return [float(item) for item in solution]
+
+
+def objective_from_result(result) -> float:
+    value = getattr(result, "mejor_valor", None)
+    if value is None:
+        value = result.mejor_valor_global
+    return float(value)
+
+
+def history_length(result):
+    for name in ("historial_global", "historial"):
+        history = getattr(result, name, None)
+        if history is not None:
+            return len(history)
+    iterations = getattr(result, "iteraciones", None)
+    return None if iterations is None else int(iterations)
+
+
+def result_elapsed(result):
+    for name in ("elapsed_seconds", "elapsed"):
+        if getattr(result, name, None) is not None:
+            return finite_or_none(getattr(result, name))
+    switches = getattr(result, "log_switches", None) or []
+    if switches and getattr(switches[-1], "t_fin", None) is not None:
+        return finite_or_none(switches[-1].t_fin)
+    return None
+
+
+def build_run_record(func, result, *, run, method, mode, seed, role, nominal, elapsed):
+    solution = solution_from_result(result)
+    objective = objective_from_result(result)
+    info = func.get_info(np.asarray(solution, dtype=float))
+    physical_lcoe = finite_or_none(info.get("lcoe_cny_per_kwh"))
+    physical_lcoh = finite_or_none(info.get("lcoh_cny_per_kg"))
+    physical_agsr = finite_or_none(info.get("agsr"))
+    feasible = None if info.get("feasible") is None else bool(info.get("feasible"))
+    objective_finite = finite_or_none(objective)
+    same_lcoe = (
+        feasible is True and objective_finite is not None and physical_lcoe is not None
+        and math.isclose(objective_finite, physical_lcoe, rel_tol=1e-12, abs_tol=0.0)
+    )
+    actual = history_length(result)
+    decoded_keys = (
+        "wind_mw", "pv_mw", "n_el_units", "electrolyzer_mw", "battery_mw",
+        "battery_duration_h", "battery_mwh", "total_h2_kg", "electrolyzer_cf",
+    )
+    decoded = {
+        key: info.get(key) if key == "n_el_units" else finite_or_none(info.get(key))
+        for key in decoded_keys
+    }
+    return {
+        "run": run, "method": method, "mode": mode, "seed": seed, "role": role,
+        "objective": objective_finite, "objective_repr": repr(objective),
+        "objective_is_physical_lcoe": same_lcoe, "feasible": feasible,
+        "physical_lcoe": physical_lcoe,
+        "physical_lcoe_repr": None if physical_lcoe is None else repr(physical_lcoe),
+        "physical_lcoh": physical_lcoh,
+        "physical_lcoh_repr": None if physical_lcoh is None else repr(physical_lcoh),
+        "physical_agsr": physical_agsr,
+        "physical_agsr_repr": None if physical_agsr is None else repr(physical_agsr),
+        "solution": [finite_or_none(item) for item in solution],
+        "solution_repr": [repr(float(item)) for item in solution],
+        "decoded": decoded, "nominal_iterations": nominal, "actual_iterations": actual,
+        "overshoot_iterations": None if actual is None else int(actual) - int(nominal),
+        "elapsed_seconds": finite_or_none(elapsed), "result_elapsed_seconds": result_elapsed(result),
+        "paired_initial_conditions": False, "seed_note": SEED_NOTE,
+    }
+
+
+def num_or_nan(value) -> float:
+    number = finite_or_none(value)
+    return float("nan") if number is None else number
+
+
+def detalle_from_record(record: dict, result) -> dict:
+    decoded = record["decoded"]
+    return {
+        "run": record["run"], "lcoe": num_or_nan(record["physical_lcoe"]),
+        "lcoh": num_or_nan(record["physical_lcoh"]), "agsr": num_or_nan(record["physical_agsr"]),
+        "total_h2_kg": num_or_nan(decoded.get("total_h2_kg")),
+        "electrolyzer_cf": num_or_nan(decoded.get("electrolyzer_cf")),
+        "switches": len(getattr(result, "log_switches", []) or []),
+        "wind_mw": num_or_nan(decoded.get("wind_mw")), "pv_mw": num_or_nan(decoded.get("pv_mw")),
+        "n_el_units": decoded.get("n_el_units"), "electrolyzer_mw": num_or_nan(decoded.get("electrolyzer_mw")),
+        "battery_mw": num_or_nan(decoded.get("battery_mw")),
+        "battery_duration_h": num_or_nan(decoded.get("battery_duration_h")),
+        "objective": num_or_nan(record["objective"]),
+    }
 
 
 # ── Función Auxiliar para Graficar Boxplot de HRES2-H2 ─────────────────────────
 
-def grafico_boxplot_hres2(valores: list[float], output_dir: str):
+def grafico_boxplot_hres2(valores: list[float], output_dir: str, etiqueta: str = "HRES2-H2 Hybrid DTW"):
     """Genera el gráfico de boxplot para las 31 ejecuciones de HRES2-H2."""
+    finite = [value for value in valores if math.isfinite(value)]
+    if not finite:
+        print("  [boxplot] omitido: no hay LCOE fisico finito")
+        return
     plt.figure(figsize=(7, 5))
-    bp = plt.boxplot(valores, patch_artist=True, widths=0.4,
+    bp = plt.boxplot(finite, patch_artist=True, widths=0.4,
                      boxprops=dict(facecolor="#2196F3", color="#1565C0", alpha=0.7),
                      medianprops=dict(color="#D32F2F", linewidth=2.0),
                      whiskerprops=dict(color="#1565C0", linewidth=1.5),
                      capprops=dict(color="#1565C0", linewidth=1.5),
                      flierprops=dict(marker="o", color="#D32F2F", alpha=0.6))
 
-    media = np.mean(valores)
+    media = np.mean(finite)
+    valores = finite
     plt.axhline(y=media, color="#388E3C", linestyle="--", linewidth=1.5, label=f"Mean: {media:.4f} CNY/kWh")
 
     plt.title("LCOE Distribution across 31 Runs - HRES2-H2 (WPEB)", fontsize=12, fontweight="bold")
     plt.ylabel("LCOE (CNY/kWh)", fontsize=11)
-    plt.xticks([1], ["HRES2-H2 Hybrid DTW"])
+    plt.xticks([1], [etiqueta])
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.legend(loc="upper right")
     plt.tight_layout()
@@ -120,127 +351,120 @@ def ejecutar_benchmark_hres2(
     n_runs    : int = N_RUNS,
     max_iters : int = MAX_ITERS_POR_RUN,
     output_dir: str | None = None,
+    *,
+    modes: list[str] | None = None,
+    baselines: list[str] | None = None,
+    nonpaper: bool = False,
+    pipeline=None,
+    standalone=None,
+    function_factory=None,
+    seed_globals=None,
+    seed_base: int = RANDOM_SEED,
 ) -> dict:
-    """Ejecuta 31 runs independientes del pipeline híbrido y standalone en HRES2-H2."""
-    if output_dir is None:
-        dtw_mode  = "ddtw" if STAG_USE_DDTW else "dtw"
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = os.path.join(OUTPUT_BASE, f"run_{dtw_mode}_{timestamp}")
-
-    os.makedirs(output_dir, exist_ok=True)
-    func = HRES2Function()
-
-    stag_cfg = StagnationConfig(
-        window           = STAG_WINDOW,
-        band             = STAG_BAND,
-        min_slope        = STAG_MIN_SLOPE,
-        plateau_max      = STAG_PLATEAU_MAX,
-        patience         = STAG_PATIENCE,
-        use_ddtw         = STAG_USE_DDTW,
-        adapt_thresholds = STAG_ADAPT,
-        p_low            = STAG_P_LOW,
-        p_high           = STAG_P_HIGH,
-    )
-
+    """Ejecuta el pipeline híbrido y baselines, guardando cada observación."""
+    selected_modes = list(modes) if modes is not None else ["ddtw" if STAG_USE_DDTW else "dtw"]
+    selected_baselines = list(PAPER_BASELINES if baselines is None else baselines)
+    unknown = [name for name in selected_baselines if name not in PAPER_BASELINES]
+    if unknown:
+        raise ValueError("ABC stays in the hybrid portfolio and is not a paper baseline: " + ",".join(unknown))
+    for mode in selected_modes:
+        hybrid_method(mode)
+    label = "_".join(selected_modes) if len(selected_modes) > 1 else selected_modes[0]
+    output_dir = resolve_output_dir(output_dir, "nonpaper_" + label if nonpaper else label)
+    os.makedirs(output_dir)
+    pipeline_fn = pipeline or ejecutar_pipeline_hres2
+    standalone_fn = standalone or ejecutar_mh_standalone_hres2
+    seed_fn = seed_globals or _seed_globals
+    factory = function_factory or HRES2Function
+    func = factory()
+    df = getattr(func, "df_year", None)
+    columns = getattr(df, "columns", None)
+    manifest = {
+        "effective_monitor": {mode: monitor_dict(mode == "ddtw") for mode in selected_modes},
+        "effective_configuration": {
+            "n_runs": n_runs, "nominal_iterations": max_iters, "modes": selected_modes,
+            "baselines": selected_baselines, "nonpaper": nonpaper, "seed_base": seed_base,
+            "iteration_note": ITERATION_NOTE, "seed_note": SEED_NOTE,
+            "hybrid_population": list(getattr(_orch_mod, "POOL_POBLACIONAL_HRES2", [])),
+            "hybrid_trajectory": list(getattr(_orch_mod, "POOL_TRAYECTORIA_HRES2", [])),
+        },
+        "model": {"type": type(func).__name__, "config": getattr(func, "config", None)},
+        "weather": {
+            "constructed_before_campaign_seeds": True,
+            "default_factory": function_factory is None,
+            "default_generator": "generate_synthetic_tmy_8760" if function_factory is None else None,
+            "rows": None if df is None else int(len(df)),
+            "columns": None if columns is None else [str(column) for column in columns],
+            "note": "Campaign seeds are applied only after weather construction.",
+        },
+        "runtime": {"python": sys.version, "platform": platform.platform(), "numpy": np.__version__},
+        "source": _source_evidence(),
+    }
+    write_json(os.path.join(output_dir, "manifest.json"), manifest)
+    writer = _CanonicalWriter(os.path.join(output_dir, "runs.jsonl"))
+    all_records = []
+    primary_label = hybrid_method(selected_modes[0])
+    valores_lcoe, detalles_runs, resultados_runs = [], [], []
+    resultados_dict = {}
     banner = "=" * 66
-    print(f"\n{banner}")
-    print(f"  BENCHMARK HRES2-H2 (WPEB Extendido) - PIPELINE HÍBRIDO DTW")
-    print(banner)
-    print(f"  Runs independientes : {n_runs}")
-    print(f"  Max Iters / Run     : {max_iters}")
-    print(f"  Pool Poblacional    : PSO, GWO, WOA, EHO, ACO, ABC")
-    print(f"  Pool Trayectoria    : ILS, SA, TS, VNS")
-    print(f"  Carpeta de salida   : {output_dir}")
-    print(banner)
+    print(f"\n{banner}\n  BENCHMARK HRES2-H2 - {primary_label}\n{banner}")
+    print(f"  Runs: {n_runs} | nominal iters: {max_iters} | {SEED_NOTE}")
+    try:
+        for mode in selected_modes:
+            method = hybrid_method(mode)
+            stag_cfg = make_stag(mode == "ddtw")
+            for run in range(1, n_runs + 1):
+                seed = campaign_seed(seed_base, method, run)
+                seed_fn(seed)
+                print(f"  >>> {method} [{run:02d}/{n_runs:02d}] seed={seed}")
+                started = time.perf_counter()
+                result = pipeline_fn(func=func, max_iters=max_iters, stag_cfg=stag_cfg, verbose=False)
+                record = build_run_record(
+                    func, result, run=run, method=method, mode=mode, seed=seed,
+                    role="hybrid", nominal=max_iters, elapsed=time.perf_counter() - started,
+                )
+                writer.write(record)
+                all_records.append(record)
+                if mode == selected_modes[0]:
+                    valores_lcoe.append(num_or_nan(record["physical_lcoe"]))
+                    detalles_runs.append(detalle_from_record(record, result))
+                    resultados_runs.append(result)
+            resultados_dict[method] = [
+                num_or_nan(item["physical_lcoe"]) for item in all_records if item["method"] == method
+            ]
+        for name in selected_baselines:
+            values = []
+            for run in range(1, n_runs + 1):
+                seed = campaign_seed(seed_base, name, run)
+                seed_fn(seed)
+                started = time.perf_counter()
+                result = standalone_fn(func, name, max_iters)
+                record = build_run_record(
+                    func, result, run=run, method=name, mode="baseline", seed=seed,
+                    role="baseline", nominal=max_iters, elapsed=time.perf_counter() - started,
+                )
+                writer.write(record)
+                all_records.append(record)
+                values.append(num_or_nan(record["physical_lcoe"]))
+            resultados_dict[name] = values
+            print(f"    {name:<4s} | registros: {len(values)} | no reejecutado por modo")
+    finally:
+        writer.close()
 
-    valores_lcoe = []
-    soluciones_4d = []
-    n_switches_list = []
-    detalles_runs = []
-
-    # 1. Ejecutar Pipeline Híbrido DTW (31 Runs)
-    resultados_runs = []
-    for r in range(1, n_runs + 1):
-        if RANDOM_SEED is not None:
-            run_seed = RANDOM_SEED + r
-            import random
-            random.seed(run_seed)
-            np.random.seed(run_seed)
-
-        print(f"  >>> RUN HYBRID DTW [{r:02d}/{n_runs:02d}] en progreso...")
-        res = ejecutar_pipeline_hres2(
-            func              = func,
-            max_iters         = max_iters,
-            stag_cfg          = stag_cfg,
-            verbose           = False,
-        )
-
-        best_lcoe = res.mejor_valor_global
-        sol_4d = res.mejor_solucion_global
-        decoded = decode_solution(np.array(sol_4d))
-
-        info = func.get_info(np.array(sol_4d))
-        lcoh = info["lcoh_cny_per_kg"]
-        agsr = info["agsr"]
-        total_h2_kg = info["total_h2_kg"]
-        electrolyzer_cf = info["electrolyzer_cf"]
-
-        valores_lcoe.append(best_lcoe)
-        soluciones_4d.append(sol_4d)
-        n_switches_list.append(res.n_switches)
-        resultados_runs.append(res)
-
-        detalles_runs.append({
-            "run": r,
-            "lcoe": best_lcoe,
-            "lcoh": lcoh,
-            "agsr": agsr,
-            "total_h2_kg": total_h2_kg,
-            "electrolyzer_cf": electrolyzer_cf,
-            "switches": res.n_switches,
-            "wind_mw": decoded["wind_mw"],
-            "pv_mw": decoded["pv_mw"],
-            "n_el_units": decoded["n_el_units"],
-            "electrolyzer_mw": decoded["electrolyzer_mw"],
-            "battery_mw": decoded["battery_mw"],
-            "battery_duration_h": decoded["battery_duration_h"],
-        })
-
-        print(f"      Run {r:02d} completado | LCOE: {best_lcoe:.6f} CNY/kWh | LCOH: {lcoh:.4f} CNY/kg | AGSR: {agsr*100:.2f}% | "
-              f"Eólica: {decoded['wind_mw']:.1f}MW, PV: {decoded['pv_mw']:.1f}MW, "
-              f"Elz: {decoded['electrolyzer_mw']}MW, Bat: {decoded['battery_mw']}MW ({decoded['battery_duration_h']}h) | "
-              f"Switches: {res.n_switches}")
-
-    # 2. Ejecutar Metaheurísticas Standalone Comparativas (31 Runs cada una)
-    standalone_mhs = ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC", "ILS", "SA", "TS", "VNS"]
-    resultados_dict = {"Hybrid DTW": valores_lcoe}
-
-    print(f"\n{banner}")
-    print(f"  EJECUTANDO BENCHMARKS STANDALONE PARA ANÁLISIS ESTADÍSTICO ({n_runs} RUNS POR MH)")
-    print(banner)
-
-    for mh in standalone_mhs:
-        print(f"  > Ejecutando {mh} Standalone ({n_runs} runs x {max_iters} iters)...")
-        vals_mh = []
-        for r in range(n_runs):
-            res_std = ejecutar_mh_standalone_hres2(func, mh, max_iters=max_iters)
-            vals_mh.append(res_std.mejor_valor)
-        resultados_dict[mh] = vals_mh
-        print(f"    {mh:<4s} | Media: {np.mean(vals_mh):.6f} | Min: {np.min(vals_mh):.6f} | Max: {np.max(vals_mh):.6f}")
-
-    # 3. Métricas Estadísticas Generales del Hybrid DTW
-    media_lcoe   = float(np.mean(valores_lcoe))
-    std_lcoe     = float(np.std(valores_lcoe))
-    mediana_lcoe = float(np.median(valores_lcoe))
-    mejor_lcoe   = float(np.min(valores_lcoe))
-    peor_lcoe    = float(np.max(valores_lcoe))
+    # 3. Métricas del modo primario. min y mediana no se intercambian.
+    finite_lcoe = [value for value in valores_lcoe if math.isfinite(value)]
+    media_lcoe   = float(np.mean(finite_lcoe)) if finite_lcoe else float("nan")
+    std_lcoe     = float(np.std(finite_lcoe)) if finite_lcoe else float("nan")
+    mediana_lcoe = float(np.median(finite_lcoe)) if finite_lcoe else float("nan")
+    mejor_lcoe   = float(np.min(finite_lcoe)) if finite_lcoe else float("nan")
+    peor_lcoe    = float(np.max(finite_lcoe)) if finite_lcoe else float("nan")
 
     valores_lcoh = [d["lcoh"] for d in detalles_runs]
     valores_agsr = [d["agsr"] for d in detalles_runs]
     media_lcoh   = float(np.mean(valores_lcoh))
     media_agsr   = float(np.mean(valores_agsr))
 
-    best_run_idx = int(np.argmin(valores_lcoe))
+    best_run_idx = int(np.argmin([item["objective"] for item in detalles_runs]))
     best_config = detalles_runs[best_run_idx]
     best_res = resultados_runs[best_run_idx]
 
@@ -403,8 +627,9 @@ def ejecutar_benchmark_hres2(
     print(f"  Std LCOE     : {std_lcoe:.6f}")
     print(f"  Media LCOH   : {media_lcoh:.6f} CNY/kg")
     print(f"  Media AGSR   : {media_agsr * 100:.2f}%")
-    print(f"  Mediana LCOE : {mediana_lcoe:.6f} CNY/kWh")
-    print(f"  Mejor LCOE   : {mejor_lcoe:.6f} CNY/kWh (Run #{best_run_idx + 1})")
+    print(f"  Mediana LCOE fisico : {mediana_lcoe:.6f} CNY/kWh")
+    print(f"  Mejor LCOE fisico (min) : {mejor_lcoe:.6f} CNY/kWh (Run #{best_run_idx + 1})")
+    print("  El objetivo penalizado no se reporta como LCOE fisico.")
     print(f"  Peor LCOE    : {peor_lcoe:.6f} CNY/kWh")
     print(f"  Configuración Óptima:")
     print(f"    - Parque Eólico   : {best_config['wind_mw']:.2f} MW")
@@ -416,7 +641,7 @@ def ejecutar_benchmark_hres2(
     print(banner)
 
     # Boxplot individual del Hybrid DTW
-    grafico_boxplot_hres2(valores_lcoe, output_dir)
+    grafico_boxplot_hres2(valores_lcoe, output_dir, etiqueta=primary_label)
 
     # CSV de Runs del Hybrid DTW
     csv_runs_path = os.path.join(output_dir, "runs_resultados.csv")
@@ -437,6 +662,10 @@ def ejecutar_benchmark_hres2(
         f.write("RESUMEN BENCHMARK HRES2-H2 (WPEB EXTENDIDO)\n")
         f.write(f"Runs independientes : {n_runs}\n")
         f.write(f"Max Iters / Run     : {max_iters}\n\n")
+        f.write(f"Modo primario: {primary_label}\n")
+        f.write(f"Mejor LCOE fisico (min): {mejor_lcoe:.6f}\n")
+        f.write(f"Mediana LCOE fisico: {mediana_lcoe:.6f}\n")
+        f.write("El objetivo de optimizacion no es LCOE fisico si es penalizacion o no finito.\n\n")
         f.write("Estadísticas Principales:\n")
         f.write(f"  Media LCOE       : {media_lcoe:.6f} CNY/kWh (± {std_lcoe:.6f})\n")
         f.write(f"  Media LCOH       : {media_lcoh:.6f} CNY/kg\n")
@@ -461,7 +690,9 @@ def ejecutar_benchmark_hres2(
     # Reporte Markdown Resumen
     md_path = os.path.join(output_dir, "resumen_hres2.md")
     with open(md_path, "w", encoding="utf-8") as f:
-        f.write(f"# Resumen Benchmark HRES2-H2 - Pipeline Híbrido DTW ({n_runs} Runs)\n\n")
+        f.write(f"# Resumen Benchmark HRES2-H2 - {primary_label} ({n_runs} Runs)\n\n")
+        f.write(f"- **Mejor LCOE fisico (min):** `{mejor_lcoe:.6f}`\n")
+        f.write(f"- **Mediana LCOE fisico:** `{mediana_lcoe:.6f}`\n")
         f.write(f"- **Runs totales:** {n_runs}\n")
         f.write(f"- **Iteraciones por Run:** {max_iters}\n")
         f.write(f"- **LCOE Medio:** `{media_lcoe:.6f} CNY/kWh` (± {std_lcoe:.6f})\n")
@@ -483,12 +714,29 @@ def ejecutar_benchmark_hres2(
 
 
 
-    # 4. ANÁLISIS ESTADÍSTICO INFERENCIAL (p-valores, Wilcoxon, Shapiro, Friedman)
-    stat_results = realizar_analisis_estadistico_completo(
-        resultados_dict = resultados_dict,
-        output_dir      = output_dir,
-        algoritmo_referencia = "Hybrid DTW",
-    )
+    # Cada híbrido contra los baselines de paper elegidos. El otro híbrido no entra en la familia.
+    stat_results_by_hybrid = {}
+    for mode in selected_modes:
+        method = hybrid_method(mode)
+        family_names = [method, *selected_baselines]
+        family_dict = {name: resultados_dict[name] for name in family_names}
+        family_records = [
+            record for record in all_records if str(record.get("method")) in family_dict
+        ]
+        analysis_dir = output_dir if len(selected_modes) == 1 else os.path.join(output_dir, "analisis_" + mode)
+        stat_results_by_hybrid[method] = realizar_analisis_estadistico_completo(
+            resultados_dict=family_dict,
+            output_dir=analysis_dir,
+            algoritmo_referencia=method,
+            records=family_records,
+            expected_n=n_runs,
+        )
+    stat_results = stat_results_by_hybrid[primary_label]
+    write_json(os.path.join(output_dir, "completion.json"), {
+        "completed": True, "records": len(all_records), "nonpaper": nonpaper,
+        "reference": primary_label,
+        "references": list(stat_results_by_hybrid),
+    })
 
     return {
         "media_lcoe": media_lcoe,
@@ -496,15 +744,40 @@ def ejecutar_benchmark_hres2(
         "mejor_lcoe": mejor_lcoe,
         "best_config": best_config,
         "stat_results": stat_results,
+        "stat_results_by_hybrid": stat_results_by_hybrid,
+        "output_dir": output_dir,
+        "mediana_lcoe": mediana_lcoe,
     }
 
 
-def main():
-
-    ejecutar_benchmark_hres2(
-        n_runs    = N_RUNS,
-        max_iters = MAX_ITERS_POR_RUN,
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Benchmark HRES2-H2 con registros canonicos por run. --help no ejecuta simulaciones."
     )
+    parser.add_argument("--output", default=None, help="Directorio nuevo. Un destino existente se rechaza sin sobrescribir.")
+    parser.add_argument("--nonpaper", action="store_true", help="Smoke explicito: por defecto 1 run, 1 iteracion nominal, modo dtw y baseline PSO. Honors --runs/--iterations overrides, and also --modes/--baselines. n=1 statistical output is not meaningful.")
+    parser.add_argument("--modes", default=None, help="Modos dtw,ddtw. Run sin argumentos ejecuta ambos; --nonpaper usa dtw por defecto.")
+    parser.add_argument("--baselines", default=None, help="Subconjunto de PSO,GWO,WOA,EHO,ACO,ILS,SA,TS,VNS. ABC no es baseline.")
+    parser.add_argument("--runs", type=int, default=None, help="Runs por metodo. Nominal de paper: 31.")
+    parser.add_argument("--iterations", type=int, default=None, help="Presupuesto nominal max_iters. Nominal de paper: 1000.")
+    args = parser.parse_args(argv)
+    if args.nonpaper:
+        n_runs = 1 if args.runs is None else args.runs
+        max_iters = 1 if args.iterations is None else args.iterations
+        selected_modes = parse_modes(args.modes) if args.modes else ["dtw"]
+        selected_baselines = parse_baselines(args.baselines) if args.baselines else ["PSO"]
+        nonpaper = True
+    else:
+        n_runs = N_RUNS if args.runs is None else args.runs
+        max_iters = MAX_ITERS_POR_RUN if args.iterations is None else args.iterations
+        selected_modes = parse_modes(args.modes) if args.modes else ["dtw", "ddtw"]
+        selected_baselines = parse_baselines(args.baselines) if args.baselines else None
+        nonpaper = False
+    ejecutar_benchmark_hres2(
+        n_runs, max_iters, args.output, modes=selected_modes,
+        baselines=selected_baselines, nonpaper=nonpaper,
+    )
+    return 0
 
 
 

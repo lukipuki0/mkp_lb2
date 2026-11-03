@@ -18,7 +18,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass, field, replace
-from typing import Optional
+from typing import Optional, Protocol, Any
 
 from hybrid_mkp.mkp_core.problem import MKPInstance
 from hybrid_mkp.mkp_core.repair  import reparar_solucion
@@ -91,6 +91,23 @@ class PipelineResult:
         return len(self.log_switches)
 
 
+class SelectionPolicy(Protocol):
+    """Optional run-local selection; does not own epochs, budgets or initialization.
+
+    choose receives an immutable pool in its native order and must return a member.
+    observe is called once after each successful, nonempty block, with the actual
+    epoch result (read-only by contract), len(historial), and retained global best.
+    The first fitness_before is -inf. Exceptions propagate; policies must not
+    mutate solver results, pools or global RNG state unless intentionally sharing
+    the native random.choice stream. No hook runs when policy is None.
+    """
+
+    def choose(self, pool_names: tuple[str, ...], tipo: str) -> str: ...
+
+    def observe(self, mh: str, tipo: str, fitness_before: float,
+                epoch_result: Any, n_iters: int, fitness_after: float) -> None: ...
+
+
 # ── Función pública principal ─────────────────────────────────────────────────
 
 def ejecutar_pipeline(
@@ -101,6 +118,7 @@ def ejecutar_pipeline(
     pop_injection_mode : str = "mixed",
     verbose            : bool = True,
     max_epoch_iters    : int | None = None,
+    policy             : SelectionPolicy | None = None,
 ) -> PipelineResult:
     """Ejecuta el pipeline híbrido rotando MH hasta alcanzar max_iters o agotar tiempo_max.
 
@@ -112,6 +130,10 @@ def ejecutar_pipeline(
     stag_cfg           : Configuración del monitor DTW. Si None usa valores por defecto.
     pop_injection_mode : Estrategia de inyección para MH poblacionales.
     verbose            : Imprime log de cada switch en consola.
+    max_epoch_iters    : Cap opcional; None conserva épocas completas y posible
+                         sobrepaso de max_iters en el último bloque.
+    policy             : Selección/observación opcional. None conserva random.choice
+                         y su secuencia RNG original, sin observaciones adicionales.
 
     Returns
     -------
@@ -162,11 +184,15 @@ def ejecutar_pipeline(
 
         # Elegir MH del pool correspondiente
         if turno == "poblacional":
-            mh = random.choice(POOL_POBLACIONAL)
+            pool = POOL_POBLACIONAL
             tipo = "poblacional"
         else:
-            mh = random.choice(POOL_TRAYECTORIA)
+            pool = POOL_TRAYECTORIA
             tipo = "trayectoria"
+        mh = random.choice(pool) if policy is None else policy.choose(tuple(pool), tipo)
+        if policy is not None and mh not in pool:
+            raise ValueError(f"Policy selected {mh!r} outside the {tipo} pool")
+        fitness_before = valor_global
 
         if verbose:
             elapsed = time.time() - t_inicio
@@ -222,6 +248,9 @@ def ejecutar_pipeline(
             dtw_deltas   = mh_deltas,
             dtw_info_hist= mh_info_hist,
         ))
+
+        if policy is not None:
+            policy.observe(mh, tipo, fitness_before, resultado, n_iters, valor_global)
 
         if verbose:
             dur = t_mh_fin - t_mh_inicio

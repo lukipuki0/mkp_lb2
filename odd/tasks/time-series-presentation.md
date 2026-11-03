@@ -32,8 +32,14 @@ La presentación deja explícito qué serie se observa y para qué decisión se 
 - TSP-2: diapositiva 11 con curva PGFPlots esquemática, rampa y meseta, delimitada por exactamente dos líneas verticales; diapositiva 12 con explicación de DTW en lenguaje simple. Recurrencia, ejemplo numérico y discriminante conservados en diapositivas 30–32 del apéndice. La diapositiva 11 aclara que el detector recibe `-LCOE` aunque la gráfica de LCOE desciende.
 - TSP-3: compilación con `pdflatex -jobname=main_rebuild` (tres pasadas iniciales y dos finales) y `biber main_rebuild`: salida final de 36 páginas, sin errores fatales. Verificación de texto mediante PyMuPDF y visual de las páginas 1, 7, 9, 11, 12, 27 y 29–32. La compilación directa con `main.aux` preexistente falló; el nombre de trabajo limpio evitó el auxiliar desactualizado. Persisten avisos de sobrecaja anteriores en otras diapositivas (páginas 6 y 18), fuera del alcance de este cambio.
 
-Espejo Engram: sincronizado. Commit: pendiente, lo realizará el agente principal.
+Commit de la presentación: `cf6d809` (`docs: center presentation on convergence time series`).
+
+Revisión nativa: riesgo medio, consentimiento `granted`, revisión de fiabilidad sin hallazgos y cierre confirmado (`review-32d24ee97c4be94c`). El revisor inspeccionó el código fuente y los metadatos del PDF; la apariencia renderizada la verificaron el ejecutor y el agente principal. `git diff --check` pasó.
+
+Integración: el usuario autorizó usar las credenciales Git del equipo para hacer pull y push de `origin/main`. `git pull --ff-only origin main` no descargó cambios: remoto y local ya estaban en `9a53ed9`, cuyo ajuste de terminología forma parte de la base de la presentación. `main` incorporó `cf6d809` por fast-forward, sin conflictos. Publicación remota confirmada: `9a53ed9..cf6d809 main -> main`, mediante push normal, sin force. El primer intento respondió HTTP 408; `git ls-remote` confirmó que no había actualizado main y un único reintento posterior terminó correctamente.
+
+Espejo Engram: documento completo bajo `odd/time-series-presentation/tasks`.
 
 ## Siguiente paso
 
-Revisión final del agente principal y commit convencional de la unidad de trabajo.
+La presentación está publicada. Los ajustes adicionales de contenido quedan fuera de este trabajo.
