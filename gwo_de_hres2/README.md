@@ -16,6 +16,28 @@ python -m gwo_de_hres2.run [--policies p1,p2] [--signal ddtw|dtw] [--pop-size N]
 
 Writes `manifest.json` (configuration, monitor, model config, bounds, runtime) and `runs.jsonl`, one record per policy, written as each run finishes: objective, feasibility, physical LCOE/LCOH/AGSR, solution, decoded capacities, evaluations, elapsed time, and per-generation series (`best_series`, `profile_series`, `parameter_series`, `intensity_series`, `changes`, `step_stats`).
 
+## Campaign (31 seeds)
+
+```
+python -m gwo_de_hres2.campaign [--signals dtw ddtw] [--policies ...] [--seeds 1 2 ...] [--pop-size N] [--iterations T] [--out DIR] [--dry-run]
+```
+
+Defaults: both signals, the six policies, seeds 1..31 and the settings below, i.e. 2 × 6 × 31 = 372 runs. Unique seeds, `--pop-size >= 4`, `--iterations >= 1` and an absent or empty `--out` (default `gwo_de_hres2/results/campaign_<timestamp>`) are checked before anything is written; `--dry-run` prints the plan and stops.
+
+Output folder:
+
+| File | Content |
+|---|---|
+| `campaign_config.json` | settings, monitor per signal, total/completed runs, status (`running`, `completed`, `failed`) |
+| `runs.csv`, `runs.jsonl` | one row/record per run (no per-generation series), written as each run finishes |
+| `statistics.csv` | per signal and policy: runs, feasible runs, best, worst, mean, median, sample sd, best seed, mean time |
+| `tests.csv` | two-sided Mann-Whitney U, Holm-adjusted per family: each signal (all 15 policy pairs) and `dtw_vs_ddtw` (each policy across signals) |
+| `resumen.txt` | Spanish summary: ranking per signal and Holm-significant pairs |
+| `<signal>/<policy>/best_run.json` | full record of the best run (lowest objective, ties to the lower seed) |
+| `<signal>/convergence_comparison.png` | best-so-far LCOE of the best run of each policy |
+
+Statistics use the objective (LCOE when feasible, the penalty otherwise; `feasible_runs` shows how many were feasible). A pair with identical samples has no p-value and stays out of its Holm family. A failing run stops the campaign with status `failed` and exit code 1; the rows already written stay, but no summary is produced.
+
 ## Defaults (`config.py`)
 
 | Setting | Default |
@@ -38,5 +60,5 @@ The HRES2 dispatch is compiled with numba: the first evaluation takes about 1 s 
 ## Tests
 
 ```
-.venv/Scripts/python.exe -m unittest tests.test_gwo_de_hres2
+.venv/Scripts/python.exe -m unittest tests.test_gwo_de_hres2 tests.test_gwo_de_hres2_campaign
 ```

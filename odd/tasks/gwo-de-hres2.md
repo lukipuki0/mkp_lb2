@@ -8,12 +8,19 @@ S2. Chosen location: "Paquete nuevo gwo_de_hres2/" (reuses gwo_de_dtw operators/
 S3. Chosen scope: "Rama nueva, smoke corto" (new branch, tests and a short smoke; no full campaign, no push).
 S4. Design (agent, from exploration): search in normalized z in [-1, 1]^4 mapped linearly to `HRES2Function.lb_vector..ub_vector`, so `gwo_de_dtw.gwo.gwo_candidate` / `gwo_de_dtw.de.de_candidate` are reused unchanged with `v_max=1`. Competitive mode only (GWO vs DE per individual, greedy `<=` on LCOE objective). Cost: N at init, 2N per generation. Objective is `HRES2Function._evaluate` (LCOE, or the 100+10*AGSR penalty when infeasible). The monitor receives `-best` (it maximizes), as HRES2 MH do. Profiles a/F/CR from `gwo_de_dtw.config`; G3 unused. All six policies of `gwo_de_dtw.policies.CAMPAIGN_POLICIES` via `gwo_de_dtw.controller.ProfileController`.
 S5. Defaults: N=30, 1000 generations, seed 1, monitor = HRES2 paper nominal (W40, band 4, min_slope 0.1, plateau 15, patience 8, adaptive 30/70), signal DDTW selectable DTW. Records per run: policy, signal, seed, objective, feasible, physical LCOE/LCOH/AGSR, solution, decoded capacities, evaluations, series, changes, elapsed. CLI writes `runs.jsonl` + `manifest.json` to a fresh directory and refuses a non-empty one.
+S6. User: "gemera el codigo que corra 31 del hres2 de gwo de donde estaria eso? preguntame si es necesario". Chosen: "gwo_de_hres2/campaign.py"; signals "DTW y DDTW" (31 seeds x 6 policies x 2 signals = 372 runs); output "Eso + estadística" = like gwo_de_dtw campaign (per-run records/CSV, statistics.csv per policy with mean, median, best, worst, sample sd, resumen.txt in Spanish, best run per policy with trace and a convergence comparison plot) plus Mann-Whitney/Holm.
+S7. Design (agent): best run = lowest objective, tie lower seed. Statistics on `objective` (LCOE, penalty if infeasible; feasible count reported). Tests two-sided Mann-Whitney: family per signal of all 15 policy pairs, and family dtw_vs_ddtw of the 6 policies, each Holm-adjusted. Validation (output dir empty or absent, unique seeds, pop >= 4, iterations >= 1) before any write; `--dry-run` stops after it. A failing run sets status failed and exits 1.
+S8. User on launching: "no se no entiendo es una prueba de si funciona?". Scope: code, tests, dry-run and a short smoke; the full campaign is asked separately after explaining smoke vs full run.
 
 ## Tasks
 T1 | S1-S5 | inline | done | Package gwo_de_hres2 (config, search, control, run CLI), tests, README. RED (module missing) then GREEN 12 tests; regression gwo_de_dtw+policies+hres2 101 tests OK. Commit: 1dfec2b.
+T3 | S6-S8 | inline | done | gwo_de_hres2/campaign.py with tests and README section. RED (module missing) then GREEN 19 tests (7 campaign + 12 earlier). Commit: see feat(gwo-de-hres2) campaign commit.
+T4 | S8 | inline | done | Dry-run and short real smoke of the campaign; report. Commit: n/a.
 T2 | S3 | inline | done | Short real smoke (tiny N/iterations, all six policies) and report runtime. Commit: n/a (results not committed).
 
 ## Log
+L7. job-4 exit 0: default dry-run printed 372 runs and wrote nothing; smoke `--seeds 1 2 3 --pop-size 10 --iterations 60` completed 36/36 with all summaries, 0 Holm-significant pairs (n=3, no claim). A default run (N30 T1000, binary_complex, seed 1) took 20.1 s with 60030 evals, so the full 372-run campaign is about 2 h. vanilla_* ignore the signal, so their DTW and DDTW samples are identical; binary_complex equals vanilla_exploitation when the monitor never fires.
+L6. User: "hay un script que corra todo 31 veces?" then S6 request and answers (S6, S8).
 L1. User: "quiero implementar lo del hres2 en el gwo_De_dtw okey preguntame si es necesario donde guardarlo etc"
 L2. Answers: "Correr GWO-DE-DTW sobre HRES2"; "Paquete nuevo gwo_de_hres2/"; "Rama nueva, smoke corto".
 L3. Measured one HRES2 evaluation ~60 ms (.venv); default N30 x 1000 gens = 60030 evals, about 1 h per run.
