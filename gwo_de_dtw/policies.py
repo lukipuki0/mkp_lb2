@@ -1,8 +1,9 @@
 """
-The four profile policies, named after the DTW_optimization-main folders.
+The four profile policies, named after the DTW_optimization-main folders,
+plus two fixed baselines that never read the monitor decision.
 
-All of them read the same monitor output (dtw_stagnation.StagnationMonitor)
-and use the same exploit/explore profiles:
+The adaptive policies read the same monitor output
+(dtw_stagnation.StagnationMonitor) and use the same exploit/explore profiles:
   - binary_simple      exploit -> explore when D2_vs_const <= theta_c
   - binary_complex     exploit -> explore when the monitor fires
     Both return to exploit with the S8 rule and replace the monitor after
@@ -11,6 +12,9 @@ and use the same exploit/explore profiles:
   - continuous_complex intensity = sigmoid(k * (delta / (theta_delta + eps) - center))
     The active profile is blend(exploit, explore, intensity); the monitor is
     never replaced.
+  - vanilla_exploitation  exploit for every generation
+  - vanilla_exploration   explore for every generation
+    Neither changes mode, whatever the monitor reports.
 
 Spec: odd/tasks/gwo-de-dtw-hybrid.md (S20).
 """
@@ -23,13 +27,18 @@ from .hybrid import Profile
 POLICIES = ("binary_simple", "binary_complex", "continuous_simple", "continuous_complex")
 BINARY_POLICIES = POLICIES[:2]
 CONTINUOUS_POLICIES = POLICIES[2:]
+# Fixed baselines. Not part of POLICIES. run.py and campaign.py iterate
+# CAMPAIGN_POLICIES, which appends these two.
+VANILLA_POLICIES = ("vanilla_exploitation", "vanilla_exploration")
+CAMPAIGN_POLICIES = POLICIES + VANILLA_POLICIES
+ACCEPTED_POLICIES = CAMPAIGN_POLICIES
 
 EPS = 1e-10
 
 
 def check_policy(policy: str) -> None:
-    if policy not in POLICIES:
-        raise ValueError(f"policy must be one of {POLICIES}, got {policy!r}")
+    if policy not in ACCEPTED_POLICIES:
+        raise ValueError(f"policy must be one of {ACCEPTED_POLICIES}, got {policy!r}")
 
 
 def enters_explore(policy: str, out: Dict) -> bool:

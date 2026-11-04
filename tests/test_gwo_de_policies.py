@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 from dtw_stagnation import StagnationConfig  # noqa: E402
 from gwo_de_dtw import EXPLOIT, EXPLORE, ProfileController, run_hybrid  # noqa: E402
 from gwo_de_dtw.policies import (  # noqa: E402
-    BINARY_POLICIES, CONTINUOUS_POLICIES, POLICIES, blend, intensity,
+    BINARY_POLICIES, CAMPAIGN_POLICIES, CONTINUOUS_POLICIES, POLICIES, blend, intensity,
 )
 
 W = 10
@@ -68,6 +68,26 @@ class PolicyNamesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "policy"):
             run_hybrid(make_instance(), fixed_cfg(), pop_size=8, iterations=1,
                        policy="binary_medium")
+
+
+class VanillaPolicyTests(unittest.TestCase):
+    def test_each_vanilla_stays_in_its_mode_for_the_whole_run(self):
+        inst = make_instance()
+        cfg = fixed_cfg(window=4)
+        generations = 12
+        for policy, mode, profile in (
+            ("vanilla_exploitation", "exploit", EXPLOIT),
+            ("vanilla_exploration", "explore", EXPLORE),
+        ):
+            res = run_hybrid(inst, cfg, pop_size=6, iterations=generations,
+                             seed=1, policy=policy)
+            self.assertEqual(res["policy"], policy)
+            self.assertEqual(res["profile_series"], [mode] * generations)
+            self.assertEqual(res["changes"], [])
+            self.assertTrue(all(value is None for value in res["intensity_series"]))
+            for key in ("a", "F", "CR", "G3"):
+                self.assertEqual(res["parameter_series"][key],
+                                 [getattr(profile, key)] * generations)
 
 
 class BlendTests(unittest.TestCase):
@@ -337,16 +357,16 @@ class RunCliPolicyTests(unittest.TestCase):
             lines = res.stdout.splitlines()
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=ddtw W=10 pop=8 iterations=25 seed=3")
-            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
+            self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
             policy_lines = [line for line in lines if line.startswith("policy=")]
-            self.assertEqual(policy_lines, lines[1:21:5])
-            for line, policy in zip(policy_lines, POLICIES):
+            self.assertEqual(policy_lines, lines[1:1 + 5 * len(CAMPAIGN_POLICIES):5])
+            for line, policy in zip(policy_lines, CAMPAIGN_POLICIES):
                 self.assert_policy_line(line, policy)
             self.assertEqual([p.name for p in Path(tmp).iterdir()], ["gwo_de_dtw"])
             groups = list((Path(tmp) / "gwo_de_dtw" / "results").iterdir())
             self.assertEqual(len(groups), 1)
             self.assertEqual(sorted(p.name for p in groups[0].iterdir()),
-                             sorted(list(POLICIES) + ["convergence_comparison.pdf",
+                             sorted(list(CAMPAIGN_POLICIES) + ["convergence_comparison.pdf",
                                                       "convergence_comparison.png"]))
 
     def test_out_writes_json_and_plots_per_policy(self):
@@ -356,9 +376,9 @@ class RunCliPolicyTests(unittest.TestCase):
             self.assertEqual(res.stderr, "")
             lines = res.stdout.splitlines()
             policy_lines = [i for i, line in enumerate(lines) if line.startswith("policy=")]
-            self.assertEqual(len(policy_lines), 4)
+            self.assertEqual(len(policy_lines), len(CAMPAIGN_POLICIES))
             self.assertEqual([p.name for p in Path(tmp).iterdir()], ["x"])
-            for i, policy in zip(policy_lines, POLICIES):
+            for i, policy in zip(policy_lines, CAMPAIGN_POLICIES):
                 self.assert_policy_line(lines[i], policy)
                 folder = Path(tmp) / "x" / policy
                 plots = lines[i + 1:i + 5]

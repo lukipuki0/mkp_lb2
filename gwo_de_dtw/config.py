@@ -40,7 +40,7 @@ EXPLOIT_A, EXPLOIT_F, EXPLOIT_CR = 0.5, 0.5, 0.9
 EXPLORE_A, EXPLORE_F, EXPLORE_CR = 2.0, 0.9, 0.3
 
 # Profile policy (policies.py) used by run_hybrid / ProfileController;
-# run.py runs all four.
+# run.py runs CAMPAIGN_POLICIES (the four adaptive policies plus the two vanillas).
 POLICY = "binary_complex"
 SCALE = 2.0           # continuous_simple: D2 / (theta_c * SCALE)
 K = 5.0               # continuous_complex: sigmoid slope

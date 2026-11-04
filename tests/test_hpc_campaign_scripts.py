@@ -98,12 +98,18 @@ class HpcScriptTest(unittest.TestCase):
                 result = run(script, "--dry-run")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stderr, "")
-                groups = re.findall(r"^items_(\d+): 9 instancias en paralelo$", result.stdout, re.MULTILINE)
+                per_size = 6 if name == "gwo_de" else 9
+                groups = re.findall(
+                    rf"^items_(\d+): {per_size} instancias en paralelo$", result.stdout, re.MULTILINE)
                 self.assertEqual(groups, ["100", "250", "500"])
                 plan = re.findall(r"^items_(\d+) task (\d): mknapcb(\d)\.txt index (\d)$",
                                   result.stdout, re.MULTILINE)
-                expected = [(size, str(task), str(FAMILIES[size][task // 3]), str(task % 3))
-                            for size in ("100", "250", "500") for task in range(9)]
+                if name == "gwo_de":
+                    expected = [(size, str(task), str(FAMILIES[size][task // 2]), str(task % 2))
+                                for size in ("100", "250", "500") for task in range(6)]
+                else:
+                    expected = [(size, str(task), str(FAMILIES[size][task // 3]), str(task % 3))
+                                for size in ("100", "250", "500") for task in range(9)]
                 self.assertEqual(plan, expected)
                 self.assertIn(f"Resultados: {posix(RESULTS)}/{name}_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/",
                               result.stdout)
@@ -189,7 +195,8 @@ class HpcScriptTest(unittest.TestCase):
                 result = run(script, env=env)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 calls = log.read_text(encoding="utf-8").splitlines()
-                self.assertEqual(len(calls), 27)
+                expected_calls = 18 if name == "gwo_de" else 27
+                self.assertEqual(len(calls), expected_calls)
                 sizes = [SIZE_OF_FAMILY[self._instance_of(call)[0]] for call in calls]
                 self.assertEqual(sizes, sorted(sizes, key=int), "groups must not overlap")
                 for call in calls:
@@ -198,9 +205,10 @@ class HpcScriptTest(unittest.TestCase):
                 self.assertEqual(sorted(p.name for p in experiment.iterdir()),
                                  [f"mknapcb{family}" for family in range(1, 10)])
                 for family in range(1, 10):
+                    indices = (0, 1) if name == "gwo_de" else (0, 1, 2)
                     self.assertEqual(sorted(p.name for p in (experiment / f"mknapcb{family}").iterdir()),
-                                     ["inst_00", "inst_01", "inst_02"])
-                    for index in range(3):
+                                     [f"inst_{index:02d}" for index in indices])
+                    for index in indices:
                         inst = experiment / f"mknapcb{family}" / f"inst_{index:02d}"
                         self.assertEqual((inst / "runs.csv").read_text(encoding="utf-8"),
                                          f"file,index\nmknapcb{family}.txt,{index}\n")
@@ -214,7 +222,7 @@ class HpcScriptTest(unittest.TestCase):
                 again = run(script, env=env)
                 self.assertEqual(again.returncode, 2)
                 self.assertIn("ya existe", again.stderr)
-                self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 27)
+                self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), expected_calls)
 
     def test_failed_instance_keeps_staging_and_others_continue(self):
         for name, script in SCRIPTS.items():
@@ -224,13 +232,15 @@ class HpcScriptTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn("Instancias fallidas (1): mknapcb4/inst_01", result.stderr)
                 self.assertIn("código 7", result.stderr)
-                self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 27)
+                expected_calls = 18 if name == "gwo_de" else 27
+                self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), expected_calls)
                 self.assertFalse((experiment / "mknapcb4" / "inst_01").exists())
                 staging = experiment / ".staging" / "mknapcb4_inst_01"
                 self.assertIn("falla simulada", (staging / "run.log").read_text(encoding="utf-8"))
                 self.assertEqual(sorted(p.name for p in (experiment / ".staging").iterdir()),
                                  ["mknapcb4_inst_01"])
-                self.assertTrue((experiment / "mknapcb9" / "inst_02" / "runs.csv").is_file())
+                survivor = "inst_01" if name == "gwo_de" else "inst_02"
+                self.assertTrue((experiment / "mknapcb9" / survivor / "runs.csv").is_file())
 
 
 if __name__ == "__main__":

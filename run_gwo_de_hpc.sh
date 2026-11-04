@@ -16,10 +16,10 @@
 # Revisar sin ejecutar:    bash run_gwo_de_hpc.sh --dry-run
 #
 # Un job de 9 CPUs. Corre los tamaños en orden 100 -> 250 -> 500. En cada
-# tamaño lanza 9 procesos en paralelo, uno por instancia: los 3 archivos de
-# ese tamaño con índices 0, 1 y 2. Cada proceso corre 31 semillas x 4 modos
-# (124 corridas) y conserva la mejor corrida de cada modo. El tamaño siguiente
-# empieza cuando terminan los 9 procesos del anterior. Una instancia que falla
+# tamaño lanza 6 procesos en paralelo, uno por instancia: los 3 archivos de
+# ese tamaño con índices 0 y 1. Cada proceso corre 31 semillas x 6 modos
+# (186 corridas) y conserva la mejor corrida de cada modo. El tamaño siguiente
+# empieza cuando terminan los 6 procesos del anterior. Una instancia que falla
 # no detiene a las demás; el job termina con código 1 si alguna falló.
 #
 # Resultados: resultados/gwo_de_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/
@@ -38,8 +38,8 @@ module=gwo_de_dtw.campaign
 fail() { printf 'Error: %s\n' "$*" >&2; exit 2; }
 usage() {
     printf 'Uso: sbatch run_gwo_de_hpc.sh           (desde la raíz del repo)\n'
-    printf '     bash run_gwo_de_hpc.sh --dry-run   (muestra las 27 instancias sin ejecutar)\n'
-    printf 'Tamaños 100, 250 y 500 en orden; 9 instancias en paralelo por tamaño.\n'
+    printf '     bash run_gwo_de_hpc.sh --dry-run   (muestra las 18 instancias sin ejecutar)\n'
+    printf 'Tamaños 100, 250 y 500 en orden; 6 instancias en paralelo por tamaño.\n'
     printf 'Resultados: resultados/gwo_de_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/<modo>/\n'
 }
 
@@ -98,11 +98,11 @@ if $dry_run; then
     experiment="$repo/resultados/${name}_<SLURM_JOB_ID>"
     printf 'Resultados: %s/mknapcb<F>/inst_<II>/\n' "$experiment"
     for size in 100 250 500; do
-        printf 'items_%s: 9 instancias en paralelo\n' "$size"
+        printf 'items_%s: 6 instancias en paralelo\n' "$size"
         families_for "$size"
-        for task in 0 1 2 3 4 5 6 7 8; do
-            family=${families[task / 3]}
-            index=$((task % 3))
+        for task in 0 1 2 3 4 5; do
+            family=${families[task / 2]}
+            index=$((task % 2))
             printf -v case_name 'mknapcb%s_inst_%02d' "$family" "$index"
             printf 'items_%s task %s: mknapcb%s.txt index %s\n' "$size" "$task" "$family" "$index"
             task_command "$repo" "$family" "$index" "$experiment/.staging/$case_name/campaign"
@@ -135,14 +135,14 @@ printf '=== %s | job %s | nodo %s | CPUs %s | inicio %s ===\n' \
 printf 'Resultados: %s\n' "$experiment"
 failed=()
 for size in 100 250 500; do
-    printf -- '--- items_%s: 9 instancias en paralelo | %s\n' "$size" "$(date)"
+    printf -- '--- items_%s: 6 instancias en paralelo | %s\n' "$size" "$(date)"
     families_for "$size"
     pids=()
     cases=()
     stagings=()
-    for task in 0 1 2 3 4 5 6 7 8; do
-        family=${families[task / 3]}
-        index=$((task % 3))
+    for task in 0 1 2 3 4 5; do
+        family=${families[task / 2]}
+        index=$((task % 2))
         printf -v case_name 'mknapcb%s_inst_%02d' "$family" "$index"
         printf -v target '%s/mknapcb%s/inst_%02d' "$experiment" "$family" "$index"
         staging="$experiment/.staging/$case_name"

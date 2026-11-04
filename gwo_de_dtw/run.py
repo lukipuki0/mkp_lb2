@@ -1,15 +1,15 @@
 """
-Run the GWO-DE hybrid on one OR-Library MKP instance with the four policies.
+Run the GWO-DE hybrid on one OR-Library MKP instance with the six policies.
 
 Usage (from the repository root):
     python -m gwo_de_dtw.run --instance instancias/mknapcb1.txt --index 0 \
         --binarization lb2 --signal ddtw --window 40 --pop 30 --iterations 1000 \
         --seed 1 --out gwo_de_dtw/results/mknapcb1_0_ddtw_s1.json
 
-Defaults come from config.py. The policies of policies.POLICIES run one after
-the other with the same settings, each with its own hybrid seeded with --seed.
-Every invocation writes one group folder: <policy>/result.json and its plots
-for each policy, plus convergence_comparison.png/.pdf with the four policies.
+Defaults come from config.py. The policies of policies.CAMPAIGN_POLICIES run
+one after the other with the same settings, each with its own hybrid seeded
+with --seed. Every invocation writes one group folder: <policy>/result.json
+and its plots for each policy, plus convergence_comparison.png/.pdf.
 --out X.json uses the folder X/ (results/x.json -> results/x/binary_simple/...),
 any other --out is the folder itself; without --out a new folder
 <instance>_<index>_s<seed>_<YYYYmmdd-HHMMSS> is created in gwo_de_dtw/results/
@@ -29,7 +29,7 @@ from .problem import cargar_instancia
 from dtw_stagnation import StagnationConfig
 
 from .controller import run_hybrid
-from .policies import POLICIES
+from .policies import CAMPAIGN_POLICIES as POLICIES
 from .plots import plot_convergence_comparison, save_all_plots
 
 # Parent of the default groups, relative to the working directory (the repository root).
@@ -100,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
                              "Each policy writes <policy>/result.json (full run record) "
                              "and its plots, including temporal PNG/PDF and NPZ/CSV "
                              "diagnostics; the folder also gets "
-                             "convergence_comparison.png/.pdf with the four policies "
+                             "convergence_comparison.png/.pdf with the six policies "
                              "(default: new folder <instance>_<index>_s<seed>_<timestamp> "
                              "in gwo_de_dtw/results/)")
     return parser

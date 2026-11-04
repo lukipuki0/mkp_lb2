@@ -5,10 +5,11 @@ best run of each policy per instance.
 Usage (from the repository root):
     python -m gwo_de_dtw.campaign --out gwo_de_dtw/results/campaign_full
 
-Defaults: mknapcb1..9.txt from instancias/, indices 0 1 2, seeds 1..31, the four
-policies of policies.POLICIES and the algorithm settings of config.py, i.e.
-9 x 3 x 31 x 4 = 3348 runs. Every run calls controller.run_hybrid with the same
-arguments as run.py (run.py stays the one-seed, four-policy runner).
+Defaults: mknapcb1..9.txt from instancias/, indices 0 1, seeds 1..31, the six
+policies of policies.CAMPAIGN_POLICIES (the four adaptive rules plus the two
+vanilla baselines) and the algorithm settings of config.py, i.e.
+9 x 2 x 31 x 6 = 3348 runs. Every run calls controller.run_hybrid with the same
+arguments as run.py (run.py stays the one-seed runner of the same six policies).
 
 Everything is checked before the first run or write: instance file names
 (basenames inside --instances-dir), indices, seeds, budgets and the output
@@ -46,12 +47,12 @@ from .problem import cargar_instancia, parsear_instancias
 from dtw_stagnation import StagnationConfig
 
 from .controller import run_hybrid
-from .policies import POLICIES
+from .policies import CAMPAIGN_POLICIES as POLICIES
 from .plots import plot_convergence_comparison, save_all_plots
 from .run import RESULTS_DIR, _to_json
 
 FILES = tuple(f"mknapcb{i}.txt" for i in range(1, 10))
-INDICES = (0, 1, 2)
+INDICES = (0, 1)
 SEEDS = tuple(range(1, 32))
 
 CONFIG_FILE = "campaign_config.json"
@@ -76,7 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="instance file names inside --instances-dir, basenames only "
                              "(default: mknapcb1.txt .. mknapcb9.txt)")
     parser.add_argument("--indices", nargs="+", type=int, default=list(INDICES),
-                        help="instance indices of every file (default: 0 1 2)")
+                        help="instance indices of every file (default: 0 1)")
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS),
                         help="seeds, nonnegative and unique (default: 1 .. 31)")
     parser.add_argument("--binarization", choices=("lb2", "sigmoid"),
@@ -384,7 +385,7 @@ def _render_resumen(state: dict, args, completed) -> str:
         f"G3 exploraci\u00f3n: {args.g3_explore:g}",
         f"DTW Kirito: {'s\u00ed' if args.dtw_kirito else 'no'}",
     ])
-    final_title = "Ranking final de los cuatro modos"
+    final_title = "Ranking final de los modos"
     final = "\n".join([
         final_title,
         "=" * len(final_title),

@@ -2,7 +2,8 @@
 DTW/DDTW profile controller and run loop for the GWO-DE hybrid.
 
 The controller watches the best-so-far fitness (last W generations) and sets
-the joint GWO/DE profile with one of the four policies of policies.py.
+the joint GWO/DE profile with one of the policies of policies.py. The two
+vanilla policies ignore that signal and keep their initial profile.
 
 Binary policies switch between the two fixed profiles:
     exploit + trigger                     -> explore
@@ -54,9 +55,12 @@ class ProfileController:
         self.policy = policy
         self.dtw_kirito = dtw_kirito  # binary policies only
         self.scale, self.k, self.center = scale, k, center
-        self.profile: Profile = exploit
-        # Intensity of the active profile; None for binary policies.
-        self.intensity = None if policy in policies.BINARY_POLICIES else 0.0
+        # Vanilla baselines never leave their mode. The adaptive policies
+        # start in exploitation, as before.
+        self.profile: Profile = explore if policy == "vanilla_exploration" else exploit
+        # Intensity of the active profile; None when the profile is not a blend.
+        fixed = policy in policies.BINARY_POLICIES or policy in policies.VANILLA_POLICIES
+        self.intensity = None if fixed else 0.0
         self.monitor = StagnationMonitor(cfg=cfg)
 
     def _next_profile(self, out: Dict) -> Profile:
@@ -70,7 +74,9 @@ class ProfileController:
         """Feed one best-so-far observation; returns the monitor output plus the decision."""
         out = dict(self.monitor.update(best_fitness))
         changed = False
-        if out["ready"] and self.intensity is None:
+        if self.policy in policies.VANILLA_POLICIES:
+            pass
+        elif out["ready"] and self.intensity is None:
             new = self._next_profile(out)
             if new is not self.profile:
                 self.profile = new

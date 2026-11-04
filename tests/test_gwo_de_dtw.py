@@ -14,7 +14,7 @@ if str(PKG_ROOT) not in sys.path:
     sys.path.insert(0, str(PKG_ROOT))
 
 from gwo_de_dtw import (  # noqa: E402
-    EXPLOIT, EXPLORE, POLICIES, GWODEHybrid, Profile, ProfileController, run_hybrid,
+    EXPLOIT, EXPLORE, POLICIES, CAMPAIGN_POLICIES, GWODEHybrid, Profile, ProfileController, run_hybrid,
 )
 from gwo_de_dtw.binarization import (  # noqa: E402
     SIGMOID_EVALUATIONS, lb2_binarize, lb2_probabilities, sigmoid_binarize,
@@ -812,8 +812,8 @@ class RunCliTests(unittest.TestCase):
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=dtw W=40 pop=8 iterations=5 seed=3")
             # S15/S21: plot lines follow each policy line; 5 < W, so the delta plot is skipped.
-            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
-            for i, policy in enumerate(POLICIES):
+            self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
+            for i, policy in enumerate(CAMPAIGN_POLICIES):
                 block = lines[1 + 5 * i:6 + 5 * i]
                 self.assertRegex(block[0], rf"^policy={policy} best=\d+ known_optimum=\d+ "
                                            r"gap=\d+\.\d{2}% evaluations=168 generations=5 "
@@ -845,8 +845,8 @@ class RunCliTests(unittest.TestCase):
             lines = res.stdout.splitlines()
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=ddtw W=40 pop=8 iterations=45 seed=3")
-            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
-            for i, policy in enumerate(POLICIES):
+            self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
+            for i, policy in enumerate(CAMPAIGN_POLICIES):
                 block = lines[1 + 5 * i:6 + 5 * i]
                 self.assertRegex(block[0], rf"^policy={policy} best=\d+ known_optimum=\d+ "
                                            r"gap=\d+\.\d{2}% evaluations=1448 generations=45 "
@@ -856,7 +856,7 @@ class RunCliTests(unittest.TestCase):
                 assert_png_files(self, folder, PLOT_FILES, ["result.json"])
             self.assertEqual([p.name for p in Path(tmp).iterdir()], ["demo"])
             self.assertEqual(sorted(p.name for p in (Path(tmp) / "demo").iterdir()),
-                             sorted(list(POLICIES) + ["convergence_comparison.pdf",
+                             sorted(list(CAMPAIGN_POLICIES) + ["convergence_comparison.pdf",
                                                       "convergence_comparison.png"]))
 
     # S14
@@ -868,10 +868,10 @@ class RunCliTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stderr, "")
         lines = res.stdout.splitlines()
-        self.assertEqual(len(lines), 1 + 4 * 5 + 2)
+        self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
         self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=sigmoid "
                                    "signal=dtw W=40 pop=8 iterations=5 seed=3")
-        for line, policy in zip(lines[1:21:5], POLICIES):
+        for line, policy in zip(lines[1:1 + 5 * len(CAMPAIGN_POLICIES):5], CAMPAIGN_POLICIES):
             self.assertRegex(line, rf"^policy={policy} best=\d+ known_optimum=\d+ "
                                    r"gap=\d+\.\d{2}% evaluations=88 generations=5 changes=\d+$")
 

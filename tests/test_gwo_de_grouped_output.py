@@ -22,7 +22,7 @@ import matplotlib  # noqa: E402
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from gwo_de_dtw import POLICIES  # noqa: E402
+from gwo_de_dtw import CAMPAIGN_POLICIES, POLICIES  # noqa: E402
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 POLICY_FILES = sorted([
@@ -60,11 +60,11 @@ class GroupedCliTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stderr, "")
         self.assertEqual(sorted(p.name for p in group.iterdir()),
-                         sorted(list(POLICIES) + COMPARISON_FILES))
+                         sorted(list(CAMPAIGN_POLICIES) + COMPARISON_FILES))
         lines = res.stdout.splitlines()
         self.assertEqual(lines[0], HEADER)
-        self.assertEqual(len(lines), 1 + 4 * 5 + 2)
-        for i, policy in enumerate(POLICIES):
+        self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
+        for i, policy in enumerate(CAMPAIGN_POLICIES):
             folder = group / policy
             block = lines[1 + 5 * i:6 + 5 * i]
             self.assertTrue(block[0].startswith(f"policy={policy} best="), block[0])
@@ -173,7 +173,7 @@ class ComparisonPlotTests(unittest.TestCase):
         fig = convergence_comparison_figure([record])
         try:
             self.assertEqual(fig.axes[0].get_title(),
-                             "Convergence of the four policies - mknapcb1[0]")
+                             "Convergence of one policy - mknapcb1[0]")
             self.assertEqual(record["instance"], "mknapcb1.txt[0]")
         finally:
             import matplotlib.pyplot as plt

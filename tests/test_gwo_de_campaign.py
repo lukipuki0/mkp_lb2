@@ -28,7 +28,8 @@ if str(ROOT) not in sys.path:
 import matplotlib  # noqa: E402
 matplotlib.use("Agg")
 
-from gwo_de_dtw import POLICIES, campaign  # noqa: E402
+from gwo_de_dtw import campaign  # noqa: E402
+from gwo_de_dtw.policies import CAMPAIGN_POLICIES as POLICIES  # noqa: E402
 from gwo_de_dtw.controller import run_hybrid as real_run_hybrid  # noqa: E402
 from gwo_de_dtw.problem import cargar_instancia  # noqa: E402
 from gwo_de_dtw.run import _to_json  # noqa: E402
@@ -159,7 +160,7 @@ class DefaultsAndPreflightTests(CampaignTestCase):
     def test_defaults_come_from_config(self):
         args = campaign.build_parser().parse_args([])
         self.assertEqual(args.files, [f"mknapcb{i}.txt" for i in range(1, 10)])
-        self.assertEqual(args.indices, [0, 1, 2])
+        self.assertEqual(args.indices, [0, 1])
         self.assertEqual(args.seeds, list(range(1, 32)))
         self.assertEqual((args.pop, args.iterations, args.window, args.signal,
                           args.binarization, args.dtw_kirito, args.out, args.dry_run),
@@ -175,7 +176,7 @@ class DefaultsAndPreflightTests(CampaignTestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stderr, "")
         self.assertEqual(res.stdout.splitlines(), [
-            "campaign files=9 indices=3 seeds=31 policies=4 runs=3348 binarization=lb2 "
+            "campaign files=9 indices=2 seeds=31 policies=6 runs=3348 binarization=lb2 "
             "signal=ddtw W=40 pop=30 iterations=1000",
             "dry-run: selection and output validated, nothing executed or written",
         ])
@@ -252,7 +253,7 @@ class CampaignOutputTests(CampaignTestCase):
                                           "--seeds", *seeds, *SMALL, "--out", str(self.out))
         self.assertEqual(code, 0, err)
         self.assertEqual(err, "")
-        self.assertEqual(len(runner.calls), 124)
+        self.assertEqual(len(runner.calls), 186)
         self.assertEqual(sorted(p.name for p in self.out.iterdir()),
                          ["campaign_config.json", "mknapcb1", "resumen.txt", "statistics.csv",
                           "summary.csv"])
@@ -271,8 +272,8 @@ class CampaignOutputTests(CampaignTestCase):
 
         fields, rows = read_csv(inst / "runs.csv")
         self.assertEqual(fields, RUN_FIELDS)
-        self.assertEqual(len(rows), 124)
-        self.assertEqual([(r["seed"], r["policy"]) for r in rows[:5]],
+        self.assertEqual(len(rows), 186)
+        self.assertEqual([(r["seed"], r["policy"]) for r in rows[:len(POLICIES) + 1]],
                          [("31", p) for p in POLICIES] + [("30", "binary_simple")])
         for row in rows:
             self.assertEqual((row["file"], row["index"], row["status"]),
@@ -294,7 +295,7 @@ class CampaignOutputTests(CampaignTestCase):
 
         config = json.loads((self.out / "campaign_config.json").read_text())
         self.assertEqual((config["status"], config["completed_runs"], config["total_runs"]),
-                         ("completed", 124, 124))
+                         ("completed", 186, 186))
         self.assertIsNone(config["error"])
         self.assertEqual(config["selection"]["seeds"], list(range(31, 0, -1)))
         self.assertEqual(config["selection"]["policies"], list(POLICIES))
@@ -302,14 +303,14 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertIs(config["config"]["dtw_kirito"], False)
 
         lines = out.splitlines()
-        self.assertEqual(lines[0], "campaign files=1 indices=1 seeds=31 policies=4 runs=124 "
+        self.assertEqual(lines[0], "campaign files=1 indices=1 seeds=31 policies=6 runs=186 "
                                    "binarization=lb2 signal=ddtw W=5 pop=4 iterations=12")
         run_lines = [RUN_LINE.match(line) for line in lines if line.startswith("[")]
-        self.assertEqual(len(run_lines), 124)
+        self.assertEqual(len(run_lines), 186)
         self.assertTrue(all(run_lines))
         self.assertEqual(run_lines[0].groups()[:8],
-                         ("1", "124", "mknapcb1.txt", "0", "31", "binary_simple", "1", "n/a"))
-        self.assertEqual(lines[-2], "status=completed runs=124/124")
+                         ("1", "186", "mknapcb1.txt", "0", "31", "binary_simple", "1", "n/a"))
+        self.assertEqual(lines[-2], "status=completed runs=186/186")
         self.assertEqual(lines[-1], f"output={self.out}")
 
         resumen = (self.out / "resumen.txt").read_text(encoding="utf-8")
@@ -334,7 +335,8 @@ class CampaignOutputTests(CampaignTestCase):
     def test_winner_seeds_differ_statistics_and_only_winners_are_exported(self):
         write_references(self.inst_dir)
         winners = {"binary_simple": 4, "binary_complex": 1,
-                   "continuous_simple": 5, "continuous_complex": 2}
+                   "continuous_simple": 5, "continuous_complex": 2,
+                   "vanilla_exploitation": 3, "vanilla_exploration": 3}
         policy_rank = {p: k for k, p in enumerate(POLICIES)}
 
         def fitness(index, policy, seed):
@@ -348,7 +350,7 @@ class CampaignOutputTests(CampaignTestCase):
             runner, "--files", "mknapcb1.txt", "--indices", "1", "0", "--seeds", *seeds,
             *SMALL, "--out", str(self.out), wrap_plots=True)
         self.assertEqual(code, 0, err)
-        self.assertEqual(len(runner.calls), 40)
+        self.assertEqual(len(runner.calls), 60)
 
         saved = [(c.args[0]["fake_tag"], Path(c.args[1])) for c in spies["save"].call_args_list]
         expected_saved = []
@@ -367,7 +369,7 @@ class CampaignOutputTests(CampaignTestCase):
             self.assertEqual(call.kwargs, {"seed_labels": True})
 
         _, summary = read_csv(self.out / "summary.csv")
-        self.assertEqual([(r["index"], r["seed"]) for r in summary[::4]],
+        self.assertEqual([(r["index"], r["seed"]) for r in summary[::len(POLICIES)]],
                          [(i, s) for i in ("1", "0") for s in seeds])
         _, root_stats = read_csv(self.out / "statistics.csv")
         self.assertEqual([(r["index"], r["policy"]) for r in root_stats],
@@ -410,7 +412,7 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertEqual(code, 0, err)
         _, stats = read_csv(self.out / "statistics.csv")
         self.assertEqual([(r["runs"], r["std_fitness"], r["best_seed"]) for r in stats],
-                         [("1", "", "9")] * 4)
+                         [("1", "", "9")] * len(POLICIES))
         resumen = (self.out / "resumen.txt").read_text(encoding="utf-8")
         self.assertIn("Desviaci\u00f3n est\u00e1ndar muestral: no aplica", resumen)
         self.assertNotIn("Desviaci\u00f3n est\u00e1ndar muestral: 0", resumen)
@@ -428,17 +430,17 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertEqual(code, 1)
         self.assertEqual(err, "error: campaign failed at mknapcb1.txt[1] "
                               "policy=continuous_simple seed=2: RuntimeError: boom\n")
-        self.assertEqual(len(runner.calls), 15)
-        self.assertEqual(out.splitlines()[-2:], ["status=failed runs=14/16",
+        self.assertEqual(len(runner.calls), 21)
+        self.assertEqual(out.splitlines()[-2:], ["status=failed runs=20/24",
                                                  f"output={self.out}"])
         config = json.loads((self.out / "campaign_config.json").read_text())
         self.assertEqual((config["status"], config["completed_runs"], config["total_runs"]),
-                         ("failed", 14, 16))
+                         ("failed", 20, 24))
         self.assertEqual(config["error"], "mknapcb1.txt[1] policy=continuous_simple seed=2: "
                                           "RuntimeError: boom")
         _, summary = read_csv(self.out / "summary.csv")
-        self.assertEqual(len(summary), 15)
-        self.assertEqual([r["status"] for r in summary], ["ok"] * 14 + ["failed"])
+        self.assertEqual(len(summary), 21)
+        self.assertEqual([r["status"] for r in summary], ["ok"] * 20 + ["failed"])
         failed = summary[-1]
         self.assertEqual((failed["index"], failed["policy"], failed["seed"]),
                          ("1", "continuous_simple", "2"))
@@ -448,12 +450,12 @@ class CampaignOutputTests(CampaignTestCase):
         partial = self.out / "mknapcb1" / "inst_01"
         self.assertEqual([p.name for p in partial.iterdir()], ["runs.csv"])
         _, rows = read_csv(partial / "runs.csv")
-        self.assertEqual(rows, summary[8:])
+        self.assertEqual(rows, summary[12:])
         _, stats = read_csv(self.out / "statistics.csv")
-        self.assertEqual([r["index"] for r in stats], ["0"] * 4)
+        self.assertEqual([r["index"] for r in stats], ["0"] * len(POLICIES))
         resumen = (self.out / "resumen.txt").read_text(encoding="utf-8")
         self.assertIn("Estado: fallida", resumen)
-        self.assertIn("Progreso: 1/2 instancias completadas, 14/16 corridas", resumen)
+        self.assertIn("Progreso: 1/2 instancias completadas, 20/24 corridas", resumen)
         self.assertIn("Instancia mknapcb1.txt [0]", resumen)
         self.assertNotIn("Instancia mknapcb1.txt [1]", resumen)
         self.assertIn("Error: mknapcb1.txt[1] policy=continuous_simple seed=2: "
@@ -504,10 +506,10 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertEqual(err, "")
         self.assertFalse(runner.progressive_tmp)
         progressive = expected_resumen(
-            "en curso", "1/2 instancias completadas, 12/24 corridas",
+            "en curso", "1/2 instancias completadas, 18/36 corridas",
             "Incluye solo las instancias completadas hasta ahora.", (1,))
         final = expected_resumen(
-            "completada", "2/2 instancias completadas, 24/24 corridas",
+            "completada", "2/2 instancias completadas, 36/36 corridas",
             "Incluye todas las instancias completadas.", (1, 0))
         self.assertEqual(runner.progressive, progressive)
         self.assertEqual((self.out / "resumen.txt").read_text(encoding="utf-8"), final)
@@ -535,9 +537,11 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertEqual([(r["index"], r["policy"]) for r in stats],
                          [(str(index), policy) for index in (1, 0) for policy in POLICIES])
         winners = {1: {"binary_simple": "1", "binary_complex": "2",
-                       "continuous_simple": "1", "continuous_complex": "1"},
+                       "continuous_simple": "1", "continuous_complex": "1",
+                       "vanilla_exploitation": "1", "vanilla_exploration": "1"},
                    0: {"binary_simple": "2", "binary_complex": "1",
-                       "continuous_simple": "2", "continuous_complex": "2"}}
+                       "continuous_simple": "2", "continuous_complex": "2",
+                       "vanilla_exploitation": "3", "vanilla_exploration": "3"}}
         for row in stats:
             index, policy = int(row["index"]), row["policy"]
             values = [FITNESS_TABLE[(index, policy)][seed] for seed in (3, 1, 2)]
@@ -572,7 +576,7 @@ class CampaignOutputTests(CampaignTestCase):
         self.assertEqual(code, 1)
         self.assertIn("interrupted", err)
         progressive = expected_resumen(
-            "en curso", "1/2 instancias completadas, 12/24 corridas",
+            "en curso", "1/2 instancias completadas, 18/36 corridas",
             "Incluye solo las instancias completadas hasta ahora.", (1,))
         text = (self.out / "resumen.txt").read_text(encoding="utf-8")
         self.assertEqual(runner.progressive, progressive)
@@ -582,7 +586,7 @@ class CampaignOutputTests(CampaignTestCase):
         config = json.loads((self.out / "campaign_config.json").read_text(encoding="utf-8"))
         self.assertEqual(config["status"], "failed")
         _, rows = read_csv(self.out / "summary.csv")
-        self.assertEqual(len(rows), 24)
+        self.assertEqual(len(rows), 36)
         self.assertTrue(all(row["status"] == "ok" for row in rows))
 
 
@@ -649,7 +653,33 @@ Modo continuous_complex
   Ranking de semillas (mejor a peor; por fitness, no por la media):
     1. semilla 1  fitness 70.0000  brecha no disponible
     2. semilla 2  fitness 25.0000  brecha no disponible
-    3. semilla 3  fitness 5.0000  brecha no disponible""",
+    3. semilla 3  fitness 5.0000  brecha no disponible
+
+Modo vanilla_exploitation
+  Mejor fitness: 15.0000
+  Peor fitness: 10.0000
+  Media: 12.3333
+  Desviaci\u00f3n est\u00e1ndar muestral: 2.5166
+  Semilla ganadora: 1
+  Brecha de la semilla ganadora: no disponible
+  Tiempo medio: 0.2500 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 1  fitness 15.0000  brecha no disponible
+    2. semilla 2  fitness 12.0000  brecha no disponible
+    3. semilla 3  fitness 10.0000  brecha no disponible
+
+Modo vanilla_exploration
+  Mejor fitness: 9.0000
+  Peor fitness: 7.0000
+  Media: 8.0000
+  Desviaci\u00f3n est\u00e1ndar muestral: 1.0000
+  Semilla ganadora: 1
+  Brecha de la semilla ganadora: no disponible
+  Tiempo medio: 0.2500 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 1  fitness 9.0000  brecha no disponible
+    2. semilla 3  fitness 8.0000  brecha no disponible
+    3. semilla 2  fitness 7.0000  brecha no disponible""",
     0: """Instancia mknapcb1.txt [0]
 --------------------------
 Modo binary_simple
@@ -702,7 +732,33 @@ Modo continuous_complex
   Ranking de semillas (mejor a peor; por fitness, no por la media):
     1. semilla 2  fitness 135.0000  brecha 55.00%
     2. semilla 1  fitness 130.0000  brecha 56.67%
-    3. semilla 3  fitness 130.0000  brecha 56.67%""",
+    3. semilla 3  fitness 130.0000  brecha 56.67%
+
+Modo vanilla_exploitation
+  Mejor fitness: 90.0000
+  Peor fitness: 80.0000
+  Media: 85.0000
+  Desviaci\u00f3n est\u00e1ndar muestral: 5.0000
+  Semilla ganadora: 3
+  Brecha de la semilla ganadora: 70.00%
+  Tiempo medio: 0.2500 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 3  fitness 90.0000  brecha 70.00%
+    2. semilla 2  fitness 85.0000  brecha 71.67%
+    3. semilla 1  fitness 80.0000  brecha 73.33%
+
+Modo vanilla_exploration
+  Mejor fitness: 70.0000
+  Peor fitness: 60.0000
+  Media: 65.0000
+  Desviaci\u00f3n est\u00e1ndar muestral: 5.0000
+  Semilla ganadora: 3
+  Brecha de la semilla ganadora: 76.67%
+  Tiempo medio: 0.2500 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 3  fitness 70.0000  brecha 76.67%
+    2. semilla 2  fitness 65.0000  brecha 78.33%
+    3. semilla 1  fitness 60.0000  brecha 80.00%""",
 }
 
 RANK_TEXT = {
@@ -710,12 +766,16 @@ RANK_TEXT = {
   1. continuous_simple  mejor 70.0000  semilla 1  brecha no disponible  media 33.3333
   2. continuous_complex  mejor 70.0000  semilla 1  brecha no disponible  media 33.3333
   3. binary_complex  mejor 70.0000  semilla 2  brecha no disponible  media 56.6667
-  4. binary_simple  mejor 50.0000  semilla 1  brecha no disponible  media 43.3333""",
+  4. binary_simple  mejor 50.0000  semilla 1  brecha no disponible  media 43.3333
+  5. vanilla_exploitation  mejor 15.0000  semilla 1  brecha no disponible  media 12.3333
+  6. vanilla_exploration  mejor 9.0000  semilla 1  brecha no disponible  media 8.0000""",
     0: """Instancia mknapcb1.txt [0]
   1. binary_complex  mejor 200.0000  semilla 1  brecha 33.33%  media 170.0000
   2. binary_simple  mejor 200.0000  semilla 2  brecha 33.33%  media 193.3333
   3. continuous_simple  mejor 140.0000  semilla 2  brecha 53.33%  media 120.0000
-  4. continuous_complex  mejor 135.0000  semilla 2  brecha 55.00%  media 131.6667""",
+  4. continuous_complex  mejor 135.0000  semilla 2  brecha 55.00%  media 131.6667
+  5. vanilla_exploitation  mejor 90.0000  semilla 3  brecha 70.00%  media 85.0000
+  6. vanilla_exploration  mejor 70.0000  semilla 3  brecha 76.67%  media 65.0000""",
 }
 
 
@@ -730,7 +790,7 @@ def expected_resumen(estado, progreso, alcance, instance_keys):
         "Archivos: mknapcb1.txt\n"
         "\u00cdndices: 1, 0\n"
         "Semillas: 3, 1, 2\n"
-        "Modos: binary_simple, binary_complex, continuous_simple, continuous_complex\n"
+        "Modos: binary_simple, binary_complex, continuous_simple, continuous_complex, vanilla_exploitation, vanilla_exploration\n"
         "Binarizaci\u00f3n: lb2\n"
         "Se\u00f1al: ddtw\n"
         "Poblaci\u00f3n: 4\n"
@@ -746,8 +806,8 @@ def expected_resumen(estado, progreso, alcance, instance_keys):
         "DTW Kirito: s\u00ed"
     )
     final = (
-        "Ranking final de los cuatro modos\n"
-        "=================================\n"
+        "Ranking final de los modos\n"
+        "==========================\n"
         "Orden por la mejor corrida de cada modo, dentro de cada instancia: mayor fitness "
         "y, en empate, semilla menor.\n"
         "No se mezclan fitness de instancias distintas. La media se muestra y no determina "
@@ -766,10 +826,14 @@ FITNESS_TABLE = {
     (1, "binary_complex"): {3: 70.0, 1: 30.0, 2: 70.0},
     (1, "continuous_simple"): {3: 20.0, 1: 70.0, 2: 10.0},
     (1, "continuous_complex"): {3: 5.0, 1: 70.0, 2: 25.0},
+    (1, "vanilla_exploitation"): {3: 10.0, 1: 15.0, 2: 12.0},
+    (1, "vanilla_exploration"): {3: 8.0, 1: 9.0, 2: 7.0},
     (0, "binary_simple"): {3: 200.0, 1: 180.0, 2: 200.0},
     (0, "binary_complex"): {3: 160.0, 1: 200.0, 2: 150.0},
     (0, "continuous_simple"): {3: 120.0, 1: 100.0, 2: 140.0},
     (0, "continuous_complex"): {3: 130.0, 1: 130.0, 2: 135.0},
+    (0, "vanilla_exploitation"): {3: 90.0, 1: 80.0, 2: 85.0},
+    (0, "vanilla_exploration"): {3: 70.0, 1: 60.0, 2: 65.0},
 }
 
 

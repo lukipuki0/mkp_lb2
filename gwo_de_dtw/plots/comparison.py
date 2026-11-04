@@ -24,6 +24,8 @@ POLICY_COLORS = {
     "binary_complex": "#E69F00",
     "continuous_simple": "#009E73",
     "continuous_complex": "#CC79A7",
+    "vanilla_exploitation": "#56B4E9",
+    "vanilla_exploration": "#000000",
 }
 
 
@@ -52,7 +54,9 @@ def convergence_comparison_figure(records: Sequence[dict], seed_labels: bool = F
             ax.axhline(y=optimum, color="red", linestyle="--", linewidth=2.0,
                        label=f"Best known ({optimum:.0f})")
 
-    title = "Best run of each policy" if seed_labels else "Convergence of the four policies"
+    counted = {1: "one policy", 4: "the four policies", 6: "the six policies"}.get(
+        len(records), f"the {len(records)} policies")
+    title = "Best run of each policy" if seed_labels else f"Convergence of {counted}"
     instances = {res.get("instance") for res in records}
     if len(instances) == 1 and None not in instances:
         instance_label = re.sub(r"\.txt(?=\[|$)", "", instances.pop(), flags=re.IGNORECASE)

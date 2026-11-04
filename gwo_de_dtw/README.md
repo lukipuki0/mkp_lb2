@@ -1,6 +1,6 @@
 # GWO–DE hybrid with DTW/DDTW profile control
 
-Binary MKP hybrid: one shared population where GWO and DE compete for every individual (an opt-in sequential GWO → DE mode exists for experiments), and the best-so-far fitness curve (DTW or DDTW) sets the joint parameter profile through one of four policies.
+Binary MKP hybrid: one shared population where GWO and DE compete for every individual (an opt-in sequential GWO → DE mode exists for experiments), and the best-so-far fitness curve (DTW or DDTW) sets the joint parameter profile through one of four policies. Two fixed baselines, `vanilla_exploitation` and `vanilla_exploration`, keep one profile for the whole run and are included in `run.py` and in the campaign.
 Design contract: `odd/tasks/gwo-de-dtw-hybrid.md` (repository root); background in `planes/GWO_DE_DTW_DDTW.md`.
 
 ## Configuration
@@ -22,7 +22,7 @@ All defaults live in `config.py`; `hybrid.py`, `controller.py` and `run.py` read
 | signal | DDTW |
 | adaptive thresholds `p_low` / `p_high` | 40 / 60 |
 | `improvement_tol` | 0.0 |
-| policy (`run_hybrid` / `ProfileController`) | `binary_complex`; `run.py` runs all four |
+| policy (`run_hybrid` / `ProfileController`) | `binary_complex`; `run.py` and the campaign run all six, including the two vanilla baselines |
 | `SCALE` / `K` / `CENTER` (continuous policies) | 2.0 / 5.0 / 0.5 (no CLI options) |
 | binary control `DTW_KIRITO` | `False` = fresh window (`--dtw-kirito` / `--no-dtw-kirito`) |
 | `HYBRID_MODE` | `competitive` (`--hybrid-mode competitive\|sequential`; see below) |
@@ -105,6 +105,8 @@ The monitor (`dtw_stagnation.StagnationMonitor`, DDTW by default) looks at the l
 
 Binary policies switch between the two fixed profiles. Fresh window: after a change the monitor is replaced (window, plateau counter, streak, thresholds); no decision until `W` new generations. In explore, the return happens on a ready observation that shows recent improvement; otherwise the run stays in explore. `binary_complex` is the original controller of this package, unchanged, and the library default (`config.POLICY`).
 
+`vanilla_exploitation` and `vanilla_exploration` are fixed baselines, accepted by `run_hybrid` and `ProfileController` but not included in `POLICIES`. The first uses the exploit profile at every generation, the second the explore profile, from generation 0. The monitor is still recorded and never changes the profile, so `changes` stays empty. `run.py` and `campaign.py` both iterate `CAMPAIGN_POLICIES`: the four adaptive policies followed by the two baselines. `POLICIES` remains the four adaptive names.
+
 With `--dtw-kirito` (`config.DTW_KIRITO = True`, `dtw_kirito=True` in `run_hybrid` / `ProfileController`) the binary policies use the Kirito rolling control instead: one monitor for the whole run (never replaced), and on every ready observation the profile is explore if the policy trigger holds (`D2_vs_const <= theta_c` or `fire`) and exploit otherwise, with or without recent improvement. The GWO/DE operators, LB2 and the profiles are the same. Continuous policies are not affected. Default is off (fresh window). Every run record stores `dtw_kirito`; the header line ends with ` dtw_kirito=True` only when it is on. Temporal diagnostics replay `dtw_kirito` runs without resets; older JSONs that store the flag as `dtw_main` are read the same way, and JSONs without either key are replayed as fresh-window runs.
 
 Continuous policies never replace the monitor. On every ready observation they compute an intensity in `[0, 1]` (0 before the first ready observation):
@@ -144,7 +146,7 @@ python -m gwo_de_dtw.run --instance instancias/mknapcb1.txt --index 0 \
     --dtw-kirito --out gwo_de_dtw/results/mknapcb1_0_policies_s1_dtw_kirito
 ```
 
-Every option defaults to `config.py`, so `python -m gwo_de_dtw.run` alone runs the same configuration. The runner always runs the four policies, in `POLICIES` order, on the same instance and settings, each with its own hybrid seeded with `--seed`. There is no `--policy` option.
+Every option defaults to `config.py`, so `python -m gwo_de_dtw.run` alone runs the same configuration. The runner always runs the six policies of `CAMPAIGN_POLICIES`, on the same instance and settings, each with its own hybrid seeded with `--seed`. There is no `--policy` option.
 
 Output:
 
@@ -167,7 +169,7 @@ Each policy's `[plot]` lines follow its `policy=` line. Every invocation writes 
   binary_complex/...
   continuous_simple/...
   continuous_complex/...
-  convergence_comparison.png       four policies on one axes
+  convergence_comparison.png       six policies on one axes
   convergence_comparison.pdf
 ```
 
@@ -219,7 +221,7 @@ Four synchronized rows show: (a) best fitness and the profile actually used; (b)
 
 ## Campaign (31 seeds, best run per policy)
 
-`campaign.py` runs every selected file × index × seed × policy with the same `run_hybrid` call as `run.py` (`run.py` stays the one-seed, four-policy runner). Defaults: `mknapcb1.txt` .. `mknapcb9.txt` from `instancias/`, indices 0 1 2, seeds 1..31, the four policies and every algorithm default of `config.py` (N=30, 1000 generations, DDTW, W=40, LB2, `DTW_KIRITO=False`): 9 × 3 × 31 × 4 = 3348 runs.
+`campaign.py` runs every selected file × index × seed × policy with the same `run_hybrid` call as `run.py`. Both iterate `CAMPAIGN_POLICIES` (the four adaptive policies plus `vanilla_exploitation` and `vanilla_exploration`). Campaign defaults: `mknapcb1.txt` .. `mknapcb9.txt` from `instancias/`, indices 0 1, seeds 1..31, and every algorithm default of `config.py` (N=30, 1000 generations, DDTW, W=40, LB2, `DTW_KIRITO=False`): 9 × 2 × 31 × 6 = 3348 runs.
 
 Full campaign (long; check it first with `--dry-run`):
 

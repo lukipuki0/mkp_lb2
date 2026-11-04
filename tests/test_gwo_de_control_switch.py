@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 from dtw_stagnation import StagnationConfig  # noqa: E402
 from gwo_de_dtw import EXPLOIT, EXPLORE, ProfileController, config, run_hybrid  # noqa: E402
 from gwo_de_dtw.policies import (  # noqa: E402
-    BINARY_POLICIES, CONTINUOUS_POLICIES, POLICIES, enters_explore,
+    BINARY_POLICIES, CAMPAIGN_POLICIES, CONTINUOUS_POLICIES, POLICIES, enters_explore,
 )
 from gwo_de_dtw.run import build_parser  # noqa: E402
 
@@ -271,8 +271,8 @@ class CliSwitchTests(unittest.TestCase):
             self.assertEqual(lines[0], "instance=mknapcb1.txt[0] binarization=lb2 "
                                        "signal=ddtw W=10 pop=8 iterations=25 seed=3 "
                                        "dtw_kirito=True")
-            self.assertEqual(len(lines), 1 + 4 * 5 + 2)
-            for i, policy in enumerate(POLICIES):
+            self.assertEqual(len(lines), 1 + len(CAMPAIGN_POLICIES) * 5 + 2)
+            for i, policy in enumerate(CAMPAIGN_POLICIES):
                 block = lines[1 + 5 * i:6 + 5 * i]
                 self.assertTrue(block[0].startswith(f"policy={policy} best="))
                 self.assertTrue(all(line.startswith("  [plot] ") for line in block[1:]))
@@ -292,7 +292,7 @@ class CliSwitchTests(unittest.TestCase):
             self.assertEqual(res.stdout.splitlines()[0],
                              "instance=mknapcb1.txt[0] binarization=lb2 "
                              "signal=ddtw W=10 pop=8 iterations=25 seed=3")
-            for policy in POLICIES:
+            for policy in CAMPAIGN_POLICIES:
                 data = json.loads((Path(tmp) / "x" / policy / "result.json").read_text())
                 self.assertIs(data["dtw_kirito"], False)
                 self.assertEqual(data["hybrid_mode"], "competitive")
