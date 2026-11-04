@@ -32,10 +32,11 @@ policies; dtw_vs_ddtw, each policy across both signals (only when both
 signals run). A pair whose p-value is undefined (identical samples) gets
 blank p columns and stays out of the Holm family.
 
-A failing run stops the campaign (status failed, exit 1); finished rows stay
-on disk. Summaries are written only when every run finished.
+Any run/export/statistics failure or interruption stops the campaign (status
+failed, exit 1); written results stay on disk. All full winners are persisted
+before plotting. Completed means all runs AND exports succeeded.
 
-Spec: odd/tasks/gwo-de-hres2.md (S6-S9).
+Spec: odd/tasks/gwo-de-hres2.md (S6-S10).
 """
 
 import argparse
@@ -279,31 +280,38 @@ def main(argv=None) -> int:
                         print(f"  [{state['completed_runs']}/{total}] {signal} {policy} "
                               f"seed={seed} objective={rec['objective']:.6f} "
                               f"feasible={rec['feasible']} time={rec['elapsed_seconds']:.1f}s")
-    except Exception:
-        state["status"] = "failed"
+        # Optimization evidence must survive even the very first plot failing.
+        for (signal, policy), best in best_by_group.items():
+            _write_json(root / signal / policy / "best_run.json", best)
+        stats = []
+        for (signal, policy), rows in rows_by_group.items():
+            best = best_by_group[(signal, policy)]
+            export_run(best, root / signal / policy / "best_run")
+            stats.append(group_statistics(signal, policy, rows, best))
+        for signal in args.signals:
+            plot_convergence([best_by_group[(signal, p)] for p in args.policies],
+                             root / signal / "convergence_comparison.png", signal)
+        values = {k: [r["objective"] for r in rows] for k, rows in rows_by_group.items()}
+        tests = pairwise_tests(values, args.signals, args.policies)
+        _write_csv(root / "statistics.csv", STAT_FIELDS, stats)
+        _write_csv(root / "tests.csv", TEST_FIELDS, tests)
+        (root / "resumen.txt").write_text(render_resumen(args, stats, tests), encoding="utf-8")
+        state["status"] = "completed"
+        state["finished"] = datetime.now().isoformat(timespec="seconds")
         _write_json(root / "campaign_config.json", state)
+        print(f"Completed {state['completed_runs']}/{total} runs -> {root}")
+        return 0
+    except (Exception, KeyboardInterrupt) as exc:
+        state["status"] = "failed"
+        state["finished"] = datetime.now().isoformat(timespec="seconds")
+        state["error"] = f"{type(exc).__name__}: {exc}"
+        # Print the original traceback even if writing the failure state also fails.
         traceback.print_exc()
+        try:
+            _write_json(root / "campaign_config.json", state)
+        except (Exception, KeyboardInterrupt):
+            traceback.print_exc()
         return 1
-
-    stats = []
-    for (signal, policy), rows in rows_by_group.items():
-        best = best_by_group[(signal, policy)]
-        _write_json(root / signal / policy / "best_run.json", best)
-        export_run(best, root / signal / policy / "best_run")
-        stats.append(group_statistics(signal, policy, rows, best))
-    for signal in args.signals:
-        plot_convergence([best_by_group[(signal, p)] for p in args.policies],
-                         root / signal / "convergence_comparison.png", signal)
-    values = {k: [r["objective"] for r in rows] for k, rows in rows_by_group.items()}
-    tests = pairwise_tests(values, args.signals, args.policies)
-    _write_csv(root / "statistics.csv", STAT_FIELDS, stats)
-    _write_csv(root / "tests.csv", TEST_FIELDS, tests)
-    (root / "resumen.txt").write_text(render_resumen(args, stats, tests), encoding="utf-8")
-    state["status"] = "completed"
-    state["finished"] = datetime.now().isoformat(timespec="seconds")
-    _write_json(root / "campaign_config.json", state)
-    print(f"Completed {state['completed_runs']}/{total} runs -> {root}")
-    return 0
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import contextlib
 import copy
 import io
 import json
+import weakref
 from pathlib import Path
 import tempfile
 import unittest
@@ -22,6 +23,93 @@ ARTIFACTS = ('result.json', 'fitness_convergence.png', 'parameters.png',
 class DiagnosticsTests(unittest.TestCase):
     def record(self, policy='binary_simple', signal=True):
         return run_search(FakeFunction(), monitor_cfg(signal), policy, 4, 22, 1)
+
+    def test_export_releases_renderers_between_artifacts_and_on_return(self):
+        from matplotlib.backends.backend_agg import RendererAgg
+        from gwo_de_hres2.diagnostics import export_run, plot_outcomes
+        rec = self.record()
+        refs, live_before = [], []
+        original = RendererAgg.__init__
+
+        def tracked(renderer, *args, **kwargs):
+            live_before.append(sum(ref() is not None for ref in refs))
+            refs.append(weakref.ref(renderer))
+            original(renderer, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(RendererAgg, '__init__', tracked):
+            export_run(rec, Path(tmp, 'winner'))
+            self.assertFalse(any(ref() is not None for ref in refs))
+            plot_outcomes([rec], Path(tmp, 'convergence_comparison.png'), 'comparison')
+            self.assertFalse(any(ref() is not None for ref in refs))
+            self.assertEqual(max(live_before), 0)
+            for path in (Path(tmp, 'winner', 'temporal_diagnostics.png'),
+                         Path(tmp, 'convergence_comparison.pdf')):
+                self.assertGreater(path.stat().st_size, 0)
+
+    def test_campaign_postprocessing_failure_preserves_all_winners(self):
+        argv = ['--signals', 'dtw', '--policies', 'binary_simple', 'binary_complex',
+                '--seeds', '1', '--pop-size', '4', '--iterations', '3']
+        stages = ('export_run', 'plot_convergence', 'group_statistics', '_write_csv')
+        for stage in stages:
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp, 'campaign')
+                out, err = io.StringIO(), io.StringIO()
+                with mock.patch.object(campaign, 'load_function', FakeFunction), \
+                        mock.patch.object(campaign, stage, side_effect=MemoryError('bounded allocation failure')), \
+                        contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    code = campaign.main(argv + ['--out', str(root)])
+                self.assertEqual(code, 1)
+                self.assertNotIn('Completed ', out.getvalue())
+                self.assertIn('MemoryError: bounded allocation failure', err.getvalue())
+                state = json.loads((root / 'campaign_config.json').read_text())
+                self.assertEqual((state['status'], state['completed_runs']), ('failed', 2))
+                self.assertIn('finished', state)
+                self.assertIn('MemoryError: bounded allocation failure', state['error'])
+                self.assertEqual(len((root / 'runs.jsonl').read_text().splitlines()), 2)
+                for policy in ('binary_simple', 'binary_complex'):
+                    best = json.loads((root / 'dtw' / policy / 'best_run.json').read_text())
+                    self.assertEqual(len(best['best_series']), 3)
+
+    def test_renderer_failure_preserves_results_and_closes_new_figures_without_retry(self):
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_agg import RendererAgg
+        existing = plt.figure()
+        try:
+            with tempfile.TemporaryDirectory() as tmp, \
+                    mock.patch.object(campaign, 'load_function', FakeFunction), \
+                    mock.patch.object(RendererAgg, '__init__', side_effect=MemoryError('simulated RendererAgg')) as renderer, \
+                    contextlib.redirect_stdout(io.StringIO()) as out, \
+                    contextlib.redirect_stderr(io.StringIO()) as err:
+                code = campaign.main(['--signals', 'dtw', '--policies', 'binary_simple', 'binary_complex',
+                                      '--seeds', '1', '--pop-size', '4', '--iterations', '3', '--out', tmp])
+                self.assertEqual(code, 1)
+                self.assertEqual(renderer.call_count, 1)
+                self.assertEqual(plt.get_fignums(), [existing.number])
+                self.assertNotIn('Completed ', out.getvalue())
+                self.assertIn('MemoryError: simulated RendererAgg', err.getvalue())
+                root = Path(tmp)
+                state = json.loads((root / 'campaign_config.json').read_text())
+                self.assertEqual((state['status'], state['completed_runs']), ('failed', 2))
+                self.assertEqual(state['error'], 'MemoryError: simulated RendererAgg')
+                self.assertEqual(len((root / 'runs.jsonl').read_text().splitlines()), 2)
+                self.assertEqual(len(list(root.glob('dtw/*/best_run.json'))), 2)
+                self.assertTrue((root / 'dtw' / 'binary_simple' / 'best_run' / 'result.json').exists())
+        finally:
+            plt.close(existing)
+
+    def test_campaign_interruption_marks_failed(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(campaign, 'load_function', FakeFunction), \
+                mock.patch.object(campaign, 'export_run', side_effect=KeyboardInterrupt), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            code = campaign.main(['--signals', 'dtw', '--policies', 'binary_simple',
+                                  '--seeds', '1', '--pop-size', '4', '--iterations', '3', '--out', tmp])
+            self.assertEqual(code, 1)
+            self.assertIn('KeyboardInterrupt', err.getvalue())
+            state = json.loads(Path(tmp, 'campaign_config.json').read_text())
+            self.assertEqual((state['status'], state['completed_runs']), ('failed', 1))
+            self.assertTrue(Path(tmp, 'dtw', 'binary_simple', 'best_run.json').exists())
 
     def test_actual_observations_and_controller_provenance(self):
         from gwo_de_dtw.controller import ProfileController

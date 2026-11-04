@@ -67,6 +67,16 @@ def temporal_series(rec):
 
 
 def plot_outcomes(records, path, title):
+    """Release comparison renderers before returning, including on failure."""
+    _closed_plot(_plot_outcomes, records, path, title)
+
+
+def export_run(rec, output_dir):
+    """Release each winner's figures without retaining native pixel buffers."""
+    _closed_plot(_export_run, rec, output_dir)
+
+
+def _plot_outcomes(records, path, title):
     """Raw minimized objectives; no invented optimum or feasibility assumption."""
     # Matplotlib figures contain reference cycles; release closed renderers
     # between exports so long campaigns do not retain their pixel buffers.
@@ -87,15 +97,31 @@ def plot_outcomes(records, path, title):
         plt.close(fig)
 
 
-def export_run(rec, output_dir):
+def _closed_plot(plot, *args):
+    """Reference plotters may raise before close; own only their new figures."""
+    existing = set(plt.get_fignums())
+    try:
+        # Layout and save must use the same DPI. Otherwise tight_layout creates
+        # a 100-DPI renderer followed by a second 150-DPI pixel buffer at save.
+        with plt.rc_context({'figure.dpi': 150}):
+            return plot(*args)
+    finally:
+        for number in set(plt.get_fignums()) - existing:
+            fig = plt.figure(number)
+            fig.clear()
+            plt.close(fig)
+        gc.collect()
+
+
+def _export_run(rec, output_dir):
     """Write the reference individual artifact set from a newly captured record."""
     data = temporal_series(rec)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     (output / 'result.json').write_text(json.dumps(rec, indent=2), encoding='utf-8')
-    plot_outcomes([rec], output / 'fitness_convergence.png', 'HRES2 objective convergence')
-    plot_parameters(rec, output)
-    plot_dtw_delta(rec, output)
+    _closed_plot(_plot_outcomes, [rec], output / 'fitness_convergence.png', 'HRES2 objective convergence')
+    _closed_plot(plot_parameters, rec, output)
+    _closed_plot(plot_dtw_delta, rec, output)
     np.savez_compressed(output / 'temporal_series.npz', **data)
     np.savetxt(output / 'temporal_series.csv', np.column_stack([data[k] for k in SCALARS]),
                delimiter=',', header=','.join(SCALARS), comments='')

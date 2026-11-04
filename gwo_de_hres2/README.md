@@ -37,7 +37,15 @@ Output folder:
 | `<signal>/<policy>/best_run/` | `result.json` (same full record as `best_run.json`) and individual diagnostics below |
 | `<signal>/convergence_comparison.png`, `.pdf` | minimized objective of the best run of each policy |
 
-Statistics use the objective (LCOE when feasible, the penalty otherwise; `feasible_runs` shows how many were feasible). A pair with identical samples has no p-value and stays out of its Holm family. A failing run stops the campaign with status `failed` and exit code 1; the rows already written stay, but no summary is produced.
+Statistics use the objective (LCOE when feasible, the penalty otherwise; `feasible_runs` shows how many were feasible). A pair with identical samples has no p-value and stays out of its Holm family.
+
+All full `best_run.json` records are saved **before any plotting**. Any optimization,
+plotting, statistics or export exception (including Ctrl+C) stops the campaign
+with status `failed` and exit code 1. `campaign_config.json` includes `finished`
+and the actual exception type/message in `error`; stderr retains the traceback.
+Already written records and artifacts stay on disk, including partial exports.
+Only successful optimization **and** postprocessing produce status `completed`.
+A failed folder is not silently retried or overwritten.
 
 ## Individual diagnostics (new runs only)
 
@@ -57,6 +65,13 @@ are retained.
 - `temporal_series.npz`: verified filtered windows/baselines and scalar series;
   `temporal_series.csv`: scalar series; `temporal_metadata.json`: provenance,
   signal convention and timing notes. Unready windows remain NaN.
+
+Plot resources are closed and collected between artifacts and before export
+returns, including failure cleanup. Layout and PNG export use the same 150 DPI
+to avoid allocating separate 100-DPI and 150-DPI renderers. Plot sizes, labels,
+series and optimizer/RNG behavior are unchanged; allocation failures still
+propagate rather than being retried or hidden. This reduces temporary memory
+use, not a guarantee of success under system-wide memory exhaustion.
 
 Before export, replay checks every captured monitor output and controller
 setting, the profile/parameters/intensity used at generation t, and the decision
