@@ -21,7 +21,8 @@ Layout of the campaign folder:
     tests.csv              two-sided Mann-Whitney U with Holm adjustment
     resumen.txt            Spanish readable summary
     <signal>/<policy>/best_run.json        full record of the best run
-    <signal>/convergence_comparison.png    best run of each policy
+    <signal>/<policy>/best_run/            result.json and verified individual diagnostics
+    <signal>/convergence_comparison.png/.pdf    best run of each policy
 
 Best run = lowest objective; ties go to the lower seed. Statistics use the
 objective (physical LCOE when feasible, the HRES2 penalty otherwise; the
@@ -34,7 +35,7 @@ blank p columns and stays out of the Holm family.
 A failing run stops the campaign (status failed, exit 1); finished rows stay
 on disk. Summaries are written only when every run finished.
 
-Spec: odd/tasks/gwo-de-hres2.md (S6-S8).
+Spec: odd/tasks/gwo-de-hres2.md (S6-S9).
 """
 
 import argparse
@@ -49,22 +50,19 @@ import statistics
 import sys
 import traceback
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 from scipy.stats import mannwhitneyu  # noqa: E402
 
 from gwo_de_dtw.policies import CAMPAIGN_POLICIES  # noqa: E402
 
 from . import config  # noqa: E402
 from .control import run_search  # noqa: E402
+from .diagnostics import export_run, plot_outcomes  # noqa: E402
 from .run import RESULTS_DIR, load_function  # noqa: E402
 
 SIGNALS = ("dtw", "ddtw")
 SEEDS = tuple(range(1, 32))
 SERIES_KEYS = ("best_series", "profile_series", "parameter_series", "intensity_series",
-               "step_stats", "monitor_config")
+               "step_stats", "monitor_config", "monitor", "controller_config")
 RUN_FIELDS = ["signal", "policy", "seed", "objective", "feasible", "physical_lcoe",
               "physical_lcoh", "physical_agsr", "wind_mw", "n_el_units", "battery_mw",
               "battery_duration_h", "changes", "evaluations", "elapsed_seconds"]
@@ -189,19 +187,8 @@ def pairwise_tests(values: dict, signals, policies) -> list:
 
 
 def plot_convergence(records, path: Path, signal: str) -> None:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    for rec in records:
-        series = rec["best_series"]
-        ax.plot(range(1, len(series) + 1), series,
-                label=f"{rec['policy']} (seed {rec['seed']}, {series[-1]:.5f})")
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Best-so-far LCOE (CNY/kWh, minimization)")
-    ax.set_title(f"GWO-DE on HRES2, {signal.upper()}: best run of each policy")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=9)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+    plot_outcomes(records, path,
+                  f"GWO-DE on HRES2, {signal.upper()}: best run of each policy")
 
 
 def render_resumen(args, stats, tests) -> str:
@@ -302,6 +289,7 @@ def main(argv=None) -> int:
     for (signal, policy), rows in rows_by_group.items():
         best = best_by_group[(signal, policy)]
         _write_json(root / signal / policy / "best_run.json", best)
+        export_run(best, root / signal / policy / "best_run")
         stats.append(group_statistics(signal, policy, rows, best))
     for signal in args.signals:
         plot_convergence([best_by_group[(signal, p)] for p in args.policies],

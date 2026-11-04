@@ -7,10 +7,11 @@ CLI: GWO-DE DTW/DDTW policies on HRES2, one seed.
 Runs every selected policy (default: the six of gwo_de_dtw.CAMPAIGN_POLICIES)
 on the same HRES2Function (synthetic TMY weather, built once) and writes
 runs.jsonl (one record per policy, flushed after each run) and manifest.json
-into a fresh directory. A non-empty output directory is rejected before any
+into a fresh directory, plus <policy>/result.json and individual diagnostics
+and convergence_comparison.png/.pdf at the root. A non-empty output directory is rejected before any
 run. Run from the repository root.
 
-Spec: odd/tasks/gwo-de-hres2.md (S5).
+Spec: odd/tasks/gwo-de-hres2.md (S5, S9).
 """
 
 import argparse
@@ -31,6 +32,7 @@ from gwo_de_dtw.policies import CAMPAIGN_POLICIES  # noqa: E402
 
 from . import config  # noqa: E402
 from .control import EXPLOIT, EXPLORE, run_search  # noqa: E402
+from .diagnostics import export_run, plot_outcomes  # noqa: E402
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 
@@ -55,7 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--iterations", type=int, default=config.ITERATIONS)
     p.add_argument("--seed", type=int, default=config.SEED)
     p.add_argument("--output-dir", default=None,
-                   help="fresh directory (default: gwo_de_hres2/results/<signal>_s<seed>_<timestamp>)")
+                   help="fresh directory for full records, individual diagnostics and comparison "
+                        "(default: gwo_de_hres2/results/<signal>_s<seed>_<timestamp>)")
     return p
 
 
@@ -95,15 +98,20 @@ def main(argv=None) -> int:
 
     print(f"GWO-DE on HRES2 signal={args.signal} N={args.pop_size} T={args.iterations} "
           f"seed={args.seed} -> {out}")
+    records = []
     with open(os.path.join(out, "runs.jsonl"), "w", encoding="utf-8") as fh:
         for policy in args.policies:
             rec = run_search(func, monitor_cfg, policy=policy, pop_size=args.pop_size,
                              iterations=args.iterations, seed=args.seed)
             fh.write(json.dumps(rec) + "\n")
             fh.flush()
+            records.append(rec)
+            export_run(rec, os.path.join(out, policy))
             print(f"  {policy:<22s} objective={rec['objective']:.6f} feasible={rec['feasible']} "
                   f"changes={len(rec['changes'])} evals={rec['evaluations']} "
                   f"time={rec['elapsed_seconds']:.1f}s")
+    plot_outcomes(records, os.path.join(out, "convergence_comparison.png"),
+                  f"HRES2 {args.signal.upper()}: one seed, selected policies")
     return 0
 
 

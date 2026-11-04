@@ -34,9 +34,37 @@ Output folder:
 | `tests.csv` | two-sided Mann-Whitney U, Holm-adjusted per family: each signal (all 15 policy pairs) and `dtw_vs_ddtw` (each policy across signals) |
 | `resumen.txt` | Spanish summary: ranking per signal and Holm-significant pairs |
 | `<signal>/<policy>/best_run.json` | full record of the best run (lowest objective, ties to the lower seed) |
-| `<signal>/convergence_comparison.png` | best-so-far LCOE of the best run of each policy |
+| `<signal>/<policy>/best_run/` | `result.json` (same full record as `best_run.json`) and individual diagnostics below |
+| `<signal>/convergence_comparison.png`, `.pdf` | minimized objective of the best run of each policy |
 
 Statistics use the objective (LCOE when feasible, the penalty otherwise; `feasible_runs` shows how many were feasible). A pair with identical samples has no p-value and stays out of its Holm family. A failing run stops the campaign with status `failed` and exit code 1; the rows already written stay, but no summary is produced.
+
+## Individual diagnostics (new runs only)
+
+Campaign winners save these inside `<signal>/<policy>/best_run/`; the one-seed
+`run.py` saves them inside `<policy>/`, plus `convergence_comparison.png` and
+`.pdf` at the output root. Existing `best_run.json`, root CSVs and statistics
+are retained.
+
+- `result.json`: full record, including actual `monitor` observations and
+  `controller_config` (profiles, scale, k, center, binary reset mode).
+- `fitness_convergence.png`: raw best objective, **minimization**. This is LCOE
+  when feasible and a penalty otherwise; no known optimum is assumed.
+- `parameters.png`: a, F and CR used per generation.
+- `dtw_delta.png`: observed monitor delta; omitted only if no window is ready.
+- `temporal_diagnostics.png` / `.pdf`: **negated objective** (maximizing monitor
+  input), distances/thresholds, delta and profile decisions.
+- `temporal_series.npz`: verified filtered windows/baselines and scalar series;
+  `temporal_series.csv`: scalar series; `temporal_metadata.json`: provenance,
+  signal convention and timing notes. Unready windows remain NaN.
+
+Before export, replay checks every captured monitor output and controller
+setting, the profile/parameters/intensity used at generation t, and the decision
+applied at t+1. Reference replay also checks the filtered-window distances.
+No optimizer is rerun. Historical results without captured observations cannot
+be verified and are not backfilled. Compact campaign `runs.jsonl` excludes the
+monitor history and controller configuration as well as the existing series;
+one-seed `runs.jsonl` remains full.
 
 ## Defaults (`config.py`)
 
@@ -60,5 +88,6 @@ The HRES2 dispatch is compiled with numba: the first evaluation takes about 1 s 
 ## Tests
 
 ```
-.venv/Scripts/python.exe -m unittest tests.test_gwo_de_hres2 tests.test_gwo_de_hres2_campaign
+.venv/Scripts/python.exe -B -m unittest tests.test_gwo_de_hres2_diagnostics
+.venv/Scripts/python.exe -B -m unittest tests.test_gwo_de_hres2 tests.test_gwo_de_hres2_campaign
 ```

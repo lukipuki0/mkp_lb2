@@ -56,6 +56,7 @@ def run_search(func, monitor_cfg: StagnationConfig, policy: str,
     parameter_series: Dict[str, List[float]] = {"a": [], "F": [], "CR": []}
     intensity_series: List[Optional[float]] = []
     step_stats: List[Dict] = []
+    monitor_hist: List[Dict] = []
     changes: List[int] = []
     for generation in range(iterations):
         search.set_profile(controller.profile)
@@ -66,7 +67,9 @@ def run_search(func, monitor_cfg: StagnationConfig, policy: str,
         best = search.step()
         step_stats.append(dict(search.last_step_stats))
         best_series.append(best)
-        if controller.observe(-best)["changed"]:
+        observation = controller.observe(-best)
+        monitor_hist.append(observation)
+        if observation["changed"]:
             changes.append(generation)
     elapsed = time.perf_counter() - started
 
@@ -92,6 +95,12 @@ def run_search(func, monitor_cfg: StagnationConfig, policy: str,
         "solution_repr": [repr(float(v)) for v in solution],
         "decoded": decoded,
         "monitor_config": asdict(monitor_cfg),
+        "monitor": monitor_hist,
+        "controller_config": {
+            "scale": controller.scale, "k": controller.k, "center": controller.center,
+            "dtw_kirito": controller.dtw_kirito,
+            "exploit": asdict(controller.exploit), "explore": asdict(controller.explore),
+        },
         "best_series": best_series,
         "profile_series": profile_series,
         "parameter_series": parameter_series,
