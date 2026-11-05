@@ -1,0 +1,35 @@
+Campaña GWO-DE sobre HRES2 (WPEB)
+Señales: dtw, ddtw | semillas: 31 | N=30 | generaciones=1000
+Objetivo: LCOE (CNY/kWh) si la solución es factible; penalización 100 + 10*AGSR si no. Menor es mejor.
+Ranking por mejor objetivo; en empate, la semilla menor. sd muestral (n - 1).
+
+== DTW ==
+1. binary_simple          mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+2. binary_complex         mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+3. continuous_simple      mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+4. continuous_complex     mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+5. vanilla_exploration    mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+6. vanilla_exploitation   mejor=0.267159 (semilla 2) mediana=0.267159 media=0.268632 sd=0.003067 factibles=31/31
+
+== DDTW ==
+1. binary_simple          mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+2. binary_complex         mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+3. continuous_simple      mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+4. continuous_complex     mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+5. vanilla_exploration    mejor=0.267159 (semilla 1) mediana=0.267159 media=0.267159 sd=0.000000 factibles=31/31
+6. vanilla_exploitation   mejor=0.267159 (semilla 2) mediana=0.267159 media=0.268632 sd=0.003067 factibles=31/31
+
+Mann-Whitney bilateral con ajuste de Holm por familia (alfa 0.05).
+Familia dtw: 5 de 15 pares significativos.
+  binary_simple vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  binary_complex vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  continuous_simple vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  continuous_complex vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  vanilla_exploitation vs vanilla_exploration: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+Familia ddtw: 5 de 15 pares significativos.
+  binary_simple vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  binary_complex vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  continuous_simple vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  continuous_complex vs vanilla_exploitation: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+  vanilla_exploitation vs vanilla_exploration: p_holm=0.00226 (medianas 0.267159 vs 0.267159)
+Familia dtw_vs_ddtw: 0 de 6 pares significativos.
