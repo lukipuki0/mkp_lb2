@@ -300,6 +300,46 @@ The job runs the sizes in order 100, 250, 500. For each size it starts nine proc
 
 Output: `resultados/woa_abc_<SLURM_JOB_ID>/mknapcb<F>/inst_<II>/` with `runs.csv`, `statistics.csv`, `convergence_comparison.png/.pdf`, `campaign_config.json`, `run.log` and `<policy>/best_run/`. Each process runs in `resultados/woa_abc_<SLURM_JOB_ID>/.staging/mknapcb<F>_inst_<II>/` and moves its `mknapcb<F>/inst_<II>/` into the experiment when it ends well (the campaign root `summary.csv` and `statistics.csv` repeat the instance files and are dropped). A failed instance keeps its `.staging` folder with `run.log`. Job log: `.hpc/logs/woa_abc_<jobid>.log`, errors in `.hpc/errors/`. There is no resume. `MKP_CONDA_SH` sets the path of `conda.sh` (environment `mkp_env`). Tests: `python -m unittest tests.test_hpc_campaign_scripts`.
 
+## Cluster: all five variants with 31 seeds
+
+From the repository root, submit the ready-to-run variant array:
+
+```bash
+sbatch run_woa_abc_variants_hpc.sh
+# Optional preview, without allocating resources or writing results:
+bash run_woa_abc_variants_hpc.sh --dry-run
+```
+
+This is separate from `run_woa_abc_hpc.sh`, which still runs policies.
+The array has 27 tasks (nine files × indices 0, 1, 2), at most nine running
+simultaneously. Each task sequentially runs seeds 1..31, each with v0–v4:
+**4185 solver runs**. Population is 30, horizon 1000 cycles, evaluation cap
+180030 per run. The existing campaign uses its DDTW monitor defaults.
+No scout limit override is passed, so v1 retains its default of 100.
+
+Uses the CPU partition, long QOS, one CPU and 4 GB per task, and Conda
+`mkp_env`. Set `MKP_CONDA_SH` when `conda.sh` is not under `~/miniconda3`.
+Slurm writes `woa_abc_variants_<array-job>_<task>.log` and `.error` in the
+submission directory; no log-directory setup is necessary.
+
+Results are retained for **every** seed, not only the winner:
+
+```text
+resultados/woa_abc_variants_<array-job>/mknapcb<F>/inst_<II>/seed_<SS>/
+  run.log
+  campaign_<timestamp>/
+    campaign_results.csv
+    campaign_summary.json
+    <size>/mknapcb<F>/inst_<II>/v0/ ... v4/
+```
+
+Each variant contains its normal full single-run artifacts. There is no new
+cross-seed statistical summary. A failing seed stops its array task with the
+original exit code; completed results and the failed seed's log remain. Other
+array tasks continue independently. Existing instance destinations are refused;
+there is no automatic retry or resume. Keeping all plots can use substantial
+disk space. Actual Slurm submission must be verified on the cluster.
+
 ## Quick path
 
 ```text
