@@ -322,23 +322,52 @@ Uses the CPU partition, long QOS, one CPU and 4 GB per task, and Conda
 Slurm writes `woa_abc_variants_<array-job>_<task>.log` and `.error` in the
 submission directory; no log-directory setup is necessary.
 
-Results are retained for **every** seed, not only the winner:
+Only the **best seed per variant** retains its full export. All 155 run metrics
+remain available per instance; maximization selects the winner, breaking ties
+with the lower seed (independent of execution order).
 
 ```text
-resultados/woa_abc_variants_<array-job>/mknapcb<F>/inst_<II>/seed_<SS>/
-  run.log
-  campaign_<timestamp>/
-    campaign_results.csv
-    campaign_summary.json
-    <size>/mknapcb<F>/inst_<II>/v0/ ... v4/
+resultados/woa_abc_variants_<array-job>/mknapcb<F>/inst_<II>/
+  campaign_config.json         settings, progress, status and error
+  run.log                     run progress and failure location
+  resumen.txt                 readable status and variant statistics
+  runs.csv                    155 rows: 31 seeds × 5 variants
+  statistics.csv              5 rows: best/worst/mean/median/sample std/best seed
+  convergence_comparison.png
+  convergence_comparison.pdf  winning curves labeled with variant and seed
+  v0/best_run/ ... v4/best_run/
 ```
 
-Each variant contains its normal full single-run artifacts. There is no new
-cross-seed statistical summary. A failing seed stops its array task with the
-original exit code; completed results and the failed seed's log remain. Other
-array tasks continue independently. Existing instance destinations are refused;
-there is no automatic retry or resume. Keeping all plots can use substantial
-disk space. Actual Slurm submission must be verified on the cluster.
+Each `best_run/` contains the normal full single-run export: `manifest.json`
+(effective configuration), `runs/run_01.json` (complete solution and history),
+tables, summaries and `best_run_01/` with plots and temporal series. Standard
+deviation is sample-based (`n - 1`), blank for one seed. Unknown gaps stay blank.
+`runs.csv` also retains evaluations, cycles (`generations`), elapsed seconds,
+profile changes, recoveries, scouts, resolved scout limit and reference source.
+
+The separate runner can also be used locally:
+
+```text
+python -B -m woa_abc.variant_seed_campaign --instances-dir instancias --files mknapcb1.txt --indices 0 --out resultados/variants_local
+```
+
+Defaults are all nine files, indices 0 1 2, seeds 1..31, population 30,
+1000 cycles and cap 180030. `--seeds`, `--population-size`, `--iterations` and
+`--max-evaluations` can narrow a functional check. `--dry-run` validates without
+writing or solving. Policies are not accepted; the existing policy campaign
+and single-seed campaign remain unchanged.
+
+The root may exist so independent array tasks can share it, but every selected
+instance destination must be absent, even if empty. Inputs are validated before
+allocation. The exporter runs once per seed/variant (including its plots); only
+current winners survive in newly created `.runs/` scratch. On success winners
+move to `v0..v4/best_run/`, and scratch is removed: no `seed_01/` folders remain.
+A failed solve/export/comparison stops the task, marks its configuration failed,
+and retains completed metrics and available evidence, including scratch. Python
+returns 1 on failure (2 on validation refusal); the shell propagates that code.
+Other tasks continue independently. There is no retry/resume or solver rerun,
+and previous results are never changed. Slurm logs also capture exporter output.
+Actual Slurm submission and the Conda environment must be verified on the cluster.
 
 ## Quick path
 
