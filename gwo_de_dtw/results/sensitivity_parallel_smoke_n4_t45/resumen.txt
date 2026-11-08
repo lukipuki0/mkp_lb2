@@ -1,0 +1,18 @@
+Descriptive OAT summary
+Sample SD uses n-1 and is blank when n=1. Unknown gaps are blank, not zero.
+Mean fitness delta uses the same instance and policy baseline. Instances are not pooled.
+No inferential test is reported. This does not claim robustness.
+Times are wall-clock seconds (elapsed_s).
+
+mknapcb1.txt[0] binary_complex baseline: mean=23085.0 median=23085.0 best=23085.0 worst=23085.0 sample_sd=blank mean_gap=5.3156146179401995 delta_vs_baseline=0.0 mean_elapsed_s=1.335117
+mknapcb1.txt[0] binary_complex window_20: mean=23085.0 median=23085.0 best=23085.0 worst=23085.0 sample_sd=blank mean_gap=5.3156146179401995 delta_vs_baseline=0.0 mean_elapsed_s=1.243433
+mknapcb1.txt[0] binary_simple baseline: mean=23085.0 median=23085.0 best=23085.0 worst=23085.0 sample_sd=blank mean_gap=5.3156146179401995 delta_vs_baseline=0.0 mean_elapsed_s=1.697458
+mknapcb1.txt[0] binary_simple window_20: mean=23260.0 median=23260.0 best=23260.0 worst=23260.0 sample_sd=blank mean_gap=4.597842582338706 delta_vs_baseline=175.0 mean_elapsed_s=1.912379
+mknapcb1.txt[15] binary_complex baseline: mean=41304.0 median=41304.0 best=41304.0 worst=41304.0 sample_sd=blank mean_gap=3.7808372353064503 delta_vs_baseline=0.0 mean_elapsed_s=1.145841
+mknapcb1.txt[15] binary_complex window_20: mean=41322.0 median=41322.0 best=41322.0 worst=41322.0 sample_sd=blank mean_gap=3.7389055838982457 delta_vs_baseline=18.0 mean_elapsed_s=0.880657
+mknapcb1.txt[15] binary_simple baseline: mean=41304.0 median=41304.0 best=41304.0 worst=41304.0 sample_sd=blank mean_gap=3.7808372353064503 delta_vs_baseline=0.0 mean_elapsed_s=0.951571
+mknapcb1.txt[15] binary_simple window_20: mean=41322.0 median=41322.0 best=41322.0 worst=41322.0 sample_sd=blank mean_gap=3.7389055838982457 delta_vs_baseline=18.0 mean_elapsed_s=1.163607
+mknapcb1.txt[29] binary_complex baseline: mean=59151.0 median=59151.0 best=59151.0 worst=59151.0 sample_sd=blank mean_gap=1.3574585174685232 delta_vs_baseline=0.0 mean_elapsed_s=0.89909
+mknapcb1.txt[29] binary_complex window_20: mean=59151.0 median=59151.0 best=59151.0 worst=59151.0 sample_sd=blank mean_gap=1.3574585174685232 delta_vs_baseline=0.0 mean_elapsed_s=0.807763
+mknapcb1.txt[29] binary_simple baseline: mean=59151.0 median=59151.0 best=59151.0 worst=59151.0 sample_sd=blank mean_gap=1.3574585174685232 delta_vs_baseline=0.0 mean_elapsed_s=0.534493
+mknapcb1.txt[29] binary_simple window_20: mean=59151.0 median=59151.0 best=59151.0 worst=59151.0 sample_sd=blank mean_gap=1.3574585174685232 delta_vs_baseline=0.0 mean_elapsed_s=0.83969

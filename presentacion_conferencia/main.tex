@@ -17,7 +17,7 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{tikz}
-\usetikzlibrary{shapes,arrows,arrows.meta,positioning,calc,fit,patterns,backgrounds}
+\usetikzlibrary{shapes,arrows,arrows.meta,positioning,calc,fit,patterns,backgrounds,decorations.pathreplacing}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.15}
 \usepackage{csquotes}
@@ -97,7 +97,7 @@
   \leavevmode%
   \hbox{%
     \begin{beamercolorbox}[wd=.72\paperwidth,ht=2.4ex,dp=1.1ex,leftskip=0.35cm]{author in head/foot}%
-      \usebeamerfont{footline}Optimización cooperativa de HRES--H$_2$ \; · \; DTW/DDTW%
+      \usebeamerfont{footline}Series temporales y DTW/DDTW%
     \end{beamercolorbox}%
     \begin{beamercolorbox}[wd=.28\paperwidth,ht=2.4ex,dp=1.1ex,rightskip=0.35cm]{author in head/foot}%
       \usebeamerfont{footline}\hfill\insertframenumber\,/\,\inserttotalframenumber%
@@ -113,17 +113,42 @@
 \newcommand{\gcell}{\cellcolor{primary!78}\color{white}\bfseries X}
 \newcommand{\hcell}{\cellcolor{accent!24}\color{accent!70!black}\bfseries $\star$}
 
-\title[Optimización cooperativa HRES-H2]{Desarrollo de arquitecturas híbridas para la optimización del HRES-H2 con tecnologías de hidrógeno verde}
+% Estilos de los diagramas (curvas ilustrativas, no resultados experimentales)
+\pgfplotsset{
+  convaxis/.style={
+    axis lines=left,
+    axis line style={inkgray!80},
+    xtick=\empty, ytick=\empty,
+    xmin=0, xmax=100, ymin=0,
+    xlabel={Iteración}, ylabel={Mejor resultado encontrado},
+    label style={font=\scriptsize, text=inkgray},
+    xlabel style={yshift=2pt},
+    ylabel style={yshift=-4pt},
+    clip=false,
+  },
+  miniaxis/.style={
+    convaxis,
+    width=4.4cm, height=3.6cm,
+    title style={font=\scriptsize\bfseries, text=inkgray, yshift=-4pt},
+    ylabel={Mejor resultado},
+  },
+}
+\tikzset{
+  flujo/.style={draw=primary, fill=lightbg, rounded corners=3pt, thick,
+    align=center, font=\footnotesize, text=inkgray, minimum height=1.0cm},
+  flecha/.style={-{Stealth[length=5pt]}, thick, inkgray!80},
+  llave/.style={decorate, decoration={brace, amplitude=4pt}, thick},
+}
+
+
+\title[Series temporales y DTW]{Coordinación de metaheurísticas colaborativas guiada por series temporales mediante Dynamic Time Warping}
 \author{Lucas Erazo}
-\institute{Escuela de Ingeniería Informática\\Pontificia Universidad Católica de Valparaíso\\[3pt]
-\small Profesor guía: Emanuel Vega \qquad Profesor correferente: Ricardo Soto}
-\date{Septiembre de 2026}
+\institute{Escuela de Ingeniería Informática\ Pontificia Universidad Católica de Valparaíso}
+\date{}
 
 \begin{document}
 
-% -----------------------------------------------------------------------------
 \begin{frame}[plain]
-  % Logos institucionales de la portada.
   \nointerlineskip
   \makebox[\textwidth][s]{\hspace{0.1cm}
     \includegraphics[width=7.0cm]{fig/logo_100.png}\hfill
@@ -132,872 +157,489 @@
   \titlepage
 \end{frame}
 
-\begin{frame}{Estructura de la presentación}
-  \tableofcontents
+\begin{frame}{Optimizar es elegir la mejor opción posible}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.46\textwidth}
+      \small
+      Hay muchas opciones. Cada una obtiene un resultado, y algunas no son válidas porque se pasan de un límite.
+
+      \vspace{0.35cm}
+      \begin{block}{Qué se busca}
+        La opción válida con el mejor resultado. No cualquiera que parezca buena.
+      \end{block}
+    \column{0.50\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \node[flujo, text width=3.6cm] (mala) {Opción inválida\\se pasa del límite};
+        \node[flujo, text width=3.6cm, below=0.45cm of mala] (regular) {Opción válida\\resultado medio};
+        \node[flujo, draw=best, fill=best!10, text width=3.6cm, below=0.45cm of regular] (mejor) {Opción válida\\mejor resultado};
+      \end{tikzpicture}
+  \end{columns}
 \end{frame}
 
-\section{1. Problema y sistemas cooperativos}
-
-\begin{frame}[plain]
-  \centering
-  \vfill
-  {\usebeamerfont{title}\color{primary}1. Problema y sistemas cooperativos}\\[0.6em]
-  {\color{accent}\rule{4.2cm}{2.2pt}}
-  \vfill
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{El desafío de coordinar la búsqueda}
-  \begin{columns}[T,onlytextwidth]
+\begin{frame}{Revisar todas las opciones no alcanza}
+  \begin{columns}[c,onlytextwidth]
     \column{0.48\textwidth}
-      {\large\key{Exploración global}}
-      \vspace{0.18cm}
+      \small
+      Si cada decisión es sí o no, veinte decisiones ya dan más de un millón de combinaciones.
 
-      Recorre regiones distintas del espacio de soluciones y conserva diversidad.
+      \vspace{0.3cm}
+      En un problema real hay muchas más, y el tiempo para decidir es limitado.
+    \column{0.48\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \node[font=\Huge\bfseries, text=primary] (combinaciones) {$2^{20}$};
+        \node[font=\normalsize, text=inkgray, below=0.25cm of combinaciones] {más de un millón};
+      \end{tikzpicture}
 
       \vspace{0.45cm}
-      {\large\key{Explotación local}}
-      \vspace{0.18cm}
-
-      Refina soluciones prometedoras y acelera la convergencia cerca de buenos óptimos.
-
-    \column{0.48\textwidth}
-      \begin{block}{Tensión principal}
-        Demasiada exploración retrasa la convergencia. Demasiada explotación provoca convergencia prematura.
-      \end{block}
-      \vspace{0.3cm}
-
-      El mejor comportamiento depende del problema y también de la etapa de cada ejecución.
-
-      \vspace{0.25cm}
-      \smallcite{wolpert1997no,vega2021learning,akbulut2026artificial}
+      \begin{exampleblock}{Consecuencia}
+        Hay que buscar entre algunas, no enumerarlas todas.
+      \end{exampleblock}
   \end{columns}
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{La decisión que controla el sistema híbrido}
-  \vspace{0.1cm}
-  \begin{block}{Pregunta central}
-    ¿Cuándo debe terminar la fase del algoritmo activo y transferir el control a otro?
-  \end{block}
+\begin{frame}{Una metaheurística es una estrategia de búsqueda}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.42\textwidth}
+      \small
+      Usa reglas generales para proponer opciones, evaluarlas y quedarse con la mejor hallada.
+
+      \vspace{0.3cm}
+      \begin{block}{Espacio de búsqueda}
+        Es el conjunto de soluciones que podemos explorar.
+
+        \medskip
+        \key{Óptimo local:} ninguna solución vecina válida es mejor.
+
+        \medskip
+        \key{Óptimo global:} ninguna solución válida de todo el espacio es mejor.
+      \end{block}
+      {\footnotesize La metaheurística busca buenas soluciones, sin garantizar el óptimo global.}
+    \column{0.54\textwidth}
+      \centering
+      \begin{tikzpicture}[node distance=0.55cm]
+        \node[flujo, text width=3.4cm] (propone) {Propone candidatos};
+        \node[flujo, text width=3.4cm, below=of propone] (evalua) {Evalúa el resultado};
+        \node[flujo, text width=3.4cm, draw=best, fill=best!10, below=of evalua] (guarda) {Conserva el mejor};
+        \draw[flecha] (propone) -- (evalua);
+        \draw[flecha] (evalua) -- (guarda);
+        \draw[flecha, best] (guarda.east) -- ++(0.7,0) |- (propone.east);
+      \end{tikzpicture}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Equilibrar exploración y explotación}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.48\textwidth}
+      \begin{block}{Exploración}
+        Busca en regiones distintas del espacio de búsqueda.
+      \end{block}
+      \centering
+      \vspace{0.25cm}
+      \begin{tikzpicture}
+        \foreach \x/\y in {0.2/0.3, 1.5/1.6, 2.4/0.4, 3.6/1.8, 4.8/0.6, 5.6/1.4} {
+          \fill[primary] (\x,\y) circle (2.5pt);
+        }
+      \end{tikzpicture}
+    \column{0.48\textwidth}
+      \begin{exampleblock}{Explotación}
+        Aprovecha una región prometedora para mejorar las soluciones.
+      \end{exampleblock}
+      \centering
+      \vspace{0.25cm}
+      \begin{tikzpicture}
+        \foreach \x/\y in {2.2/1.0, 2.7/1.35, 3.1/0.95, 3.5/1.4, 3.9/1.15} {
+          \fill[accent] (\x,\y) circle (2.5pt);
+        }
+        \fill[best] (3.15,1.2) circle (3.2pt);
+      \end{tikzpicture}
+  \end{columns}
+  \vfill
+  \centering
+  \small Pueden alternarse durante la búsqueda: no son dos etapas fijas.
+\end{frame}
+
+\begin{frame}{El algoritmo útil cambia durante la búsqueda}
+  \small
+  Cada metaheurística combina exploración y explotación de manera distinta. El equilibrio adecuado puede cambiar durante la búsqueda.
 
   \vspace{0.35cm}
-  \begin{tabularx}{\textwidth}{>{\bfseries\color{PUCVBlueDark}}p{3.25cm} X}
-    Presupuesto fijo & Es simple, pero ignora la dinámica observada durante la ejecución. \\[0.25cm]
-    Umbral manual & Depende de la escala del objetivo, el paisaje y el algoritmo monitoreado. \\[0.25cm]
-    Indicador escalar & Resume el estado actual, pero puede confundir una meseta transitoria con estancamiento. \\[0.25cm]
-    Política aprendida & Modela relaciones complejas, aunque requiere estados, entrenamiento y recompensas. \\
+  \begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.2cm} X}
+    Al inicio & La exploración permite identificar regiones prometedoras. \\
+    Durante la búsqueda & La explotación mejora soluciones en regiones prometedoras, sin abandonar la exploración. \\
+    Al estancarse & Puede convenir cambiar de algoritmo y conservar lo ya encontrado. \\
   \end{tabularx}
-
-  \vfill
-  \smallcite{talbi2021machine_tax,pei2025adaptive,adriaensen2022automated}
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{Estado del arte: sistemas cooperativos}
-  \vspace{0.18cm}
-  \begin{tabularx}{\dimexpr\textwidth+0.15cm\relax}{>{\raggedright\arraybackslash}p{4.45cm} >{\raggedright\arraybackslash}X}
-    \rowcolor{primary!14}
-    \textcolor{PUCVBlueDark}{\textbf{Trabajo}} &
-    \textcolor{PUCVBlueDark}{\textbf{Qué estudia o aporta}} \\
-    \addlinespace[0.06cm]
-    \textcolor{PUCVBlueDark}{\textbf{Żychowski et al. (2025)}} &
-    \scriptsize Propone un portafolio de islas: metaheurísticas en paralelo intercambian soluciones y adaptan la migración. \\
-    \addlinespace[0.1cm]
-    {\textcolor{PUCVBlueDark}{\textbf{Drake et al. (2020)}}\newline
-     \textcolor{PUCVBlueDark}{\textbf{Dokeroglu et al. (2024)}}} &
-    \scriptsize Revisan hiperheurísticas: una capa superior selecciona, genera o secuencia métodos de búsqueda. \\
-    \addlinespace[0.1cm]
-    {\textcolor{PUCVBlueDark}{\textbf{Mambrini y Sudholt (2015)}}\newline
-     \textcolor{PUCVBlueDark}{\textbf{Pei et al. (2025)}}} &
-    \scriptsize Estudian cómo ajustar intervalos de migración o seleccionar operadores según las mejoras y el estado de búsqueda. \\
-    \bottomrule
-  \end{tabularx}
+% Diagrama 1: curva de convergencia con progreso y estancamiento
+\begin{frame}{Problema}
+  \begin{block}{Pregunta}
+    Durante la búsqueda, ¿cómo detectar que el proceso deja de mejorar y decidir qué hacer?
+  \end{block}
+  \vspace{0.1cm}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.34\textwidth}
+      \small
+      La curva de convergencia muestra la evolución del mejor resultado encontrado.
 
-  \vspace{0.15cm}
-  \centering
-  {\scriptsize\destacado{Decisión de coordinación:} cuándo comunicar, qué transferir y qué algoritmo continúa.}
-\end{frame}
-
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Brecha de investigación}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.54\textwidth}
-      La literatura ya utiliza:
-      \begin{itemize}
-        \item mejora reciente del fitness;
-        \item diversidad y características de población;
-        \item historiales de operadores;
-        \item características de trayectorias para selección.
-      \end{itemize}
-
-      \vspace{0.25cm}
-      \smallcite{jankovic2022trajectory,kostovska2022per,cenikj2026survey}
-
-    \column{0.42\textwidth}
-      \vspace{0.15cm}
-      {\Large\color{PUCVRed}\bfseries Falta explotar de forma explícita la forma temporal del fitness}
-
-      \vspace{0.5cm}
+      \vspace{0.35cm}
+      Normalmente se revisa al final. Aquí se usa mientras la búsqueda todavía está en curso.
+    \column{0.64\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, width=8.6cm, height=4.9cm, ymax=100]
+          \fill[best!12] (0,0) rectangle (35,100);
+          \fill[warn!10] (35,0) rectangle (100,100);
+          \addplot[primary, very thick, domain=0:100, samples=120, smooth]
+            {10 + 78*(1 - exp(-x/9))};
+          \node[font=\footnotesize\bfseries, text=best!80!black] at (23,32) {progreso};
+          \node[font=\scriptsize, text=best!80!black, align=center] at (23,20) {mejora\\rápido};
+          \node[font=\footnotesize\bfseries, text=warn] at (67,52) {estancamiento};
+          \node[font=\scriptsize, text=warn] at (67,40) {deja de mejorar};
+        \end{axis}
+      \end{tikzpicture}
   \end{columns}
 \end{frame}
 
-\section{2. DTW/DDTW y arquitectura propuesta}
-
-\begin{frame}[plain]
-  \centering
-  \vfill
-  {\usebeamerfont{title}\color{primary}2. DTW/DDTW y detección de estancamiento}\\[0.6em]
-  {\color{accent}\rule{4.2cm}{2.2pt}}
-  \vfill
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Objetivo y alcance}
-  \begin{block}{Objetivo general}
-    Desarrollar y validar un marco cooperativo de metaheurísticas para dimensionar HRES--H$_2$, usando DTW/DDTW como detector adaptativo de estancamiento y como señal de coordinación.
-  \end{block}
-
-  \vspace{0.25cm}
-  \begin{enumerate}
-    \item Caracterizar el modelo, sus restricciones y no linealidades.
-    \item Diseñar el detector sobre ventanas móviles del mejor fitness.
-    \item Definir el intercambio de soluciones entre algoritmos heterogéneos.
-    \item Orquestar la alternancia entre exploración y explotación.
-  \end{enumerate}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Diagrama de flujo de la propuesta}
-  \centering
-  \includegraphics[width=\textwidth,height=6.15cm,keepaspectratio]{fig/Diagrama_flujo.png}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{DTW y DDTW: misma lógica, distinta señal}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.46\textwidth}
+% Mismo contador, dos situaciones distintas
+\begin{frame}{Contar iteraciones no alcanza}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.42\textwidth}
+      \small
+      \begin{itemize}
+        \item Un contador solo mide cuánto tiempo pasó sin una mejora.
+        \item No describe si el avance es constante, lento o irregular.
+        \item Un límite fijo puede depender del problema y del algoritmo.
+      \end{itemize}
+      \vspace{0.25cm}
+      \begin{exampleblock}{Qué se necesita}
+        Observar la forma reciente de la curva, no solo el tiempo transcurrido.
+      \end{exampleblock}
+    \column{0.56\textwidth}
+      \centering
       \begin{tikzpicture}
-        \begin{axis}[
-          width=\linewidth,height=5.0cm,
-          axis lines=left,
-          xlabel={Iteración},ylabel={Mejor LCOE (esquema)},
-          xmin=0,xmax=10,ymin=0.12,ymax=1.02,
-          xtick=\empty,ytick=\empty,
-          legend style={draw=none,fill=none,font=\scriptsize,at={(0.52,-0.18)},anchor=north},
-          line width=1.2pt
-        ]
-          \addplot[color=GreenH,mark=*] coordinates {(0,1.0)(1,.84)(2,.72)(3,.61)(4,.50)(5,.40)(6,.34)(7,.27)(8,.22)(9,.18)(10,.15)};
-          \addlegendentry{progreso sostenido}
-          \addplot[color=PUCVRed,mark=square*] coordinates {(0,1.0)(1,.77)(2,.62)(3,.55)(4,.52)(5,.51)(6,.505)(7,.503)(8,.502)(9,.501)(10,.50)};
-          \addlegendentry{meseta persistente}
+        \begin{axis}[miniaxis, xmax=55, ymax=95, title={Pausa y luego mejora}]
+          \addplot[const plot, primary, very thick]
+            coordinates {(0,15) (6,35) (12,48) (18,56) (38,76) (46,82) (55,82)};
+          \draw[llave, warn, decoration={mirror}] (18,52) -- (38,52)
+            node[midway, below=4pt, font=\tiny, text=warn, align=center] {20 iteraciones\\sin mejora};
+        \end{axis}
+      \end{tikzpicture}\hfill
+      \begin{tikzpicture}
+        \begin{axis}[miniaxis, xmax=55, ymax=95, title={Deja de mejorar}]
+          \addplot[const plot, primary, very thick]
+            coordinates {(0,15) (6,35) (12,48) (18,56) (55,56)};
+          \draw[llave, warn, decoration={mirror}] (18,52) -- (38,52)
+            node[midway, below=4pt, font=\tiny, text=warn, align=center] {20 iteraciones\\sin mejora};
         \end{axis}
       \end{tikzpicture}
 
-    \column{0.55\textwidth}
-      \begin{block}{Dos referencias para la misma ventana $X$}
-        \footnotesize
-        $r$: rampa de progreso. \qquad $c$: señal constante o meseta.
-        \[
-          D_{\mathrm{prog}}=d(X,r),\qquad
-          D_{\mathrm{mes}}=d(X,c)
-        \]
-      \end{block}
-
-      \footnotesize
-      \begin{tabularx}{\linewidth}{>{\bfseries\color{PUCVBlueDark}}p{1.1cm} X}
-        \toprule
-        Variante & Señal que compara \\
-        \midrule
-        DTW & niveles de $X$, $r$ y $c$ \\
-        DDTW & primeras diferencias $\nabla X$, $\nabla r$ y $\nabla c$ \\
-        \bottomrule
-      \end{tabularx}
-
-      \vspace{0.18cm}
-      
-
+      \vspace{0.15cm}
+      {\footnotesize\risk{El contador ve lo mismo en ambos casos.}}
   \end{columns}
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{Banda Sakoe--Chiba: limitar el alineamiento}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.52\textwidth}
-      \centering
-      \begin{tikzpicture}[scale=0.61,transform shape]
-        % Región permitida: |i-j| <= 2 para el ejemplo de seis puntos.
-        \foreach \i in {0,...,5}{
-          \foreach \j in {0,...,5}{
-            \pgfmathtruncatemacro{\dif}{abs(\i-\j)}
-            \ifnum\dif<3
-              \fill[PUCVBlue!13] (\j,\i) rectangle ++(1,1);
-            \fi
-          }
-        }
-        \draw[step=1,gray!70] (0,0) grid (6,6);
-        \draw[->,thick] (0,0) -- (6.35,0) node[right,font=\scriptsize]{referencia $r$ o $c$};
-        \draw[->,thick] (0,0) -- (0,6.35) node[above,font=\scriptsize]{ventana $X$};
-        \draw[PUCVRed,very thick,->]
-          (0.5,0.5) -- (0.5,1.5) -- (0.5,2.5)
-          -- (1.5,3.5) -- (2.5,4.5) -- (3.5,5.5)
-          -- (4.5,5.5) -- (5.5,5.5);
-        \node[font=\scriptsize,PUCVBlueDark,align=center] at (3.0,6.70) {zona permitida\\$|i-j|\leq b$};
-        \node[font=\scriptsize,PUCVRed] at (3.15,4.05) {camino DTW};
-      \end{tikzpicture}
+% Diagrama 2: ventana reciente sobre la curva
+\begin{frame}{La curva como serie temporal}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.36\textwidth}
+      \small
+      Se toma una ventana reciente del mejor resultado.
 
-      {\tiny Azul: celdas que el algoritmo puede visitar. Rojo: camino óptimo del ejemplo.}
+      \vspace{0.3cm}
+      Esa ventana es una \key{serie temporal}: una secuencia ordenada de valores.
 
-    \column{0.44\textwidth}
-      \begin{block}{Banda permitida}
-        \scriptsize
-        Solo visita celdas con $|i-j|\leq b$; así evita alineamientos entre puntos muy lejanos.
-      \end{block}
-
-      \begin{exampleblock}{Recurrencia DTW implementada}
-        \tiny
-        \[
-          \boxed{D_{ij}=C_{ij}+\min\!\left\{
-          D_{i-1,j},\;D_{i,j-1},\;D_{i-1,j-1}\right\}}
-        \]
-        Tres movimientos: avanza $X$, avanza $Y$ o en diagonal.
-      \end{exampleblock}
-
-      \begin{alertblock}{Ejemplo e implementación}
-        \tiny
-        $W=6$, $b=2$: $(3,5)$ permitido; $(1,5)$ prohibido.\\[-1pt]
-      \end{alertblock}
-  \end{columns}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Ejemplo numérico: DTW con los tres movimientos}
-  \tiny
-  \begin{block}{Misma forma, distinto ritmo}
-    \centering
-    $X=[.50,.50,.50,.56,.60,.65]$ \;(\text{ventana observada})\qquad
-    $r=[.50,.55,.60,.64,.65,.65]$ \;(\text{progreso})\qquad b=2
-  \end{block}
-
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-      \begin{exampleblock}{Costos locales $C_{ij}=|X_i-r_j|$}
-        \centering
-        {\setlength{\tabcolsep}{1.8pt}\renewcommand{\arraystretch}{1.10}
-        \begin{tabular}{c|cccccc}
-          & $r_1=.50$ & $r_2=.55$ & $r_3=.60$ & $r_4=.64$ & $r_5=.65$ & $r_6=.65$\\ \hline
-          $X_1=.50$ & \cellcolor{best!22}0 & .05 & .10 & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
-          $X_2=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & \cellcolor{gray!10}-- & \cellcolor{gray!10}--\\
-          $X_3=.50$ & \cellcolor{best!22}0 & .05 & .10 & .14 & .15 & \cellcolor{gray!10}--\\
-          $X_4=.56$ & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & .04 & .08 & .09 & .09\\
-          $X_5=.60$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}0 & .04 & .05 & .05\\
-          $X_6=.65$ & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{gray!10}-- & \cellcolor{best!22}.01 & \cellcolor{best!22}0 & \cellcolor{best!22}0
-        \end{tabular}}
-
-        {\scriptsize Verde: camino óptimo. Gris: celdas fuera de la banda $b=2$.}
-      \end{exampleblock}
-
-    \column{0.41\textwidth}
-      \begin{exampleblock}{Camino óptimo}
-        \tiny
-        \textbf{Vertical:}
-        $(1,1)\downarrow(2,1)\downarrow(3,1)$;\quad costo $=0$.\\[3pt]
-        \textbf{Diagonal:}
-        $(3,1)\searrow(4,2)\searrow(5,3)\searrow(6,4)$;\\[-1pt]
-        \hfill costo $=0.01+0+0.01=0.02$.\\[3pt]
-        \textbf{Horizontal:}
-        $(6,4)\rightarrow(6,5)\rightarrow(6,6)$;\quad costo $=0$.\\[5pt]
-        \centering
-        $\boxed{D_{\mathrm{prog}}=\operatorname{DTW}(X,r)=0.02}$
-      \end{exampleblock}
-  \end{columns}
-
-  \begin{alertblock}{Comparación con la meseta}
-    \centering
-    $c=[.50,.50,.50,.50,.50,.50]$,\quad
-    $D_{\mathrm{mes}}=\operatorname{DTW}(X,c)=0.31$,\quad
-    $\Delta=0.02-0.31=-0.29$
-    $\Rightarrow$ \good{más cerca del progreso}.
-  \end{alertblock}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{El discriminante $\Delta$: progreso frente a meseta}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-      \begin{block}{Diferencia implementada}
-        \small
-        \centering
-        $D_{\mathrm{prog}}=D_1$ \quad y \quad $D_{\mathrm{mes}}=D_2$
-        \vspace{0.08cm}
-
-        $\boxed{\Delta=D_{\mathrm{prog}}-D_{\mathrm{mes}}=D_1-D_2}$
-      \end{block}
-
-      \begin{block}{Cómo interpretar el signo}
-        \footnotesize
+      \vspace{0.3cm}
+      \begin{block}{Dos situaciones}
         \begin{itemize}
-          \item $\Delta<0$: más cerca del \good{progreso}.
-          \item $\Delta\approx0$: evidencia ambigua; observar.
-          \item $\Delta>0$: más cerca de la \risk{meseta}.
+          \item Sigue mejorando.
+          \item Deja de mejorar.
         \end{itemize}
       \end{block}
+    \column{0.62\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, width=8.4cm, height=5.4cm, ymax=118]
+          \fill[primary!12] (60,0) rectangle (85,100);
+          \draw[primary, thick] (60,0) rectangle (85,100);
+          \addplot[inkgray!70, very thick, domain=0:85, samples=100, smooth]
+            {10 + 78*(1 - exp(-x/20))};
+          \addplot[primary, only marks, mark=*, mark size=1.4pt, domain=60:85, samples=11]
+            {10 + 78*(1 - exp(-x/20))};
+          \draw[llave, primary] (60,102) -- (85,102)
+            node[midway, above=4pt, font=\scriptsize\bfseries, text=primary]
+            {ventana reciente ($W$ iteraciones)};
+          \draw[flecha, primary] (64,40) -- (81,40)
+            node[midway, below, font=\scriptsize, text=primary] {se desplaza};
+          \draw[dashed, inkgray!70] (85,0) -- (85,-6)
+            node[below, font=\tiny, text=inkgray] {iteración actual};
+        \end{axis}
+      \end{tikzpicture}
+  \end{columns}
+\end{frame}
 
-      {\scriptsize\textbf{Ejemplo:} $0.80-0.20=0.60$; la ventana se parece más a la meseta.}
-
+% Diagrama 3: patrones de referencia
+\begin{frame}{Dos patrones de comparación}
+  \begin{columns}[T,onlytextwidth]
     \column{0.48\textwidth}
-      \begin{alertblock}{Condiciones de estancamiento}
-        \tiny
-        El cambio se considera solo si se cumplen las tres condiciones:
-        \begin{enumerate}
-          \item \textbf{Sin mejora:} $\mathrm{sin\_mejora}\geq x$.
-          \item \textbf{Cercanía a meseta:} $D_{\mathrm{mes}}\leq\theta_c$.
-          \item \textbf{Alejamiento del progreso:} $D_{\mathrm{prog}}\geq\theta_r$
-          o $\Delta\geq\theta_\Delta$.
-        \end{enumerate}
-        Además, deben confirmarse durante $3$ actualizaciones consecutivas.
+      \begin{exampleblock}{Progreso}
+        El mejor resultado continúa mejorando dentro de la ventana.
+      \end{exampleblock}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, width=5.6cm, height=3.6cm, xmax=10, ymax=10,
+                     xlabel={Posición en la ventana}, ylabel={Mejor resultado}]
+          \addplot[best, very thick, mark=*, mark size=1.3pt, domain=0:9, samples=10] {1 + 0.9*x};
+        \end{axis}
+      \end{tikzpicture}
+    \column{0.48\textwidth}
+      \begin{alertblock}{Estancamiento}
+        El mejor resultado se mantiene prácticamente igual.
       \end{alertblock}
-
-      \begin{block}{Dónde cambia DDTW}
-        \scriptsize
-        DDTW usa las mismas dos distancias y el mismo $\Delta$, pero sobre
-        $\nabla x_t=x_t-x_{t-1}$. DTW compara niveles; DDTW compara cambios.
-      \end{block}
-
-    
-
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, width=5.6cm, height=3.6cm, xmax=10, ymax=10,
+                     xlabel={Posición en la ventana}, ylabel={Mejor resultado}]
+          \addplot[warn, very thick, mark=*, mark size=1.3pt, domain=0:9, samples=10] {6};
+        \end{axis}
+      \end{tikzpicture}
   \end{columns}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Conjunto de metaheurísticas}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      {\large\key{Poblacionales}}
-
-      \vspace{0.16cm}
-      \begin{tabularx}{\linewidth}{>{\bfseries}p{0.95cm} X}
-        GA  & evolución y recombinación \\
-        PSO & movimiento social de partículas \\
-        GWO & jerarquía de búsqueda \\
-        WOA & rodeo y trayectoria espiral \\
-        EHO & dinámica de manada \\
-        ACO & muestreo desde memoria colectiva \\
-      \end{tabularx}
-
-      \vspace{0.25cm}
-      \good{Función dominante:} diversificación y exploración global.
-
-    \column{0.47\textwidth}
-      {\large\key{De trayectoria}}
-
-      \vspace{0.16cm}
-      \begin{tabularx}{\linewidth}{>{\bfseries}p{0.95cm} X}
-        SA  & aceptación probabilística \\
-        TS  & memoria tabú y aspiración \\
-        ILS & perturbación y búsqueda local \\
-        VNS & cambio sistemático de vecindad \\
-      \end{tabularx}
-
-      \vspace{1.1cm}
-      \good{Función dominante:} intensificación y refinamiento local.
-
-    
-    \end{columns}
-\end{frame}
-
-
-
-\section{3. Modelo HRES2--H2 implementado}
-
-\begin{frame}[plain]
+  \vfill
   \centering
-  \vfill
-  {\usebeamerfont{title}\color{primary}3. Modelo HRES2--H$_2$ implementado}\\[0.6em]
-  {\color{accent}\rule{4.2cm}{2.2pt}}
-  \vfill
+  \small No son ejemplos aprendidos: son patrones definidos para interpretar la curva.
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{WPEB publicado vs. implementación HRES2--H$_2$}
-  \tiny
-  \setlength{\tabcolsep}{3.5pt}
-  \renewcommand{\arraystretch}{1.18}
-  \begin{tabularx}{\textwidth}{>{\bfseries\color{PUCVBlueDark}}p{2.85cm} X X}
-    \toprule
-    Parámetro & WPEB de Li et al. (2024) & Implementación HRES2--H$_2$ \\
-    \midrule
-    Variables de diseño
-      & Razones eólica/electrólisis; capacidades continuas.
-      & $\mathbf{x}=[P_{\mathrm{WT}},N_{\mathrm{el}},P_{\mathrm{bat}},\tau_{\mathrm{bat}}]^T$; mixto. \\
-    Renovables
-      & $P_{\mathrm{WT}}+P_{\mathrm{PV}}=200$ MW.
-      & Misma capacidad total fija; $P_{\mathrm{PV}}=200-P_{\mathrm{WT}}$ MW. \\
-    Electrolizador
-      & Estación continua; caso óptimo E95 (95 MW).
-      & $N_{\mathrm{el}}\in\{10,\ldots,20\}$ módulos de 5 MW. \\
-    BESS
-      & Fijo: $P_{\mathrm{bat}}=0.30P_{\mathrm{el}}$ y 1 h.
-      & $P_{\mathrm{bat}}\in\{0,5,\ldots,50\}$ MW; $\tau_{\mathrm{bat}}\in\{1,2,4\}$ h. \\
-    Simulación y restricción
-      & Despacho horario de 8.760 h; $\mathrm{AGSR}\leq20\%$.
-      & Mismo horizonte y AGSR; penalización de diseños inviables. \\
-    Optimización
-      & Grid search + descenso de gradiente; minimiza LCOE.
-      & DTW/DDTW: cambia metaheurística, transfiere la mejor solución. \\
-    \bottomrule
-  \end{tabularx}
+% Esquema didáctico: fig/make_convergence_mkp.py genera la figura
+\begin{frame}{Una ventana, dos patrones de comparación}
+  \centering
+  \includegraphics[width=0.96\textwidth,height=0.78\textheight,keepaspectratio]{fig/convergencia_mkp.pdf}
+\end{frame}
 
+% Diagrama 4: comparación rígida frente a alineamiento DTW
+\begin{frame}{DTW y DDTW en simple}
+  \small
+  \begin{itemize}
+    \item Comparan la forma de la ventana con los dos patrones.
+    \item Reconocen formas parecidas aunque los cambios no ocurran al mismo tiempo.
+  \end{itemize}
   \vspace{0.1cm}
-  \begin{exampleblock}{Diferencia que se quiere medir}
-    La física se conserva; la extensión añade variables discretas y cooperación adaptativa entre metaheurísticas.
-  \end{exampleblock}
-
-  \vspace{0.04cm}
-  {\tiny\color{Muted}Referencia: W190--P10--E95--B30, LCOE $=0.2692$ CNY/kWh.}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{HRES--H$_2$: qué se dimensiona}
   \centering
-  \begin{tikzpicture}[
-    scale=0.84,transform shape,
-    source/.style={draw=PUCVBlue!65,fill=PUCVLight,rounded corners=3pt,
-      minimum width=2.25cm,minimum height=0.70cm,align=center,font=\scriptsize},
-    core/.style={draw=PUCVRed!70,fill=PUCVRed!8,rounded corners=3pt,
-      minimum width=2.45cm,minimum height=0.78cm,align=center,font=\scriptsize\bfseries},
-    store/.style={draw=WarmGold!85,fill=WarmGold!12,rounded corners=3pt,
-      minimum width=2.25cm,minimum height=0.70cm,align=center,font=\scriptsize},
-    product/.style={draw=GreenH!75,fill=GreenH!10,rounded corners=3pt,
-      minimum width=2.20cm,minimum height=0.70cm,align=center,font=\scriptsize\bfseries},
-    flow/.style={-{Latex[length=2.2mm]},thick,color=PUCVBlue},
-    hflow/.style={-{Latex[length=2.2mm]},thick,color=GreenH}
-  ]
-    \node[source] (wind) at (0,0.78) {Eólica\\$P_{\mathrm{WT}}$};
-    \node[source] (pv) at (0,-0.78) {Solar PV\\$P_{\mathrm{PV}}=200-P_{\mathrm{WT}}$};
-    \node[core] (renew) at (3.0,0) {Generación\\renovable};
-    \node[store] (bat) at (6.35,0.95) {BESS\\almacena excedentes};
-    \node[core] (ely) at (6.35,-0.30) {Electrolizador PEM\\$P_{\mathrm{el}}=5N_{\mathrm{el}}$};
-    \node[store] (grid) at (3.0,-1.28) {Red\\vende excedentes};
-    \node[product] (h2) at (9.85,-0.30) {H$_2$ verde\\producto final};
-
-    % Entradas renovables y rutas de despacho, sin etiquetas sobrepuestas.
-    \draw[flow] (wind.east) -- (renew.north west);
-    \draw[flow] (pv.east) -- (renew.south west);
-    \draw[flow] (renew.east) -- (ely.west);
-    \draw[flow] (renew.north east) -- (bat.west);
-    \draw[flow] (renew.south) -- (grid.north);
-    \draw[flow] (bat.south) -- (ely.north);
-    \draw[hflow] (ely.east) -- (h2.west);
+  \begin{tikzpicture}[x=0.42cm, y=0.75cm]
+    % Panel izquierdo: punto a punto
+    \begin{scope}
+      \node[font=\footnotesize\bfseries, text=inkgray] at (5,3.55) {Comparación punto a punto};
+      \foreach \t in {0,...,10} {
+        \pgfmathsetmacro{\ya}{1.7 + 1.2/(1 + exp(-1.4*(\t - 3.5)))}
+        \pgfmathsetmacro{\yb}{0.0 + 1.2/(1 + exp(-1.4*(\t - 6.5)))}
+        \draw[dashed, warn!80] (\t,\ya) -- (\t,\yb);
+      }
+      \draw[primary, very thick, smooth, samples=40, domain=0:10]
+        plot (\x, {1.7 + 1.2/(1 + exp(-1.4*(\x - 3.5)))});
+      \draw[accent, very thick, smooth, samples=40, domain=0:10]
+        plot (\x, {0.0 + 1.2/(1 + exp(-1.4*(\x - 6.5)))});
+      \node[font=\scriptsize, text=warn, align=center] at (5,-0.65)
+        {compara el mismo instante:\\parecen curvas distintas};
+    \end{scope}
+    % Panel derecho: DTW
+    \begin{scope}[xshift=7.6cm]
+      \node[font=\footnotesize\bfseries, text=inkgray] at (5,3.55) {DTW: alinea la forma};
+      \foreach \i/\j in {0/0,0/1,0/2,0/3,1/4,2/5,3/6,4/7,5/8,6/9,7/10,8/10,9/10,10/10} {
+        \pgfmathsetmacro{\ya}{1.7 + 1.2/(1 + exp(-1.4*(\i - 3.5)))}
+        \pgfmathsetmacro{\yb}{0.0 + 1.2/(1 + exp(-1.4*(\j - 6.5)))}
+        \draw[dashed, best] (\i,\ya) -- (\j,\yb);
+      }
+      \draw[primary, very thick, smooth, samples=40, domain=0:10]
+        plot (\x, {1.7 + 1.2/(1 + exp(-1.4*(\x - 3.5)))});
+      \draw[accent, very thick, smooth, samples=40, domain=0:10]
+        plot (\x, {0.0 + 1.2/(1 + exp(-1.4*(\x - 6.5)))});
+      \node[font=\scriptsize, text=best!80!black, align=center] at (5,-0.65)
+        {empareja puntos equivalentes:\\reconoce la misma forma};
+    \end{scope}
   \end{tikzpicture}
 
-  \vspace{-0.02cm}
-  {\scriptsize\textcolor{PUCVBlue}{\bfseries Flujo de energía:} renovables, batería y red
-  \hspace{0.7cm} \textcolor{GreenH}{\bfseries Flujo de producto:} electrolizador $\rightarrow$ H$_2$}
-
-  \vspace{0.12cm}
-  \begin{minipage}{0.65\textwidth}
-    \begin{block}{Variables que realmente optimiza el algoritmo}
-      \tiny
-      \renewcommand{\arraystretch}{1.03}
-      \begin{tabularx}{\linewidth}{>{\bfseries\color{PUCVBlueDark}}p{1.35cm} X >{\raggedleft\arraybackslash}p{2.2cm}}
-        \toprule
-        Variable & Qué representa & Dominio \\
-        \midrule
-        $P_{\mathrm{WT}}$ & potencia eólica instalada & $0$--$200$ MW \\
-        $N_{\mathrm{el}}$ & módulos PEM de 5 MW & $10$--$20$ módulos \\
-        $P_{\mathrm{bat}}$ & potencia máxima BESS & $0$--$50$ MW, pasos de 5 \\
-        $\tau_{\mathrm{bat}}$ & duración nominal BESS & $1$, $2$ o $4$ h \\
-        \bottomrule
-      \end{tabularx}
-    \end{block}
-  \end{minipage}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Generación renovable horaria}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      \begin{block}{Generación eólica}
-        \scriptsize
-        La velocidad del viento determina el factor horario $f_{\mathrm{WT}}(t)$:
-        \[
-          f_{\mathrm{WT}}(t)=
-          \begin{cases}
-            0, & v<v_i\ \text{o}\ v\geq v_o,\\
-            \dfrac{v^3-v_i^3}{v_r^3-v_i^3},
-            & v_i\leq v<v_r,\\
-            1, & v_r\leq v<v_o.
-          \end{cases}
-        \]
-        $v_i=2.5$, $v_r=10.5$ y $v_o=25$ m/s. La potencia generada es
-        $P_{\mathrm{WT}}f_{\mathrm{WT}}(t)$.
-      \end{block}
-
-    \column{0.49\textwidth}
-      \begin{exampleblock}{Generación fotovoltaica}
-        \scriptsize
-        La irradiancia $G(t)$ y la temperatura ambiente determinan el perfil solar:
-        \[
-          T_c(t)=T_a(t)+\frac{NOCT-20}{0.8}G(t)
-        \]
-        \[
-          \resizebox{\linewidth}{!}{$f_{\mathrm{PV}}(t)=\operatorname{clip}\!\left(
-          G(t)f_{\mathrm{dera}}\max[1+\gamma_T(T_c(t)-25),0],0,1\right)$}
-        \]
-        $P_{\mathrm{PV}}f_{\mathrm{PV}}(t)$ es la potencia generada.
-        $NOCT=47^\circ$C, $\gamma_T=-0.5\%/^\circ$C y $f_{\mathrm{dera}}=0.90$.
-      \end{exampleblock}
-  \end{columns}
-
-  \vspace{0.06cm}
-  \centering
-  \destacado{Potencia disponible cada hora:}
-  \[
-    P_{\mathrm{gen}}(t)=P_{\mathrm{WT}}f_{\mathrm{WT}}(t)+P_{\mathrm{PV}}f_{\mathrm{PV}}(t)
-    \leq P_{\mathrm{WT}}+P_{\mathrm{PV}}=200\,\mathrm{MW}.
-  \]
-  {\scriptsize $P_{\mathrm{WT}}$ y $P_{\mathrm{PV}}$ son capacidades instaladas, fijas las 8760 h;
-  $f_{\mathrm{WT}}(t),f_{\mathrm{PV}}(t)\in[0,1]$ varían con el clima.}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{HRES--H$_2$: cómo opera cada hora}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-      \begin{enumerate}
-        \item Calcular $P_{\mathrm{gen}}(t)=P_{\mathrm{WT}}(t)+P_{\mathrm{PV}}(t)$ a partir del clima.
-        \item Si $P_{\mathrm{gen}}(t)\geq0.30P_{\mathrm{el}}$, alimentar el PEM hasta $P_{\mathrm{el}}$.
-        \item Si no se alcanza ese mínimo, descargar BESS si hay energía; si no, detener el electrolizador esa hora.
-        \item El excedente carga el BESS hasta $SOC\leq P_{\mathrm{bat}}\tau_{\mathrm{bat}}$; lo restante se vende a la red.
-      \end{enumerate}
-
-    \column{0.39\textwidth}
-      \begin{block}{Energía anual que recibe el PEM}
-        \scriptsize
-        \[
-          E_{\mathrm{el,annual}}=
-          \sum_{t=1}^{8760}P_{\mathrm{el,usada}}(t)\,\Delta t
-        \]
-        \scriptsize $P_{\mathrm{el,usada}}(t)$ es la potencia que realmente consume el PEM en la hora $t$; con $\Delta t=1$ h, la suma queda en MWh/año.
-      \end{block}
-      \vspace{0.15cm}
-  \end{columns}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{De electricidad renovable a producción de H$_2$}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-      \begin{block}{1. Energía que realmente usó el PEM}
-        \small
-        \[
-          E_{\mathrm{el,annual}}=
-          \sum_{t=1}^{8760}P_{\mathrm{el,usada}}(t)\,\Delta t
-        \]
-        \footnotesize
-        $P_{\mathrm{el,usada}}(t)$ es la potencia realmente consumida en la hora $t$ [MW]. Como $\Delta t=1$ h, la suma da $E_{\mathrm{el,annual}}$ en MWh/año: se usa el consumo del despacho, no $P_{\mathrm{el}}\times8760$.
-      \end{block}
-
-    \column{0.48\textwidth}
-      \begin{exampleblock}{2. Conversión de energía a masa}
-        \small
-        \[
-          m_{\mathrm{H_2}}=
-          \frac{E_{\mathrm{el,annual}}\cdot1000\cdot\eta_{\mathrm{el}}}
-          {HHV_{\mathrm{H_2}}}
-        \]
-        \footnotesize
-        $m_{\mathrm{H_2}}$: kg producidos por año.\\
-        $\eta_{\mathrm{el}}=0.75$: eficiencia, sin unidades.\\
-        $HHV_{\mathrm{H_2}}=39.4$ kWh/kg: energía por kg de H$_2$.\\
-        $1000$: convierte MWh a kWh.
-      \end{exampleblock}
-  \end{columns}
-
-  
-\end{frame}
-
-
-% -----------------------------------------------------------------------------
-\begin{frame}{HRES--H$_2$: objetivos y restricciones}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-      \key{Costo nivelado de electricidad (LCOE)}
-      \[
-        \mathrm{LCOE}=\frac{\mathrm{NPC}\cdot\mathrm{CRF}}
-        {E_{\mathrm{entregada,annual}}}
-      \]
-      {\scriptsize
-      \begin{itemize}
-        \setlength{\itemsep}{0.04cm}
-        \item $NPC$: costo presente neto: CAPEX, reemplazos y operación/mantenimiento.
-        \item $CRF$: factor que convierte el $NPC$ en costo anual equivalente:
-        \(CRF=\frac{r(1+r)^N}{(1+r)^N-1}\).
-        \item $r=4.35\%$: tasa de descuento real; $N=25$: años del proyecto.
-        \item $E_{\mathrm{entregada,annual}}=1000(E_{\mathrm{el,annual}}+E_{\mathrm{grid,sales,annual}})$: energía anual contabilizada [kWh/año].
-      \end{itemize}}
-
-    \column{0.48\textwidth}
-      \key{Restricciones y penalización}
-      \begin{itemize}
-        \item $P_{\mathrm{WT}}+P_{\mathrm{PV}}=200$ MW;
-        \item dominios mixtos de $N_{\mathrm{el}}$, $P_{\mathrm{bat}}$ y $\tau_{\mathrm{bat}}$;
-      \end{itemize}
-
-      \begin{block}{Límite de exportación anual}
-        \[
-          \mathrm{AGSR}=
-          \frac{\sum_{t=1}^{8760}P_{\mathrm{grid\_sales}}(t)}
-          {\sum_{t=1}^{8760}P_{\mathrm{gen}}(t)}
-          \leq0.20
-        \]
-      \end{block}
-
-      {\footnotesize Si $\mathrm{AGSR}>0.20$, el modelo usa
-      $f_{\mathrm{pen}}(\mathbf{x})=100+10\,\mathrm{AGSR}$.}
-
-  \end{columns}
-  \vfill
-\end{frame}
-
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Cómo se integra el optimizador con el HRES}
-  \centering
-  \begin{tikzpicture}[
-    node distance=0.55cm and 0.55cm,
-    integ/.style={draw=PUCVBlue!65,fill=PUCVLight,rounded corners=2pt,
-      minimum height=1.05cm,text width=2.6cm,align=center,font=\small},
-    sim/.style={draw=GreenH!70,fill=GreenH!9,rounded corners=2pt,
-      minimum height=1.05cm,text width=2.6cm,align=center,font=\small},
-    ctrl/.style={draw=PUCVRed!70,fill=PUCVRed!8,rounded corners=2pt,
-      minimum height=1.05cm,text width=2.6cm,align=center,font=\small},
-    flow/.style={-{Latex[length=2mm]},thick,color=PUCVBlue}
-  ]
-    \node[integ] (candidate) {Algoritmo\\propone $\mathbf{x}$};
-    \node[sim,right=of candidate] (dispatch) {Simulador\\despacho 8.760 h};
-    \node[integ,right=of dispatch] (metrics) {Evalúa LCOE, $m_{\mathrm{H_2}}$,\\AGSR y exportación};
-    \node[ctrl,below=0.8cm of metrics] (trace) {Actualiza trayectoria\\y detector DTW/DDTW};
-    \node[integ,left=of trace] (next) {mantiene o cambia algoritmo};
-    \draw[flow] (candidate) -- (dispatch);
-    \draw[flow] (dispatch) -- (metrics);
-    \draw[flow] (metrics) -- (trace);
-    \draw[flow] (trace) -- (next);
-    \draw[flow] (next.west) -| (candidate.south);
-  \end{tikzpicture}
-
-\end{frame}
-
-
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Resultados HRES2--H$_2$: métricas y configuración}
-  \scriptsize
-  \begin{columns}[T,onlytextwidth]
-    \column{0.54\textwidth}
-      \begin{block}{31 corridas independientes}
-        \setlength{\tabcolsep}{2.5pt}
-        \renewcommand{\arraystretch}{1.35}
-        \begin{tabularx}{\linewidth}{>{\bfseries}p{1.05cm} >{\centering\arraybackslash}p{1.45cm} >{\centering\arraybackslash}p{1.35cm} >{\centering\arraybackslash}p{1.2cm} X}
-          \toprule
-          Variante & LCOE medio & LCOH medio & $\sigma$ & Factibilidad / AGSR \\
-          \midrule
-          \rowcolor{PUCVLight}
-          DTW & 0.267160 & 17.6314 & 0.000001 & 100\% / 20.00\% \\
-          DDTW & 0.267160 & 17.6313 & 0.000005 & 100\% / 20.00\% \\
-          \bottomrule
-        \end{tabularx}
-        \vspace{0.05cm}
-        \centering Mejor LCOE observado: $0.267159$ CNY/kWh.
-      \end{block}
-
-    \column{0.42\textwidth}
-      \begin{exampleblock}{Configuración común encontrada}
-        \setlength{\tabcolsep}{3pt}
-        \renewcommand{\arraystretch}{1.3}
-        \begin{tabularx}{\linewidth}{>{\bfseries}p{2.3cm} >{\centering\arraybackslash}X}
-          \toprule
-          Eólica & 174.47 MW \\
-          Solar PV & 25.53 MW \\
-          Electrolizador & 70.0 MW (14 módulos) \\
-          Batería & 50.0 MW / 4 h \\
-          H$_2$ anual & 8,862,879.4 kg \\
-          \bottomrule
-        \end{tabularx}
-      \end{exampleblock}
-  \end{columns}
-
-  
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{HRES2--H$_2$: comparación con algoritmos base}
-  \tiny
-  \setlength{\tabcolsep}{3pt}
-  \renewcommand{\arraystretch}{1.2}
-  \begin{tabularx}{\textwidth}{>{\bfseries}p{2.05cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.55cm} >{\centering\arraybackslash}p{1.35cm} X}
-    \toprule
-    Método & LCOE medio & Mejor LCOE & $\sigma$ & AGSR  \\
-      & \scriptsize(CNY/kWh) & \scriptsize(CNY/kWh) & \scriptsize(CNY/kWh) & \scriptsize(\%) \\
-    \midrule
-    \rowcolor{PUCVLight}Propuesto (DTW) & 0.267160 & 0.267159 & 0.000001 & 20.00  \\
-    \rowcolor{PUCVLight}Propuesto (DDTW) & 0.267160 & 0.267159 & 0.000005 & 20.00  \\
-    GWO & 0.268066 & 0.267160 & 0.002815 & 19.42 \\
-    VNS & 0.267806 & 0.267159 & 0.002465 & 19.95\\
-    TS & 0.267188 & 0.267159 & 0.000038 & 19.99 \\
-    ACO & 0.273288 & 0.267159 & 0.007584 & 18.95 \\
-    ILS & 0.267184 & 0.267171 & 0.000023 & 19.98  \\
-    PSO & 0.277289 & 0.274579 & 0.010939 & 19.85  \\
-    WOA & 0.277227 & 0.276524 & 0.009567 & 19.70 \\
-    EHO & 0.277728 & 0.276524 & 0.007382 & 19.92 \\
-    SA & 0.286431 & 0.281339 & 0.013206 & 19.35 \\
-    \bottomrule
+  \vspace{0.15cm}
+  \begin{tabularx}{\textwidth}{p{2.2cm} X}
+    \key{DTW} & Compara los valores de las curvas. \\
+    \key{DDTW} & Compara cómo cambian esas curvas. \\
   \end{tabularx}
+\end{frame}
 
-  \vspace{0.25cm}
-  \begin{block}{Lectura del resultado}
-    En 31 corridas, DTW y DDTW combinan la menor media y el mejor LCOE, AGSR en el límite permitido y factibilidad completa; los métodos base muestran mayor variabilidad y/o diseños inviables.
+% Diagrama 4b: DDTW mira los cambios entre iteraciones
+\begin{frame}{DDTW: comparar los cambios}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.36\textwidth}
+      \small
+      DTW compara los \key{valores} de la curva.
+
+      \vspace{0.3cm}
+      DDTW compara \key{cuánto cambia} la curva de un paso al siguiente.
+
+      \vspace{0.3cm}
+      \begin{block}{Lectura}
+        Si los cambios se acercan a cero, la búsqueda dejó de mejorar.
+      \end{block}
+    \column{0.62\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, name=valor, width=8.4cm, height=3.2cm,
+                     xmin=0, xmax=21, ymax=100, xlabel={}, ylabel={Valor},
+                     title={Curva (lo que mira DTW)},
+                     title style={font=\scriptsize\bfseries, text=inkgray, yshift=-4pt}]
+          \addplot[primary, very thick, mark=*, mark size=1.2pt, domain=0:20, samples=21]
+            {10 + 78*(1 - exp(-x/4))};
+        \end{axis}
+        \begin{axis}[convaxis, at={(valor.south west)}, anchor=north west, yshift=-0.75cm,
+                     width=8.4cm, height=3.0cm,
+                     xmin=0, xmax=21, ymax=24, ylabel={Cambio},
+                     title={Cambio entre iteraciones (lo que mira DDTW)},
+                     title style={font=\scriptsize\bfseries, text=inkgray, yshift=-4pt}]
+          \addplot[ybar, bar width=4pt, fill=accent, draw=accent!80!black, domain=1:20, samples=20]
+            {78*(exp(-(x-1)/4) - exp(-x/4))};
+          \node[font=\scriptsize, text=warn, anchor=south] at (15,6) {cambios cercanos a cero};
+        \end{axis}
+      \end{tikzpicture}
+  \end{columns}
+\end{frame}
+
+% Diagrama 5: persistencia antes de cambiar
+\begin{frame}{Cómo se confirma el estancamiento}
+  \small
+  \begin{enumerate}
+    \item La ventana se parece al patrón de estancamiento.
+    \item Se aleja del patrón de progreso.
+    \item Esa condición se mantiene durante varias actualizaciones.
+  \end{enumerate}
+  \vspace{0.1cm}
+  \centering
+  \begin{tikzpicture}[
+      rev/.style={circle, minimum size=0.75cm, font=\scriptsize\bfseries, text=white, inner sep=0pt},
+      prog/.style={rev, fill=best},
+      est/.style={rev, fill=warn}]
+    \node[font=\scriptsize, text=inkgray, anchor=east] at (-0.5,0) {Revisión};
+    \node[font=\scriptsize, text=inkgray, anchor=east] at (-0.5,-0.85) {Seguidas};
+    \foreach \k/\tipo/\c in {1/prog/--, 2/prog/--, 3/est/1, 4/prog/0, 5/est/1, 6/est/2, 7/est/3} {
+      \node[\tipo] (r\k) at ({(\k-1)*1.35},0) {\k};
+      \node[font=\scriptsize, text=inkgray] at ({(\k-1)*1.35},-0.85) {\c};
+    }
+    \foreach \a/\b in {1/2,2/3,3/4,4/5,5/6,6/7} { \draw[flecha, thin] (r\a) -- (r\b); }
+    \node[flujo, draw=warn, fill=warn!10, minimum height=0.8cm, right=0.7cm of r7] (cambio) {cambio de\\algoritmo};
+    \draw[flecha, warn] (r7) -- (cambio);
+    \draw[llave, warn] ($(r5.north west)+(0,0.12)$) -- ($(r7.north east)+(0,0.12)$)
+      node[midway, above=4pt, font=\scriptsize, text=warn] {3 seguidas: se confirma};
+    \node[prog, minimum size=0.4cm, label={[font=\scriptsize, text=inkgray]right:progreso}] at (2.0,-1.65) {};
+    \node[est, minimum size=0.4cm, label={[font=\scriptsize, text=inkgray]right:estancamiento}] at (4.6,-1.65) {};
+  \end{tikzpicture}
+
+  \vspace{0.05cm}
+  \begin{block}{Para qué sirve la persistencia}
+    Evita reaccionar ante una fluctuación aislada.
   \end{block}
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{Resultados HRES2--H$_2$: convergencia del pipeline DTW}
-  \centering
-  \includegraphics[width=0.98\textwidth,height=5.25cm,keepaspectratio]{fig/hres2_dtw_convergence.png}
-
-  \vspace{0.08cm}
-  {\scriptsize Las líneas verticales indican cambios de algoritmos; el fitness se conserva y la trayectoria se estabiliza en $0.267159$ CNY/kWh.}
+% Diagrama 6: respuesta con cambio de algoritmo sin perder el mejor
+\begin{frame}{Qué hacer al detectarlo}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.36\textwidth}
+      \small
+      \begin{block}{Respuesta}
+        Cambiar el algoritmo activo, conservar el mejor resultado encontrado y continuar la búsqueda.
+      \end{block}
+      \vspace{0.2cm}
+      \begin{itemize}
+        \item No se reinicia el proceso.
+        \item No se descarta lo encontrado.
+        \item El momento del cambio depende de la curva observada.
+      \end{itemize}
+    \column{0.62\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[convaxis, width=8.6cm, height=5.6cm, ymax=108]
+          \addplot[primary, very thick, domain=0:35, samples=60, smooth]
+            {10 + 50*(1 - exp(-x/7))};
+          \addplot[accent, very thick, domain=35:68, samples=60, smooth]
+            {10 + 50*(1 - exp(-35/7)) + 18*(1 - exp(-(x-35)/6))};
+          \addplot[best, very thick, domain=68:100, samples=60, smooth]
+            {10 + 50*(1 - exp(-35/7)) + 18*(1 - exp(-33/6)) + 10*(1 - exp(-(x-68)/6))};
+          \draw[dashed, inkgray!70, thick] (35,0) -- (35,98);
+          \draw[dashed, inkgray!70, thick] (68,0) -- (68,98);
+          \node[font=\scriptsize\bfseries, text=primary] at (17.5,102) {Algoritmo A};
+          \node[font=\scriptsize\bfseries, text=accent!90!black] at (51.5,102) {Algoritmo B};
+          \node[font=\scriptsize\bfseries, text=best] at (84,102) {Algoritmo C};
+          \node[font=\tiny, text=inkgray, anchor=west] at (35,6) {cambio};
+          \node[font=\tiny, text=inkgray, anchor=west] at (68,6) {cambio};
+          \fill[warn] (35,59.66) circle (2pt);
+          \draw[flecha, warn] (50,32) -- (36.5,57);
+          \node[font=\scriptsize, text=warn, align=center, anchor=north] at (52,32)
+            {se conserva el\\mejor resultado};
+        \end{axis}
+      \end{tikzpicture}
+  \end{columns}
 \end{frame}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{Resultados HRES2--H$_2$: convergencia del pipeline DDTW}
+% Diagrama 7: flujo completo
+\begin{frame}{El proceso completo}
   \centering
-  \includegraphics[width=0.98\textwidth,height=5.25cm,keepaspectratio]{fig/hres2_ddtw_convergence.png}
-
-  \vspace{0.08cm}
-  {\scriptsize La señal derivativa mantiene la misma solución final; los cambios de metaheurística aparecen sobre los mismos plateaus de la trayectoria.}
-\end{frame}
-
-
-\section{4. Plan de trabajo}
-
-% -----------------------------------------------------------------------------
-\begin{frame}{Plan de trabajo (agosto--diciembre de 2026)}
-  \centering
-  \begin{tikzpicture}[x=0.43cm,y=0.24cm]
-    % Encabezado por meses y semanas, como en el formato anterior.
-    \fill[primary!18] (0,0) rectangle (4,1.65);
-    \fill[accent!22] (4,0) rectangle (8,1.65);
-    \fill[best!18] (8,0) rectangle (13,1.65);
-    \fill[warn!18] (13,0) rectangle (18,1.65);
-    \fill[primary!10] (18,0) rectangle (19,1.65);
-    \draw[primary!65] (0,0) rectangle (19,1.65);
-    \draw[primary!45] (4,0)--(4,1.65) (8,0)--(8,1.65)
-    (13,0)--(13,1.65) (18,0)--(18,1.65);
-    \node[font=\scriptsize\bfseries] at (2,0.82) {Agosto};
-    \node[font=\scriptsize\bfseries] at (6,0.82) {Septiembre};
-    \node[font=\scriptsize\bfseries] at (10.5,0.82) {Octubre};
-    \node[font=\scriptsize\bfseries] at (15.5,0.82) {Noviembre};
-    \node[font=\tiny\bfseries] at (18.5,0.82) {Dic.};
-
-    \draw[gray!45] (0,0) rectangle (19,-0.8);
-    \node[font=\tiny\bfseries,anchor=east] at (-0.22,-0.4) {Sem.};
-    \foreach \i in {1,...,19}{
-      \pgfmathsetmacro{\xx}{\i-0.5}
-      \node[font=\tiny] at (\xx,-0.4) {\i};
-    }
-
-    % Cuadrícula.
-    \foreach \i in {0,...,19}{\draw[gray!22] (\i,-0.8)--(\i,-23.8);}
-    \foreach \j in {0,...,23}{
-      \pgfmathsetmacro{\yy}{-0.8-\j}
-      \draw[gray!30] (0,\yy)--(19,\yy);
-    }
-
-    % Validación inicial: la selección de metaheurísticas es la primera tarea.
-    \node[anchor=east,font=\tiny\bfseries] at (-0.18,-1.3) {Validación inicial};
-    \fill[primary!82] (0,-1.48) rectangle (6,-1.12);
-    \node[anchor=east,font=\tiny] at (-0.18,-2.3) {Seleccionar metaheurísticas};
-    \fill[primary!48] (0,-2.46) rectangle (3,-2.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-3.3) {Validar DTW/DDTW en casos controlados};
-    \fill[primary!48] (1,-3.46) rectangle (4,-3.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-4.3) {Validar integración en HRES--H$_2$};
-    \fill[primary!48] (2,-4.46) rectangle (5,-4.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-5.3) {Consolidar resultados iniciales};
-    \fill[primary!48] (4,-5.46) rectangle (6,-5.14);
-
-    % Extensión multiobjetivo.
-    \node[anchor=east,font=\tiny\bfseries] at (-0.18,-6.3) {Extensión multiobjetivo};
-    \fill[best!78] (6,-6.48) rectangle (12,-6.12);
-    \node[anchor=east,font=\tiny] at (-0.18,-7.3) {Definir objetivos e indicadores};
-    \fill[best!42] (6,-7.46) rectangle (8,-7.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-8.3) {Formular HRES--H$_2$ multiobjetivo};
-    \fill[best!42] (7,-8.46) rectangle (10,-8.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-9.3) {Implementar estrategia multiobjetivo};
-    \fill[best!42] (9,-9.46) rectangle (12,-9.14);
-
-    % Nuevas metaheurísticas y sistemas.
-    \node[anchor=east,font=\tiny\bfseries] at (-0.18,-10.3) {Nuevos algoritmos y sistemas};
-    \fill[accent!82] (6,-10.48) rectangle (15,-10.12);
-    \node[anchor=east,font=\tiny] at (-0.18,-11.3) {Incorporar nuevas metaheurísticas};
-    \fill[accent!48] (6,-11.46) rectangle (11,-11.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-12.3) {Extender protocolo de cooperación};
-    \fill[accent!48] (9,-12.46) rectangle (13,-12.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-13.3) {Integrar otros sistemas con DTW/DDTW};
-    \fill[accent!48] (10,-13.46) rectangle (15,-13.14);
-
-    % Experimentación y cierre.
-    \node[anchor=east,font=\tiny\bfseries] at (-0.18,-14.3) {Experimentación y cierre};
-    \fill[warn!78] (12,-14.48) rectangle (18,-14.12);
-    \node[anchor=east,font=\tiny] at (-0.18,-15.3) {Ejecutar campañas multiobjetivo};
-    \fill[warn!45] (12,-15.46) rectangle (15,-15.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-16.3) {Comparar algoritmos y sistemas};
-    \fill[warn!45] (13,-16.46) rectangle (16,-16.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-17.3) {Analizar resultados y limitaciones};
-    \fill[warn!45] (14,-17.46) rectangle (17,-17.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-18.3) {Redactar informe y presentación};
-    \fill[warn!45] (14,-18.46) rectangle (18,-18.14);
-
-    % Hitos académicos; se elimina el hito de software.
-    \node[anchor=east,font=\tiny\bfseries] at (-0.18,-19.3) {Hitos académicos};
-    \fill[primary!70] (5,-19.48) rectangle (19,-19.12);
-    \node[anchor=east,font=\tiny] at (-0.18,-20.3) {Primera entrega (11 sep.)};
-    \fill[accent] (5.5,-20.3) circle (0.075);
-    \node[anchor=east,font=\tiny] at (-0.18,-21.3) {Presentaciones de avance};
-    \fill[primary!48] (6,-21.46) rectangle (8,-21.14);
-    \node[anchor=east,font=\tiny] at (-0.18,-22.3) {Informe final (20 nov.)};
-    \fill[accent] (15.5,-22.3) circle (0.075);
-    \node[anchor=east,font=\tiny] at (-0.18,-23.3) {Presentaciones finales};
-    \fill[primary!48] (17,-23.46) rectangle (19,-23.14);
+  \vspace{0.2cm}
+  \begin{tikzpicture}[node distance=0.55cm]
+    \node[flujo, text width=2.1cm] (curva) {Curva de\\convergencia};
+    \node[flujo, text width=2.1cm, right=of curva] (ventana) {Ventana\\reciente};
+    \node[flujo, text width=2.3cm, right=of ventana] (dtw) {Comparar con\\patrones\\(DTW/DDTW)};
+    \node[flujo, diamond, aspect=1.9, inner sep=1pt, text width=2.2cm, draw=accent, fill=accent!10,
+          right=of dtw] (dec) {¿Estancamiento\\confirmado?};
+    \node[flujo, text width=3.0cm, draw=warn, fill=warn!10, below=1.0cm of dec] (cambiar)
+      {Cambiar algoritmo y\\conservar el mejor};
+    \draw[flecha] (curva) -- (ventana);
+    \draw[flecha] (ventana) -- (dtw);
+    \draw[flecha] (dtw) -- (dec);
+    \draw[flecha, warn] (dec) -- node[right, font=\scriptsize\bfseries, text=warn] {sí} (cambiar);
+    \draw[flecha, best] (dec.north) -- ++(0,0.45) -| node[pos=0.25, above, font=\scriptsize\bfseries, text=best]
+      {no: continuar con el mismo algoritmo} (curva.north);
+    \draw[flecha] (cambiar) -| node[pos=0.25, below, font=\scriptsize, text=inkgray]
+      {la búsqueda continúa (nuevas iteraciones)} (curva.south);
   \end{tikzpicture}
 
+  \vspace{0.35cm}
+  \small La revisión se repite durante toda la búsqueda; nunca se reinicia desde cero.
 \end{frame}
 
+% Contraste: sin entrenamiento previo
+\begin{frame}{Una ventaja importante}
+  \begin{exampleblock}{No requiere entrenamiento}
+    DTW compara la curva actual con dos patrones fijos. No necesita datos históricos ni una política aprendida.
+  \end{exampleblock}
+  \vspace{0.2cm}
+  \centering
+  \begin{tikzpicture}[node distance=0.5cm]
+    \node[font=\footnotesize\bfseries, text=inkgray!70, anchor=east, align=right] at (-0.3,0) {No se\\necesita};
+    \node[flujo, text width=2.4cm, draw=inkgray!40, fill=inkgray!5, text=inkgray!55] (h1) at (1.4,0) {Datos históricos};
+    \node[flujo, text width=2.4cm, draw=inkgray!40, fill=inkgray!5, text=inkgray!55, right=of h1] (h2) {Entrenamiento};
+    \node[flujo, text width=2.4cm, draw=inkgray!40, fill=inkgray!5, text=inkgray!55, right=of h2] (h3) {Política\\aprendida};
+    \draw[flecha, inkgray!35] (h1) -- (h2);
+    \draw[flecha, inkgray!35] (h2) -- (h3);
+    \node[font=\Large\bfseries, text=warn, right=0.25cm of h3] {$\times$};
 
-\section{5. Cierre}
+    \node[font=\footnotesize\bfseries, text=best, anchor=east, align=right] at (-0.3,-1.5) {Lo que\\se usa};
+    \node[flujo, text width=2.4cm, draw=best, fill=best!10] (u1) at (1.4,-1.5) {Curva actual};
+    \node[flujo, text width=2.4cm, draw=best, fill=best!10, right=of u1] (u2) {DTW/DDTW contra\\progreso y estancamiento};
+    \node[flujo, text width=2.4cm, draw=best, fill=best!10, right=of u2] (u3) {Decisión};
+    \draw[flecha] (u1) -- (u2);
+    \draw[flecha] (u2) -- (u3);
+  \end{tikzpicture}
 
-% -----------------------------------------------------------------------------
-\begin{frame}{Contribuciones esperadas}
+  \vspace{0.3cm}
+  \small Esa comparación indica estancamiento durante la búsqueda. No es un uso habitual de DTW.
+\end{frame}
+
+\begin{frame}{Idea central}
   \begin{enumerate}
-    \item Un detector de estancamiento que usa la forma temporal del fitness.
-    \item Un protocolo de transferencia que preserva la mejor solución y adapta al algoritmo receptor.
-    \item Un orquestador que alterna exploración y explotación.
-    \item Una validación gradual del dimensionamiento HRES--H$_2$.
+    \item La curva de convergencia se analiza durante la búsqueda.
+    \item DTW o DDTW reconoce si su forma indica progreso o estancamiento.
+    \item Al confirmar el estancamiento, se cambia de algoritmo sin perder el mejor resultado.
   \end{enumerate}
-\end{frame}
-
-% -----------------------------------------------------------------------------
-\appendix
-\section{Referencias}
-\begin{frame}[allowframebreaks]{Referencias citadas}
-  \tiny
-  \nocite{wolpert1997no,vega2021learning,akbulut2026artificial,talbi2021machine_tax,
-    pei2025adaptive,adriaensen2022automated,jankovic2022trajectory,
-    kostovska2022per,cenikj2026survey,berndt1994using,keogh2001derivative,
-    mambrini2015design,liu2025three,reijnen2025search}
-  \printbibliography[heading=none]
+  \vfill
+  \centering
+  \key{La serie temporal informa la decisión; no sirve solo para el gráfico final.}
 \end{frame}
 
 \end{document}

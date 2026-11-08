@@ -1,0 +1,13 @@
+instance,index,policy,configuration,parameter,parameter_value,seed,status,best_fitness,known_optimum,gap_pct,evaluations,elapsed_s,profile_changes
+mknapcb1.txt,0,binary_simple,baseline,baseline,,1,ok,23085.0,24381.0,5.3156146179401995,724,1.697458,0
+mknapcb1.txt,0,binary_simple,window_20,window,20,1,ok,23260.0,24381.0,4.597842582338706,724,1.912379,1
+mknapcb1.txt,0,binary_complex,baseline,baseline,,1,ok,23085.0,24381.0,5.3156146179401995,724,1.335117,0
+mknapcb1.txt,0,binary_complex,window_20,window,20,1,ok,23085.0,24381.0,5.3156146179401995,724,1.243433,1
+mknapcb1.txt,15,binary_simple,baseline,baseline,,1,ok,41304.0,42927.0,3.7808372353064503,724,0.951571,0
+mknapcb1.txt,15,binary_simple,window_20,window,20,1,ok,41322.0,42927.0,3.7389055838982457,724,1.163607,1
+mknapcb1.txt,15,binary_complex,baseline,baseline,,1,ok,41304.0,42927.0,3.7808372353064503,724,1.145841,0
+mknapcb1.txt,15,binary_complex,window_20,window,20,1,ok,41322.0,42927.0,3.7389055838982457,724,0.880657,1
+mknapcb1.txt,29,binary_simple,baseline,baseline,,1,ok,59151.0,59965.0,1.3574585174685232,724,0.534493,0
+mknapcb1.txt,29,binary_simple,window_20,window,20,1,ok,59151.0,59965.0,1.3574585174685232,724,0.83969,1
+mknapcb1.txt,29,binary_complex,baseline,baseline,,1,ok,59151.0,59965.0,1.3574585174685232,724,0.89909,0
+mknapcb1.txt,29,binary_complex,window_20,window,20,1,ok,59151.0,59965.0,1.3574585174685232,724,0.807763,1

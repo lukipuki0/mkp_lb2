@@ -1,0 +1,180 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[varvw]{newtxmath}
+\usepackage{graphicx}
+
+\begin{document}
+
+\title{Leer la curva de convergencia: dynamic time warping para el perfil de GWO--DE}
+\titlerunning{Perfil de GWO--DE}
+
+\author{Lucas Erazo\inst{1,2} \and Emanuel Vega\inst{1} \and Ricardo Soto\inst{1}}
+\authorrunning{Erazo et al.}
+
+\institute{Escuela de Ingeniería Informática, Pontificia Universidad Católica de Valparaíso, Valparaíso, Chile\\
+\email{lucas.erazo@pucv.cl, emanuel.vega@pucv.cl, ricardo.soto@pucv.cl}\\
+\and
+Escuela de Ingeniería de Construcción y Transporte, Pontificia Universidad Católica de Valparaíso, Valparaíso, Chile}
+
+\maketitle
+
+\begin{abstract}
+La historia del mejor valor encontrado se lee mientras la búsqueda sigue.
+El cambio de perfil de GWO--DE sale de esa lectura, no de un contador fijo ni de una política entrenada.
+\keywords{Dynamic time warping \and GWO--DE \and Perfil de búsqueda \and Mochila multidimensional.}
+\end{abstract}
+
+\section{Introducción}
+Durante la búsqueda, la curva de convergencia se usa como señal mientras el proceso sigue, no solo como gráfico final.
+
+\section{Trabajo relacionado}
+% PENDIENTE: trabajo relacionado
+
+\section{Lectura de la curva}
+% PENDIENTE - Figura: ventana reciente contra la rampa y la constante. Ubicación: sección Lectura de la curva. Propósito: mostrar las dos referencias ancladas en el primer valor de la ventana. Fuentes: definición ya escrita en esta sección.
+
+\subsection{Serie y ventana}
+Sea $q_t$ el mejor valor registrado en la iteración $t$.
+Para comparar maximización y minimización con el mismo sentido de progreso, la serie monitoreada es $x_t = q_t$ en el primer caso y $x_t = -q_t$ en el segundo.
+Desde la iteración $W = 40$, el monitor no lee la corrida entera: toma la ventana reciente
+\[
+\mathbf{X} = [x_{t-W+1}, \ldots, x_t].
+\]
+
+\subsection{Referencias y distancias}
+Esa ventana se compara con dos referencias del mismo largo, construidas para ella y ancladas en su primer valor.
+No salen de corridas anteriores.
+La de estancamiento es constante.
+La rampa crece desde el mismo punto con pendiente fija $s_{\min} = 2$, en unidades de la serie por iteración.
+Esa pendiente dibuja la referencia.
+No obliga al algoritmo a mejorar al menos eso.
+Si se deja en cero, pasa a ser el uno por ciento del rango de la ventana.
+La Tabla~\ref{tab:monitor} fija el resto de la configuración de este híbrido.
+
+\begin{table}
+\caption{Configuración del monitor en GWO--DE.}
+\label{tab:monitor}
+\begin{tabular}{ll}
+\hline
+Parámetro & Valor \\
+\hline
+Ventana $W$ & 40 \\
+Banda de alineamiento $w$ & 4 \\
+Iteraciones sin mejora, $K_{\max}$ & 15 \\
+Paciencia de confirmación $P$ & 8 \\
+Pendiente de la rampa $s_{\min}$ & 2 \\
+Percentil bajo / alto & 40 / 60 \\
+Distancia por defecto & DDTW \\
+\hline
+\end{tabular}
+\end{table}
+
+Esos enteros no hacen el mismo trabajo.
+$W = 40$ decide cuánta historia reciente entra en la comparación.
+$K_{\max} = 15$ exige quince iteraciones seguidas sin mejora estricta antes de que las distancias puedan avanzar la confirmación.
+$P = 8$ exige que la condición completa se sostenga ocho pasos, de modo que una distancia favorable en una sola iteración no cambia el perfil.
+En este híbrido esa paciencia vale para toda la corrida.
+
+La distancia entre la ventana y cada referencia se calcula con dynamic time warping, que tolera que la mejora no caiga en el mismo instante~\cite{berndt1994using}.
+El alineamiento queda dentro de una banda de Sakoe--Chiba de ancho $w = \lfloor 0{,}1 \, W \rfloor$, aquí igual a 4, para que una deformación extrema no cuente como semejanza.
+% PENDIENTE: fuente Sakoe--Chiba
+La configuración de la Tabla~\ref{tab:monitor} usa la versión derivada, que aplica esa distancia a las diferencias de primer orden y hace que un desplazamiento vertical pese menos que el cambio de forma~\cite{keogh2001derivative}.
+$D_1$ es la distancia a la rampa, $D_2$ la distancia a la constante y $\Delta = D_1 - D_2$.
+La misma ventana puede leerse con DTW.
+Este texto no compara las dos.
+
+Una ventana parecida a la rampa tiende a quedar más cerca de esa referencia que de la constante, y una ventana casi plana tiende a quedar cerca de la constante.
+Son tendencias, no una regla de cambio: el signo de $\Delta$ depende de la pendiente, del largo de la ventana y de la trayectoria observada.
+
+\subsection{Decisión y confirmación}
+Los umbrales no son cortes fijos.
+Después de diez observaciones, el percentil 40 de $D_2$ marca cercanía a la constante, y el percentil 60 de $D_1$ y de $\Delta$ marca lejanía respecto de la rampa.
+Con $N$ el tramo seguido sin mejora estricta, y con $K_{\max}$ tomado de la Tabla~\ref{tab:monitor}, la condición instantánea es
+\begin{equation}
+\mathrm{Estancado}(t) \iff
+(N \ge K_{\max})
+\land (D_2 \le \theta_c)
+\land \bigl( (D_1 \ge \theta_r) \lor (\Delta \ge \theta_{\Delta}) \bigr).
+\label{eq:estancado}
+\end{equation}
+La ecuación~(\ref{eq:estancado}) no autoriza el cambio.
+Tiene que sostenerse $P$ pasos.
+Si falla, la racha vuelve a cero.
+
+\section{Cambio de perfil}
+\subsection{Dos perfiles}
+El monitor no elige otra metaheurística: cambia el perfil de GWO--DE.
+Hay dos perfiles fijos.
+Explotación usa $a = 0{,}5$, $F = 0{,}5$ y $CR = 0{,}9$.
+Exploración usa $a = 2$, $F = 0{,}9$ y $CR = 0{,}3$.
+La búsqueda empieza en explotación.
+
+\subsection{Ida, vuelta y reinicio}
+Si la explotación está activa y la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, el paso siguiente usa exploración.
+Si ya está en exploración y una observación lista muestra un tramo sin mejora menor que $K_{\max}$, vuelve a explotación.
+Si sigue estancado, permanece ahí.
+Después de cada cambio el monitor se reemplaza: se descartan la ventana, la racha y los umbrales, y no hay otra decisión hasta reunir $W$ observaciones nuevas.
+La población y el mejor global no se reinician.
+El cambio decidido en la generación $g$ rige desde $g+1$.
+El mismo híbrido tiene otra regla binaria, que entra a exploración solo si $D_2 \le \theta_c$.
+No es la de este texto.
+
+\section{Contraste en la mochila}
+\subsection{Instancias y corridas}
+El contraste usa nueve instancias de la mochila multidimensional de Chu y Beasley~\cite{chu1998genetic}, con 100, 250 o 500 ítems y 5, 10 o 30 restricciones, cada una con un valor de referencia conocido.
+Son 31 corridas independientes por condición, con la configuración de la Tabla~\ref{tab:monitor}.
+
+\subsection{Controles}
+La Tabla~\ref{tab:controles} separa el perfil adaptativo de dos controles que no leen la curva y no cambian: explotación fija y exploración fija.
+El adaptativo solo deja la explotación si la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, y solo vuelve si la exploración muestra mejora reciente.
+
+\begin{table}
+\caption{Qué observa cada perfil de GWO--DE y cuándo cambia.}
+\label{tab:controles}
+\begin{tabular}{lll}
+\hline
+Procedimiento & Qué observa & Cuándo cambia \\
+\hline
+Perfil adaptativo & Forma de la ventana y persistencia & Disparo completo \\
+Explotación fija & Nada de la curva & No cambia \\
+Exploración fija & Nada de la curva & No cambia \\
+\hline
+\end{tabular}
+\end{table}
+
+Esas dos diferencias aíslan la pregunta.
+Si el perfil adaptativo no supera a la explotación fija, salir de ese modo no aporta.
+Si no supera a la exploración fija, el regreso tampoco.
+Una diferencia solo cuenta si aparece en la calidad final y no se explica por haber usado un perfil distinto desde el inicio.
+Si la misma lectura se sostiene en otro dominio no se examina aquí.
+
+\section{Resultados}
+% PENDIENTE: contraste numérico en la mochila. No inventar promedios, brechas ni pruebas.
+
+\section{Discusión}
+% PENDIENTE
+
+\section{Conclusión}
+% PENDIENTE
+
+\begin{credits}
+\subsubsection{\ackname}
+% PENDIENTE
+\subsubsection{\discintname}
+% PENDIENTE
+\end{credits}
+
+\begin{thebibliography}{3}
+\bibitem{berndt1994using}
+Berndt, D.J., Clifford, J.: Using dynamic time warping to find patterns in time series. In: KDD Workshop (AAAI-94 Workshops on Knowledge Discovery in Databases), vol. 398, pp. 359--370 (1994)
+
+\bibitem{keogh2001derivative}
+Keogh, E.J., Pazzani, M.J.: Derivative dynamic time warping. In: Proceedings of the 2001 SIAM International Conference on Data Mining, pp. 1--11 (2001)
+
+\bibitem{chu1998genetic}
+Chu, P.C., Beasley, J.E.: A genetic algorithm for the multidimensional knapsack problem. Journal of Heuristics 4(1), 63--86 (1998)
+\end{thebibliography}
+
+\end{document}

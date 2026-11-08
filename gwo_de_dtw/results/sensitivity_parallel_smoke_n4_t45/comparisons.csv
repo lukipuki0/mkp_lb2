@@ -1,0 +1,13 @@
+instance,index,policy,parameter,configuration,parameter_value,mean_fitness,baseline_mean_fitness,mean_fitness_delta_vs_baseline
+mknapcb1.txt,0,binary_simple,baseline,baseline,,23085.0,23085.0,0.0
+mknapcb1.txt,0,binary_simple,window,window_20,20,23260.0,23085.0,175.0
+mknapcb1.txt,0,binary_complex,baseline,baseline,,23085.0,23085.0,0.0
+mknapcb1.txt,0,binary_complex,window,window_20,20,23085.0,23085.0,0.0
+mknapcb1.txt,15,binary_simple,baseline,baseline,,41304.0,41304.0,0.0
+mknapcb1.txt,15,binary_simple,window,window_20,20,41322.0,41304.0,18.0
+mknapcb1.txt,15,binary_complex,baseline,baseline,,41304.0,41304.0,0.0
+mknapcb1.txt,15,binary_complex,window,window_20,20,41322.0,41304.0,18.0
+mknapcb1.txt,29,binary_simple,baseline,baseline,,59151.0,59151.0,0.0
+mknapcb1.txt,29,binary_simple,window,window_20,20,59151.0,59151.0,0.0
+mknapcb1.txt,29,binary_complex,baseline,baseline,,59151.0,59151.0,0.0
+mknapcb1.txt,29,binary_complex,window,window_20,20,59151.0,59151.0,0.0

@@ -1,0 +1,114 @@
+{
+ "status": "completed",
+ "total_runs": 12,
+ "completed_runs": 12,
+ "error": null,
+ "where": null,
+ "started": "2026-11-07T22:09:12",
+ "finished": "2026-11-07T22:10:23",
+ "timing": {
+  "started": "2026-11-07T22:09:12",
+  "finished": "2026-11-07T22:10:23",
+  "elapsed_s": 70.599784,
+  "unit": "seconds"
+ },
+ "selection": {
+  "instance_file": "instancias/mknapcb1.txt",
+  "indices": [
+   0,
+   15,
+   29
+  ],
+  "seeds": [
+   1
+  ],
+  "policies": [
+   "binary_simple",
+   "binary_complex"
+  ],
+  "configurations": [
+   "baseline",
+   "window_20"
+  ],
+  "workers_requested": 3,
+  "workers_effective": 3
+ },
+ "parallelism": {
+  "by": "instance",
+  "start_method": "spawn",
+  "pending_cancel": "instances not yet started are not started",
+  "in_flight_cancel": "process termination; run_hybrid has no cooperative cancel, so a running call is not an in-frame interrupt and is not recorded as completed",
+  "retry": false
+ },
+ "effective_config": {
+  "binarization": "lb2",
+  "hybrid_mode": "competitive",
+  "signal": "ddtw",
+  "pop": 4,
+  "iterations": 45,
+  "G1": 0.5,
+  "G2": 0.5,
+  "g3_exploit": 0.1,
+  "g3_explore": 0.1,
+  "dtw_kirito": false,
+  "min_slope": 2.0,
+  "improvement_tol": 0.0,
+  "adapt_thresholds": true,
+  "monitor_by_configuration": {
+   "baseline": {
+    "window": 40,
+    "band": 4,
+    "min_slope": 2.0,
+    "plateau_max": 15,
+    "patience": 8,
+    "use_ddtw": true,
+    "adapt_thresholds": true,
+    "p_low": 40.0,
+    "p_high": 60.0,
+    "improvement_tol": 0.0
+   },
+   "window_20": {
+    "window": 20,
+    "band": 4,
+    "min_slope": 2.0,
+    "plateau_max": 15,
+    "patience": 8,
+    "use_ddtw": true,
+    "adapt_thresholds": true,
+    "p_low": 40.0,
+    "p_high": 60.0,
+    "improvement_tol": 0.0
+   }
+  }
+ },
+ "provenance": {
+  "runner": "gwo_de_dtw.controller.run_hybrid",
+  "instance_loader": "gwo_de_dtw.problem.cargar_instancia",
+  "design": "descriptive one-at-a-time",
+  "inferential_tests": false,
+  "seed_paired_initial_conditions": "not_claimed",
+  "optimum_source": "instance header, else mkcbres.txt beside the file; non-positive means unknown"
+ },
+ "runtime": {
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "numpy": "2.4.4"
+ },
+ "optimum_evidence": [
+  {
+   "index": 0,
+   "known_optimum": 24381.0,
+   "reference": "known"
+  },
+  {
+   "index": 15,
+   "known_optimum": 42927.0,
+   "reference": "known"
+  },
+  {
+   "index": 29,
+   "known_optimum": 59965.0,
+   "reference": "known"
+  }
+ ]
+}
