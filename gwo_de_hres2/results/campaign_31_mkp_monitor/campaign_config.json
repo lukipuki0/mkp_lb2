@@ -1,0 +1,82 @@
+{
+  "signals": [
+    "dtw",
+    "ddtw"
+  ],
+  "policies": [
+    "binary_simple",
+    "binary_complex",
+    "continuous_simple",
+    "continuous_complex",
+    "vanilla_exploitation",
+    "vanilla_exploration"
+  ],
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "pop_size": 30,
+  "iterations": 1000,
+  "monitor": {
+    "dtw": {
+      "window": 40,
+      "band": 4,
+      "min_slope": 2.0,
+      "plateau_max": 15,
+      "patience": 8,
+      "use_ddtw": false,
+      "adapt_thresholds": true,
+      "p_low": 40.0,
+      "p_high": 60.0,
+      "improvement_tol": 0.0
+    },
+    "ddtw": {
+      "window": 40,
+      "band": 4,
+      "min_slope": 2.0,
+      "plateau_max": 15,
+      "patience": 8,
+      "use_ddtw": true,
+      "adapt_thresholds": true,
+      "p_low": 40.0,
+      "p_high": 60.0,
+      "improvement_tol": 0.0
+    }
+  },
+  "objective": "HRES2Function._evaluate (LCOE, penalty if infeasible)",
+  "weather": "generate_synthetic_tmy_8760",
+  "total_runs": 372,
+  "completed_runs": 372,
+  "status": "completed",
+  "started": "2026-11-08T20:46:14",
+  "finished": "2026-11-08T21:34:43"
+}

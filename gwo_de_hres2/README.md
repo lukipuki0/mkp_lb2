@@ -87,7 +87,7 @@ one-seed `runs.jsonl` remains full.
 |---|---|
 | population `N` / generations / seed | 30 / 1000 / 1 |
 | signal | DDTW (`--signal dtw` for DTW) |
-| monitor | HRES2 paper nominal: W 40, band 4, `min_slope` 0.1, `plateau_max` 15, `patience` 8, adaptive thresholds 30/70 |
+| monitor | same as `gwo_de_dtw` (MKP): W 40, band 4, `min_slope` 2.0, `plateau_max` 15, `patience` 8, adaptive thresholds 40/60 |
 | profiles | from `gwo_de_dtw.config`: exploit `a=0.5, F=0.5, CR=0.9`; explore `a=2.0, F=0.9, CR=0.3` |
 
 The HRES2 dispatch is compiled with numba: the first evaluation takes about 1 s (JIT), later ones about 0.25 ms, so N30 × 1000 generations (60 030 evaluations) takes on the order of 15–25 s per policy.

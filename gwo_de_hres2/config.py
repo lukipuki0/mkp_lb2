@@ -2,9 +2,10 @@
 Defaults of the GWO-DE hybrid on HRES2.
 
 Profiles (a, F, CR) come from gwo_de_dtw.config; G3 is not used here. The
-monitor follows the HRES2 paper nominal configuration
-(HRES2-H2/benchmark_hres2.py), not the MKP one (whose min_slope 2.0 is far
-above an LCOE in CNY/kWh).
+monitor uses the same values as the MKP GWO-DE (gwo_de_dtw.config), by user
+request. Note: min_slope 2.0 is far above an LCOE in CNY/kWh, so the ramp
+baseline sits well above the convergence curve (the HRES2 paper nominal was
+min_slope 0.1, thresholds 30/70).
 
 Spec: odd/tasks/gwo-de-hres2.md (S4, S5).
 """
@@ -19,15 +20,15 @@ SEED = 1
 # "ddtw" or "dtw"
 SIGNAL = "ddtw"
 
-# Stagnation monitor (HRES2 paper nominal)
+# Stagnation monitor (same as gwo_de_dtw.config, MKP)
 WINDOW = 40
 BAND = 4
-MIN_SLOPE = 0.1
+MIN_SLOPE = 2.0
 PLATEAU_MAX = 15
 PATIENCE = 8
 ADAPT_THRESHOLDS = True
-P_LOW = 30.0
-P_HIGH = 70.0
+P_LOW = 40.0
+P_HIGH = 60.0
 IMPROVEMENT_TOL = 0.0
 
 

@@ -1,0 +1,48 @@
+{
+  "policy": "continuous_complex",
+  "signal": "ddtw",
+  "seed": 1,
+  "monitor_config": {
+    "window": 40,
+    "band": 4,
+    "min_slope": 2.0,
+    "plateau_max": 15,
+    "patience": 8,
+    "use_ddtw": true,
+    "adapt_thresholds": true,
+    "p_low": 40.0,
+    "p_high": 60.0,
+    "improvement_tol": 0.0
+  },
+  "controller_config": {
+    "scale": 2.0,
+    "k": 5.0,
+    "center": 0.5,
+    "dtw_kirito": false,
+    "exploit": {
+      "name": "exploit",
+      "a": 0.5,
+      "F": 0.5,
+      "CR": 0.9,
+      "G3": 0.0
+    },
+    "explore": {
+      "name": "explore",
+      "a": 2.0,
+      "F": 0.9,
+      "CR": 0.3,
+      "G3": 0.0
+    }
+  },
+  "objective": 0.26715945105708805,
+  "evaluations": 60030,
+  "monitor_input": "-objective",
+  "verified_controller_replay": true,
+  "notes": {
+    "f_star": "Negated best objective (maximize), not physical LCOE.",
+    "s": "Decision after t, applied at t+1: 0 exploit, 1 explore.",
+    "mode_used": "Profile used at t: 0 exploit, 1 explore.",
+    "parameters": "a/F/CR and intensity used at t, before observation.",
+    "X_R_C": "Verified filtered monitor window and baselines; NaN when unready."
+  }
+}

@@ -137,12 +137,12 @@ class RunSearchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_search(FakeFunction(), monitor_cfg(), policy="nope", pop_size=5, iterations=2)
 
-    def test_defaults_follow_hres2_paper_monitor(self):
+    def test_defaults_follow_mkp_gwo_de_monitor(self):
         self.assertEqual((config.POP_SIZE, config.ITERATIONS, config.SEED), (30, 1000, 1))
         cfg = config.monitor_config(use_ddtw=True)
         self.assertEqual((cfg.window, cfg.band, cfg.min_slope, cfg.plateau_max, cfg.patience,
                           cfg.adapt_thresholds, cfg.p_low, cfg.p_high),
-                         (40, 4, 0.1, 15, 8, True, 30.0, 70.0))
+                         (40, 4, 2.0, 15, 8, True, 40.0, 60.0))
         self.assertTrue(cfg.use_ddtw)
         self.assertFalse(config.monitor_config(use_ddtw=False).use_ddtw)
 

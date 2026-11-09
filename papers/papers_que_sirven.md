@@ -1,8 +1,10 @@
 # Papers que sirven para introducción y estado del arte
 
-Selección de `savedrecs (2).xls`, `savedrecs (3).xls` y `savedrecs (4).xls`. Ventana 2021–2026, más Drake et al. (2020) como única encuesta anterior. El enlace de cada paper es su DOI.
+Selección histórica de `savedrecs (2).xls`, `savedrecs (3).xls` y `savedrecs (4).xls`. Ventana 2021–2026, más Drake et al. (2020) como única encuesta anterior en aquella criba. El enlace de cada paper es su DOI.
 
-La búsqueda de hibridación GWO–DE no está en estos Excel.
+El catálogo vigente de los PDF leídos está en [Papers Seminario](Papers%20Seminario/README.md): 75 estudios en seis secciones, cuatro copias aparte, fichas con páginas físicas del PDF y [síntesis de trabajo](Papers%20Seminario/ESTADO_DEL_ARTE.md). La bibliografía [referencias.bib](referencias.bib) (81 claves) manda sobre el año del nombre de archivo y sobre el año de esta lista cuando discrepan. Seis claves de la selección original no tienen PDF en el catálogo y no se reescribieron como fichas: `Aydin_2025`, `Biedenkapp_2022`, `Doerr_2021`, `Guo_2024`, `Ming_2024`, `Sun_2021`.
+
+La búsqueda de hibridación GWO–DE no está en estos Excel. Esa frase describe las tres exportaciones, no el resto de la literatura ni el catálogo de 75 estudios.
 
 ## Introducción
 
@@ -29,7 +31,7 @@ Cambiar parámetros u operadores:
 
 - Sun, J. Y.; Liu, X.; Bäck, T.; Xu, Z. B. (2021). Learning Adaptive Differential Evolution Algorithm From Optimization Experiences by Policy Gradient. *IEEE Transactions on Evolutionary Computation*. <https://doi.org/10.1109/TEVC.2021.3060811>
 - Ming, F.; Gong, W. Y.; Wang, L.; Jin, Y. C. (2024). Constrained Multi-Objective Optimization With Deep Reinforcement Learning Assisted Operator Selection. *IEEE/CAA Journal of Automatica Sinica*. <https://doi.org/10.1109/JAS.2023.123687>
-- Ding, W. J.; Qian, M. T.; Lu, C.; Yi, J.; Pu, H. Y.; Luo, J. (2026). Differential Evolution with Joint Adaptation of Mutation Strategies and Control Parameters via Distributed Proximal Policy Optimization. *Tsinghua Science and Technology*. <https://doi.org/10.26599/TST.2024.9010185>
+- Ding, W. J.; Qian, M. T.; Lu, C.; Yi, J.; Pu, H. Y.; Luo, J. (número impreso febrero de 2026, pp. 101-124; registro Crossref 2025; clave retenida `Ding_2025`, no se inventó otra). Differential Evolution with Joint Adaptation of Mutation Strategies and Control Parameters via Distributed Proximal Policy Optimization. *Tsinghua Science and Technology*. <https://doi.org/10.26599/TST.2024.9010185>
 - Reijnen, R.; Zhang, Y. Q.; Bukhsh, Z.; Guzek, M. (2022). Deep Reinforcement Learning for Adaptive Parameter Control in Differential Evolution for Multi-Objective Optimization. *IEEE SSCI 2022*. <https://doi.org/10.1109/SSCI51031.2022.10022227>
 - Zhou, T. W.; Zhang, W. W.; Niu, B.; He, P. C.; Yue, G. H. (2024). Parameter Control Framework for Multiobjective Evolutionary Computation Based on Deep Reinforcement Learning. *International Journal of Intelligent Systems*. <https://doi.org/10.1155/2024/6740701>
 - Durgut, R.; Aydin, M. E. (2021). Reinforcement Learning-Based Adaptive Operator Selection. *Optimization and Learning, OLA 2021*. <https://doi.org/10.1007/978-3-030-85672-4_3>

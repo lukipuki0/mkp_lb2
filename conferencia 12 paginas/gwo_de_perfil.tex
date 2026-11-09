@@ -4,6 +4,9 @@
 \usepackage{newtxtext}
 \usepackage[varvw]{newtxmath}
 \usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
 
 \begin{document}
 
@@ -32,66 +35,142 @@ Durante la búsqueda, la curva de convergencia se usa como señal mientras el pr
 \section{Trabajo relacionado}
 % PENDIENTE: trabajo relacionado
 
-\section{Lectura de la curva}
-% PENDIENTE - Figura: ventana reciente contra la rampa y la constante. Ubicación: sección Lectura de la curva. Propósito: mostrar las dos referencias ancladas en el primer valor de la ventana. Fuentes: definición ya escrita en esta sección.
+\section{El problema y el híbrido GWO--DE}
+\label{sec:hibrido}
 
-\subsection{Serie y ventana}
-Sea $q_t$ el mejor valor registrado en la iteración $t$.
-Para comparar maximización y minimización con el mismo sentido de progreso, la serie monitoreada es $x_t = q_t$ en el primer caso y $x_t = -q_t$ en el segundo.
-Desde la iteración $W = 40$, el monitor no lee la corrida entera: toma la ventana reciente
-\[
-\mathbf{X} = [x_{t-W+1}, \ldots, x_t].
-\]
+El monitor de la sección~\ref{sec:monitor} no elige una metaheurística: regula los parámetros de un híbrido que mantiene una sola población y, por lo tanto, un solo incumbente y una sola curva de convergencia. Esa propiedad es la que permite describir el estado de toda la búsqueda con una única ventana. Los dos operadores que compiten dentro de esa población son el Grey Wolf Optimizer y la evolución diferencial, y conviene fijar sus ecuaciones antes de describir cómo se combinan.
 
-\subsection{Referencias y distancias}
-Esa ventana se compara con dos referencias del mismo largo, construidas para ella y ancladas en su primer valor.
-No salen de corridas anteriores.
-La de estancamiento es constante.
-La rampa crece desde el mismo punto con pendiente fija $s_{\min} = 2$, en unidades de la serie por iteración.
-Esa pendiente dibuja la referencia.
-No obliga al algoritmo a mejorar al menos eso.
-Si se deja en cero, pasa a ser el uno por ciento del rango de la ventana.
-La Tabla~\ref{tab:monitor} fija el resto de la configuración de este híbrido.
+\subsection{Operadores}
+\label{sec:operadores}
+
+El Grey Wolf Optimizer guía cada candidato a partir de las tres mejores soluciones de la población, denotadas $\alpha$, $\beta$ y $\delta$~\cite{mirjalili2014grey}. Para el individuo $\mathbf{x}_i$, cada líder $\mathbf{x}_k$ con $k \in \{\alpha, \beta, \delta\}$ produce una posición dirigida
+\begin{align}
+\mathbf{D}_k &= \bigl|\mathbf{C}_k \odot \mathbf{x}_k - \mathbf{x}_i\bigr|, &
+\mathbf{y}_k &= \mathbf{x}_k - \mathbf{A}_k \odot \mathbf{D}_k, \label{eq:gwo}
+\end{align}
+donde $\mathbf{A}_k = 2a\,\mathbf{r}_{1,k} - a\,\mathbf{1}$, $\mathbf{C}_k = 2\,\mathbf{r}_{2,k}$, los vectores aleatorios tienen componentes independientes uniformes en $[0,1]$ y $\odot$ es el producto elemento a elemento. El candidato del operador es el promedio de las tres posiciones dirigidas, $(\mathbf{y}_\alpha + \mathbf{y}_\beta + \mathbf{y}_\delta)/3$. El parámetro $a$ fija el rango de los coeficientes de atracción: con valores mayores que uno, alguna componente de $\mathbf{A}_k$ puede superar la unidad en magnitud y el paso se aleja del líder, mientras que valores menores lo confinan cerca de los líderes. En la formulación original $a$ decrece a lo largo de la corrida; aquí lo entrega el perfil activo, de modo que la amplitud de la búsqueda deja de ser un calendario y pasa a depender de lo que la curva muestra.
+
+La evolución diferencial construye la dirección de búsqueda a partir de diferencias entre miembros de la población~\cite{storn1997differential}. El esquema DE/rand/1/bin elige tres individuos distintos entre sí y distintos del individuo objetivo, y forma el vector mutante
+\begin{equation}
+\mathbf{v}_i = \mathbf{x}_{r_1} + F\bigl(\mathbf{x}_{r_2} - \mathbf{x}_{r_3}\bigr),
+\label{eq:de_mutacion}
+\end{equation}
+donde $F$ escala el desplazamiento diferencial. El cruce binomial combina después ese mutante con el vector objetivo:
+\begin{equation}
+u_{i,j} =
+\begin{cases}
+v_{i,j}, & \text{si } r_j < CR \text{ o } j = j_{\mathrm{rand}}, \\
+x_{i,j}, & \text{en caso contrario},
+\end{cases}
+\label{eq:de_cruce}
+\end{equation}
+con $r_j$ uniforme en $[0,1]$ y con $j_{\mathrm{rand}}$ elegido al azar para garantizar que al menos una componente provenga del mutante. Un $CR$ alto aumenta la cantidad esperada de componentes tomadas del mutante, así que el mismo operador puede copiar al objetivo o apartarse de él según el valor que le entregue el perfil.
+
+\subsection{Población compartida}
+\label{sec:poblacion}
+
+Los dos operadores no corren en fases separadas ni sobre poblaciones distintas: ambos actúan sobre los mismos individuos y, para cada uno, proponen un candidato que compite con el otro. Al comienzo de la generación se copian los vectores reales de $\alpha$, $\beta$ y $\delta$, y esas copias permanecen congeladas durante toda la generación, de modo que los reemplazos que ocurran dentro de ella no mueven los blancos del Grey Wolf Optimizer. Los donantes de la evolución diferencial, en cambio, se leen de la población viva, incluidas las filas aceptadas antes en la misma generación.
+
+El candidato del Grey Wolf Optimizer se obtiene con la ecuación~(\ref{eq:gwo}) y el de la evolución diferencial con las ecuaciones~(\ref{eq:de_mutacion}) y~(\ref{eq:de_cruce}). Ambos candidatos se binarizan y se reparan antes de evaluarse, como se detalla en la sección~\ref{sec:dominios}. De los dos candidatos retiene el de mejor aptitud y, ante empate, el del Grey Wolf Optimizer. Ese candidato reemplaza al individuo $i$ cuando su aptitud es al menos tan buena como la actual, y el reemplazo actualiza juntos el vector continuo, la solución asociada y la aptitud. Aceptar la igualdad permite que la población derive sobre mesetas de igual valor, frecuentes cuando la reparación del dominio combinatorio proyecta muchos vectores continuos sobre la misma solución factible.
+
+Ese diseño tiene una consecuencia contable que importa para el contraste de la sección~\ref{sec:diseno}. El costo de una generación no depende del perfil activo: explotación y exploración consumen la misma cantidad de evaluaciones por generación. Ningún perfil puede ganar ventaja por gastar más presupuesto que el otro, y una diferencia de calidad final queda atribuible a la regla de decisión y no al volumen de búsqueda.
+
+\subsection{Dos perfiles}
+\label{sec:perfiles}
+
+La capa de control no selecciona algoritmos: fija los parámetros que comparten ambos operadores. La Tabla~\ref{tab:perfiles} define dos perfiles. Explotación usa un $a$ pequeño, que confina los candidatos del Grey Wolf Optimizer cerca de los líderes, junto con un peso diferencial bajo y una tasa de cruce alta, de modo que la evolución diferencial toma la mayor parte de sus componentes del mutante. Exploración invierte ese balance: el $a$ grande admite pasos que se alejan de los líderes, el $F$ alto amplifica el desplazamiento diferencial y el $CR$ bajo conserva más componentes del vector objetivo.
 
 \begin{table}
-\caption{Configuración del monitor en GWO--DE.}
-\label{tab:monitor}
-\begin{tabular}{ll}
-\hline
-Parámetro & Valor \\
-\hline
-Ventana $W$ & 40 \\
-Banda de alineamiento $w$ & 4 \\
-Iteraciones sin mejora, $K_{\max}$ & 15 \\
-Paciencia de confirmación $P$ & 8 \\
-Pendiente de la rampa $s_{\min}$ & 2 \\
-Percentil bajo / alto & 40 / 60 \\
-Distancia por defecto & DDTW \\
-\hline
+\caption{Perfiles de parámetros compartidos por ambos operadores. La búsqueda empieza en explotación.}
+\label{tab:perfiles}
+\begin{tabular}{lccc}
+\toprule
+Perfil & $a$ (GWO) & $F$ (DE) & $CR$ (DE) \\
+\midrule
+Explotación & 0,5 & 0,5 & 0,9 \\
+Exploración & 2 & 0,9 & 0,3 \\
+\bottomrule
 \end{tabular}
 \end{table}
 
-Esos enteros no hacen el mismo trabajo.
-$W = 40$ decide cuánta historia reciente entra en la comparación.
-$K_{\max} = 15$ exige quince iteraciones seguidas sin mejora estricta antes de que las distancias puedan avanzar la confirmación.
-$P = 8$ exige que la condición completa se sostenga ocho pasos, de modo que una distancia favorable en una sola iteración no cambia el perfil.
-En este híbrido esa paciencia vale para toda la corrida.
+Una corrida adaptativa empieza en explotación y permanece ahí hasta completar la ventana de la sección~\ref{sec:monitor}, porque antes de reunir $W$ observaciones no hay decisión posible. El cambio decidido al cierre de la generación $g$ rige desde $g+1$. Ni la población ni el mejor global se reinician, así que un cambio de perfil altera la forma de generar candidatos nuevos sin descartar lo que la búsqueda ya acumuló.
 
-La distancia entre la ventana y cada referencia se calcula con dynamic time warping, que tolera que la mejora no caiga en el mismo instante~\cite{berndt1994using}.
-El alineamiento queda dentro de una banda de Sakoe--Chiba de ancho $w = \lfloor 0{,}1 \, W \rfloor$, aquí igual a 4, para que una deformación extrema no cuente como semejanza.
-% PENDIENTE: fuente Sakoe--Chiba
-La configuración de la Tabla~\ref{tab:monitor} usa la versión derivada, que aplica esa distancia a las diferencias de primer orden y hace que un desplazamiento vertical pese menos que el cambio de forma~\cite{keogh2001derivative}.
-$D_1$ es la distancia a la rampa, $D_2$ la distancia a la constante y $\Delta = D_1 - D_2$.
-La misma ventana puede leerse con DTW.
-Este texto no compara las dos.
+\section{Lectura de la curva y cambio de perfil}
+\label{sec:monitor}
 
-Una ventana parecida a la rampa tiende a quedar más cerca de esa referencia que de la constante, y una ventana casi plana tiende a quedar cerca de la constante.
-Son tendencias, no una regla de cambio: el signo de $\Delta$ depende de la pendiente, del largo de la ventana y de la trayectoria observada.
+% PENDIENTE - Figura: ventana reciente superpuesta a la rampa de progreso y a la referencia constante, ambas ancladas en el primer valor de la ventana, con la banda de Sakoe--Chiba marcada sobre la matriz de alineamiento. Ubicación: inicio de la sección Lectura de la curva y cambio de perfil. Propósito: hacer visible que las dos referencias se construyen para la ventana observada y no se traen de corridas anteriores, y que la banda acota la deformación admitida. Fuentes: ecuaciones (eq:ventana), (eq:rampa), (eq:constante) y (eq:banda) de esta sección. El diagrama gwo_de_dtw_paper/figs/monitor-dtw/ ya cubre este contenido y puede adaptarse.
+
+\subsection{Serie y ventana}
+\label{sec:ventana}
+
+Sea $q_t$ el mejor valor registrado en la iteración $t$. Para comparar maximización y minimización con el mismo sentido de progreso, la serie monitoreada es $x_t = q_t$ en el primer caso y $x_t = -q_t$ en el segundo, de modo que un aumento de $x_t$ significa mejora tanto al maximizar como al minimizar. Desde la iteración $W$, el monitor no lee la corrida entera: toma la ventana reciente
+\begin{equation}
+\mathbf{X} = \bigl[x_{t-W+1}, \ldots, x_t\bigr] \in \mathbb{R}^{W}, \qquad t \ge W.
+\label{eq:ventana}
+\end{equation}
+Leer solo lo reciente evita que una mejora antigua, ya incorporada al incumbente, siga contando como evidencia de progreso cuando la búsqueda lleva tiempo detenida.
+
+\subsection{Referencias}
+\label{sec:referencias}
+
+La ventana se compara con dos referencias del mismo largo, construidas para ella y ancladas en su primer valor $x_1 = x_{t-W+1}$. No salen de corridas anteriores ni de un modelo del problema: se regeneran en cada iteración a partir de la ventana observada. La de estancamiento es constante,
+\begin{equation}
+c_k = x_1, \qquad k \in \{1, \ldots, W\},
+\label{eq:constante}
+\end{equation}
+y representa el arresto completo del progreso. La rampa crece desde el mismo punto con pendiente fija,
+\begin{equation}
+r_k = x_1 + s_{\min}\,(k-1), \qquad k \in \{1, \ldots, W\},
+\label{eq:rampa}
+\end{equation}
+y representa una mejora sostenida y uniforme. Esa pendiente dibuja la referencia: no obliga al algoritmo a mejorar al menos eso. En la configuración de la Tabla~\ref{tab:monitor} vale $s_{\min} = 2$, en unidades de la serie por iteración. Si se deja en cero, el monitor calcula una pendiente automática de un centésimo del rango de la ventana por iteración, con un piso que impide que una ventana plana colapse la rampa sobre la constante. La configuración usada aquí no recurre a ese caso.
+
+\subsection{Distancias}
+\label{sec:distancias}
+
+La distancia entre la ventana y cada referencia se calcula con dynamic time warping, que tolera que la mejora no caiga en el mismo instante~\cite{berndt1994using}. La recurrencia acumula el costo absoluto,
+\begin{equation}
+D(i,j) = \bigl|x_i - y_j\bigr| + \min\bigl\{D(i-1,j),\; D(i,j-1),\; D(i-1,j-1)\bigr\},
+\label{eq:dtw}
+\end{equation}
+con $D(0,0) = 0$ y con el resto de la primera fila y de la primera columna en infinito. El alineamiento queda dentro de una banda de Sakoe--Chiba,
+\begin{equation}
+|i-j| \le w,
+\label{eq:banda}
+\end{equation}
+para que una deformación extrema no cuente como semejanza~\cite{sakoe1978dynamic}. Con $W = 40$, la regla $w = \lfloor 0{,}1\,W \rfloor$ da $w = 4$, que es el valor de la Tabla~\ref{tab:monitor}. La banda limita las actualizaciones de la recurrencia, pero la matriz de costo se asigna completa, de modo que la memoria sigue siendo cuadrática en $W$; con ventanas de este tamaño ese costo es despreciable frente a una evaluación del problema.
+
+La configuración de la Tabla~\ref{tab:monitor} no aplica esa distancia a los valores crudos sino a sus diferencias de primer orden, $\nabla x_k = x_k - x_{k-1}$ con $\nabla x_1 = 0$, que es la versión derivada de la distancia~\cite{keogh2001derivative}. Un desplazamiento vertical se cancela en esas diferencias, así que una ventana trasladada no se penaliza por estar más arriba o más abajo que la referencia; un reescalado multiplicativo, en cambio, no se cancela, y la distancia no es invariante de escala. $D_1$ es la distancia a la rampa, $D_2$ la distancia a la constante y
+\begin{equation}
+\Delta = D_1 - D_2.
+\label{eq:delta}
+\end{equation}
+
+Esa elección tiene una consecuencia exacta que conviene dejar escrita, porque cambia lo que el monitor está midiendo. Para una serie monitoreada no decreciente, las diferencias observadas son no negativas y suman la ganancia de la ventana, $x_W - x_1$, mientras que todas las diferencias de la referencia constante son cero. Cualquier camino de alineamiento visita cada índice observado al menos una vez, así que su costo es al menos esa suma, y la diagonal, que permanece dentro de la banda, alcanza la cota. Por lo tanto
+\begin{equation}
+D_2 = x_W - x_1
+\label{eq:ganancia}
+\end{equation}
+bajo la distancia derivada. La ventana del mejor valor encontrado es no decreciente por construcción, de modo que $D_2$ mide cuánto mejoró la ventana y no en qué momento ocurrió esa mejora. La identidad no se extiende a $D_1$ ni a $\Delta$: contra la rampa, el instante en que aparece la mejora sí altera el alineamiento, y es ahí donde la deformación temporal hace un trabajo que una comparación punto a punto no haría.
+
+Una ventana parecida a la rampa tiende a quedar más cerca de esa referencia que de la constante, y una ventana casi plana tiende a quedar cerca de la constante. Son tendencias, no una regla de cambio: el signo y la magnitud de $\Delta$ dependen de la pendiente de referencia, del largo de la ventana, de la representación del alineamiento y de la trayectoria observada. El cambio de perfil no se decide por el signo de $\Delta$ solo.
+
+\subsection{Umbrales}
+\label{sec:umbrales}
+
+Los umbrales no son cortes fijos, y no pueden serlo. Las distancias arrastran las unidades del objetivo, de modo que un corte numérico calibrado sobre una instancia no se transfiere a otra cuya escala sea distinta. El monitor acumula las distancias observadas desde su inicialización, incluida la observación corriente, y deriva los umbrales como percentiles empíricos de esa historia:
+\begin{align}
+\theta_c &= \mathrm{Percentil}\bigl(\mathcal{H}_{D_2},\, P_{\mathrm{bajo}}\bigr), &
+\theta_r &= \mathrm{Percentil}\bigl(\mathcal{H}_{D_1},\, P_{\mathrm{alto}}\bigr), \nonumber \\
+\theta_{\Delta} &= \mathrm{Percentil}\bigl(\mathcal{H}_{\Delta},\, P_{\mathrm{alto}}\bigr).
+\label{eq:umbrales}
+\end{align}
+Con los niveles de la Tabla~\ref{tab:monitor}, el percentil 40 de $D_2$ marca cercanía a la constante y el percentil 60 de $D_1$ y de $\Delta$ marca lejanía respecto de la rampa. Esos percentiles siguen la escala observada en la corrida; no garantizan invarianza de escala. Antes de acumular diez observaciones de distancia, el monitor usa valores de respaldo proporcionales a la ventana, $\theta_c = 0{,}1\,W$, $\theta_r = 0{,}5\,W$ y $\theta_{\Delta} = 0{,}3\,W$, de modo que la disponibilidad del monitor al completar $W$ observaciones de la serie no espera al calentamiento de los percentiles.
 
 \subsection{Decisión y confirmación}
-Los umbrales no son cortes fijos.
-Después de diez observaciones, el percentil 40 de $D_2$ marca cercanía a la constante, y el percentil 60 de $D_1$ y de $\Delta$ marca lejanía respecto de la rampa.
-Con $N$ el tramo seguido sin mejora estricta, y con $K_{\max}$ tomado de la Tabla~\ref{tab:monitor}, la condición instantánea es
+\label{sec:decision}
+
+Con $N$ el tramo seguido sin mejora estricta del mejor valor, la condición instantánea reúne tres exigencias: que el estancamiento dure, que la ventana esté cerca de la constante y que, además, esté lejos de la rampa o que la diferencia de distancias lo confirme,
 \begin{equation}
 \mathrm{Estancado}(t) \iff
 (N \ge K_{\max})
@@ -99,59 +178,106 @@ Con $N$ el tramo seguido sin mejora estricta, y con $K_{\max}$ tomado de la Tabl
 \land \bigl( (D_1 \ge \theta_r) \lor (\Delta \ge \theta_{\Delta}) \bigr).
 \label{eq:estancado}
 \end{equation}
-La ecuación~(\ref{eq:estancado}) no autoriza el cambio.
-Tiene que sostenerse $P$ pasos.
-Si falla, la racha vuelve a cero.
+La tolerancia de mejora es cero: cualquier aumento estricto de la serie reinicia el contador $N$. La ecuación~(\ref{eq:estancado}) no autoriza el cambio. Un contador de racha suma las confirmaciones consecutivas y vuelve a cero en el primer fallo, y el monitor recién levanta su señal cuando esa racha alcanza la paciencia $P$. Una distancia favorable en una sola iteración no cambia el perfil.
 
-\section{Cambio de perfil}
-\subsection{Dos perfiles}
-El monitor no elige otra metaheurística: cambia el perfil de GWO--DE.
-Hay dos perfiles fijos.
-Explotación usa $a = 0{,}5$, $F = 0{,}5$ y $CR = 0{,}9$.
-Exploración usa $a = 2$, $F = 0{,}9$ y $CR = 0{,}3$.
-La búsqueda empieza en explotación.
+\subsection{Ida, vuelta y reinicio del monitor}
+\label{sec:cambio}
 
-\subsection{Ida, vuelta y reinicio}
-Si la explotación está activa y la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, el paso siguiente usa exploración.
-Si ya está en exploración y una observación lista muestra un tramo sin mejora menor que $K_{\max}$, vuelve a explotación.
-Si sigue estancado, permanece ahí.
-Después de cada cambio el monitor se reemplaza: se descartan la ventana, la racha y los umbrales, y no hay otra decisión hasta reunir $W$ observaciones nuevas.
-La población y el mejor global no se reinician.
-El cambio decidido en la generación $g$ rige desde $g+1$.
-El mismo híbrido tiene otra regla binaria, que entra a exploración solo si $D_2 \le \theta_c$.
-No es la de este texto.
+Si la explotación está activa y la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, el paso siguiente usa exploración. La vuelta es deliberadamente más laxa y no exige la condición completa: si ya está en exploración y una observación lista muestra un tramo sin mejora menor que $K_{\max}$, vuelve a explotación, porque la aparición de mejora reciente es por sí sola motivo para volver a concentrar la búsqueda. Si sigue estancado, permanece en exploración. La asimetría responde a los costos de cada error. Salir de explotación sin necesidad abandona una región prometedora, así que la ida exige persistencia; quedarse en exploración cuando ya hay mejora gasta presupuesto en dispersión, así que la vuelta reacciona en cuanto la mejora aparece.
 
-\section{Contraste en la mochila}
-\subsection{Instancias y corridas}
-El contraste usa nueve instancias de la mochila multidimensional de Chu y Beasley~\cite{chu1998genetic}, con 100, 250 o 500 ítems y 5, 10 o 30 restricciones, cada una con un valor de referencia conocido.
-Son 31 corridas independientes por condición, con la configuración de la Tabla~\ref{tab:monitor}.
+Después de cada cambio el monitor se reemplaza: se descartan la ventana, la racha, el contador sin mejora y los historiales de percentiles, y no hay otra decisión hasta reunir $W$ observaciones nuevas. Las observaciones juntadas bajo el perfil anterior describen una búsqueda que ya no existe, y reutilizarlas dejaría que el régimen viejo dictara la decisión siguiente. Existe como opción un control rodante que conserva un único monitor durante toda la corrida y decide en cada observación lista; está desactivado, y los resultados de este trabajo corresponden al monitor que se reinicia.
 
-\subsection{Controles}
-La Tabla~\ref{tab:controles} separa el perfil adaptativo de dos controles que no leen la curva y no cambian: explotación fija y exploración fija.
-El adaptativo solo deja la explotación si la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, y solo vuelve si la exploración muestra mejora reciente.
+Esos enteros de la Tabla~\ref{tab:monitor} no hacen el mismo trabajo, y conviene separarlos porque la tentación es leerlos como un único margen de tolerancia. $W = 40$ decide cuánta historia reciente entra en la comparación. $K_{\max} = 15$ exige quince iteraciones seguidas sin mejora estricta antes de que las distancias puedan avanzar la confirmación. $P = 8$ exige que la condición completa se sostenga ocho pasos. En este híbrido esa paciencia vale para toda la corrida y no se relaja con el avance del presupuesto.
 
 \begin{table}
-\caption{Qué observa cada perfil de GWO--DE y cuándo cambia.}
-\label{tab:controles}
-\begin{tabular}{lll}
-\hline
-Procedimiento & Qué observa & Cuándo cambia \\
-\hline
-Perfil adaptativo & Forma de la ventana y persistencia & Disparo completo \\
-Explotación fija & Nada de la curva & No cambia \\
-Exploración fija & Nada de la curva & No cambia \\
-\hline
+\caption{Configuración del monitor en la mochila multidimensional.}
+\label{tab:monitor}
+\begin{tabular}{lc}
+\toprule
+Parámetro & Valor \\
+\midrule
+Ventana $W$ & 40 \\
+Banda de alineamiento $w$ & 4 \\
+Iteraciones sin mejora, $K_{\max}$ & 15 \\
+Paciencia de confirmación $P$ & 8 \\
+Pendiente de la rampa $s_{\min}$ & 2 \\
+Percentil bajo / alto & 40 / 60 \\
+Distancia & DDTW \\
+\bottomrule
 \end{tabular}
 \end{table}
 
-Esas dos diferencias aíslan la pregunta.
-Si el perfil adaptativo no supera a la explotación fija, salir de ese modo no aporta.
-Si no supera a la exploración fija, el regreso tampoco.
-Una diferencia solo cuenta si aparece en la calidad final y no se explica por haber usado un perfil distinto desde el inicio.
-Si la misma lectura se sostiene en otro dominio no se examina aquí.
+\subsection{Lo que este texto no evalúa}
+\label{sec:no_evalua}
+
+El mismo híbrido admite otras tres reglas sobre el mismo monitor, y nombrarlas sirve para delimitar lo que el contraste de la sección~\ref{sec:diseno} aísla. Una regla binaria más simple entra a exploración con la sola condición $D_2 \le \theta_c$, sin exigir persistencia ni lejanía de la rampa; bajo la distancia derivada, y por la ecuación~(\ref{eq:ganancia}), esa condición lee la ganancia de la ventana y no el momento en que ocurrió. Dos reglas continuas no reemplazan el monitor ni eligen un perfil: calculan una intensidad en $[0,1]$ e interpolan linealmente cada parámetro de la Tabla~\ref{tab:perfiles} entre los dos extremos, una a partir de la distancia a la constante y la otra a partir de una transformación logística de $\Delta$. Comparar esas cuatro reglas entre sí queda fuera de este texto. Aquí se evalúa únicamente la regla compuesta de la ecuación~(\ref{eq:estancado}) con su paciencia, que es la que exige a la vez duración, forma y confirmación.
+
+\section{Diseño experimental}
+\label{sec:diseno}
+
+\subsection{La pregunta}
+\label{sec:pregunta}
+
+El contraste separa el perfil adaptativo de dos controles que no leen la curva y no cambian: explotación fija y exploración fija. El adaptativo solo deja la explotación si la ecuación~(\ref{eq:estancado}) se sostiene $P$ pasos, y solo vuelve si la exploración muestra mejora reciente. Esas dos diferencias aíslan la pregunta. Si el perfil adaptativo no supera a la explotación fija, salir de ese modo no aporta. Si no supera a la exploración fija, el regreso tampoco. Una diferencia solo cuenta si aparece en la calidad final y no se explica por haber usado un perfil distinto desde el inicio.
+
+\begin{table}
+\caption{Qué observa cada procedimiento y cuándo cambia. Los tres comparten operadores, perfiles y presupuesto; solo difiere la regla de decisión.}
+\label{tab:controles}
+\begin{tabular}{lll}
+\toprule
+Procedimiento & Qué observa & Cuándo cambia \\
+\midrule
+Perfil adaptativo & Forma de la ventana y persistencia & Disparo completo \\
+Explotación fija & Nada de la curva & No cambia \\
+Exploración fija & Nada de la curva & No cambia \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Instancias}
+\label{sec:dominios}
+
+El contraste se ejecuta sobre la mochila multidimensional, que pide elegir un subconjunto de ítems para maximizar el beneficio sin exceder ninguna de varias capacidades compartidas~\cite{chu1998genetic}:
+\begin{align}
+\max \quad & f(\mathbf{x}) = \sum_{j=1}^{n} p_j x_j \label{eq:mkp} \\
+\text{sujeto a} \quad & \sum_{j=1}^{n} r_{ij} x_j \le b_i, \quad i \in \{1, \ldots, m\}, \nonumber \\
+& x_j \in \{0,1\}, \quad j \in \{1, \ldots, n\}, \nonumber
+\end{align}
+con $p_j > 0$, $r_{ij} \ge 0$ y $b_i > 0$. El conjunto de instancias es el MKNAPCB de la OR-Library, que combina $n \in \{100, 250, 500\}$ ítems con $m \in \{5, 10, 30\}$ restricciones. De cada uno de los nueve grupos se toman las dos primeras instancias, con índices de base cero $0$ y $1$, lo que da 18 instancias. La selección está fijada de antemano y no es una muestra aleatoria de las 30 instancias disponibles en cada archivo. Cada instancia trae un mejor valor factible conocido, tomado de \texttt{mkcbres.txt}, que se usa como referencia del gap; son las mejores soluciones factibles registradas, no óptimos certificados, y el encabezado de los archivos de instancias deja en cero el campo reservado al óptimo.
+
+El híbrido opera sobre vectores continuos, así que hace falta una correspondencia con las decisiones binarias. En lugar de derivar los bits desde cero en cada generación, la regla LB2 trata el vector continuo como una fuente de probabilidades de volteo que se aplican a los bits que el individuo ya tiene. Las dos funciones de transferencia complementarias son
+\begin{equation}
+L_1 = \mathrm{clip}\!\Bigl(-G_1 \tfrac{v}{v_{\max}-G_2} + G_3,\, 0,\, 1\Bigr), \qquad
+L_2 = \mathrm{clip}\!\Bigl(G_1 \tfrac{v}{v_{\max}-G_2} + G_3,\, 0,\, 1\Bigr),
+\label{eq:lb2}
+\end{equation}
+con $G_1 = G_2 = 0{,}5$ y $v_{\max} = 100$. Un candidato voltea cada bit con probabilidad $L_1$ y el otro con $L_2$; ambos se reparan y se conserva el mejor, con el empate a favor de $L_2$. El desplazamiento $G_3$ es la probabilidad base de volteo que aporta el perfil activo, y es el punto por el que la binarización queda ligada a la capa de control.
+
+Las soluciones que violan una capacidad se restauran con el operador de reparación por pseudo-utilidad de~\cite{chu1998genetic}. Cada ítem se ordena por la densidad
+\begin{equation}
+u_j = \min_{i} \frac{p_j}{r_{ij}},
+\label{eq:utilidad}
+\end{equation}
+y el procedimiento corre en dos etapas: mientras alguna restricción esté violada se retiran ítems en orden ascendente de $u_j$, y una vez factible la solución se agregan ítems excluidos en orden descendente siempre que todavía quepan. Los ítems de peso nulo darían un cociente infinito y reciben diez veces la mayor densidad finita, lo que preserva el orden sin un caso especial dentro del ciclo. Cada reparación cuenta como una evaluación del objetivo, de modo que el costo de la correspondencia se informa junto con el presupuesto de búsqueda. Como cada operador aporta dos candidatos LB2 y cada candidato exige una reparación y una evaluación, una generación cuesta $4N$ evaluaciones.
+
+\subsection{Presupuesto, semillas y métricas}
+\label{sec:protocolo}
+
+Los tres procedimientos de la Tabla~\ref{tab:controles} comparten todo lo demás. Cada corrida usa una población de $N = 30$ individuos y se detiene a las $T = 1000$ generaciones. El presupuesto se cuenta en evaluaciones y se informa, pero el criterio de parada es el número de generaciones: con el costo de $4N$ evaluaciones por generación de la sección~\ref{sec:dominios}, una corrida consume $120\,030$ evaluaciones, incluidas las $N$ de la población inicial, y los tres procedimientos ejecutan exactamente la misma cantidad. Esos valores se mantienen fijos en las 18 instancias.
+
+Cada condición se repite sobre 31 semillas independientes, la lista $1, \ldots, 31$, con un generador nuevo al inicio de cada corrida. La misma lista se usa para los tres procedimientos, así que una semilla identifica una réplica apareada y no un flujo aleatorio compartido entre procedimientos. Los registros se asocian a la semilla y no al orden en que terminan los procesos.
+
+Para cada condición se informan el mejor valor, el peor, la media, la mediana, la desviación estándar muestral, el gap porcentual contra el mejor valor factible conocido y la cantidad de cambios de perfil. El gap se declara no disponible cuando la referencia falta, en lugar de anotarlo como cero, y no se compara entre instancias, porque las escalas y las referencias difieren; las comparaciones se hacen dentro de cada instancia.
+
+La campaña reúne $18 \times 3 = 54$ condiciones y $54 \times 31 = 1\,674$ corridas. La comparación entre procedimientos sigue el protocolo no paramétrico recomendado para este tipo de contraste~\cite{derrac2011practical}: una prueba de Friedman sobre los tres procedimientos en cada tamaño de problema y pruebas pareadas post hoc con corrección de Holm. El nivel de significancia, la cantidad de comparaciones y la prueba efectivamente aplicada se declaran junto con los resultados y no se eligen después de inspeccionarlos.
+
+\subsection{Lo que el diseño atribuye y lo que no}
+\label{sec:atribucion}
+
+Como los tres procedimientos comparten operadores, binarización o decodificación, perfiles y presupuesto, una diferencia en la calidad final se puede atribuir a la regla de decisión. El diseño no permite, en cambio, atribuir esa diferencia a alguno de los ingredientes de la regla por separado: la ventana, la banda, la paciencia y los percentiles cambian todos juntos o no cambian. Separar sus aportes exigiría un barrido de sensibilidad que este contraste no incluye. Tampoco se transfiere la conclusión a otro dominio. La misma lectura de la curva está formulada para un problema de dimensionamiento continuo-discreto, pero ese caso no se ejecuta aquí, y nada de lo que se observe en la mochila autoriza a extrapolarlo: el objetivo, el costo de cada evaluación y la estructura del espacio de búsqueda son otros.
 
 \section{Resultados}
-% PENDIENTE: contraste numérico en la mochila. No inventar promedios, brechas ni pruebas.
+% PENDIENTE: contraste numérico. No inventar promedios, brechas ni pruebas. Completar cuando se fije el dominio y se ejecute la campaña de la sección Diseño experimental.
 
 \section{Discusión}
 % PENDIENTE
@@ -166,15 +292,29 @@ Si la misma lectura se sostiene en otro dominio no se examina aquí.
 % PENDIENTE
 \end{credits}
 
-\begin{thebibliography}{3}
+\begin{thebibliography}{99}
+
+\bibitem{mirjalili2014grey}
+Mirjalili, S., Mirjalili, S.M., Lewis, A.: Grey wolf optimizer. Advances in Engineering Software 69, 46--61 (2014). \doi{10.1016/j.advengsoft.2013.12.007}
+
+\bibitem{storn1997differential}
+Storn, R., Price, K.: Differential evolution -- a simple and efficient heuristic for global optimization over continuous spaces. Journal of Global Optimization 11(4), 341--359 (1997)
+
+\bibitem{chu1998genetic}
+Chu, P.C., Beasley, J.E.: A genetic algorithm for the multidimensional knapsack problem. Journal of Heuristics 4(1), 63--86 (1998). \doi{10.1023/A:1009642405419}
+
 \bibitem{berndt1994using}
 Berndt, D.J., Clifford, J.: Using dynamic time warping to find patterns in time series. In: KDD Workshop (AAAI-94 Workshops on Knowledge Discovery in Databases), vol. 398, pp. 359--370 (1994)
 
-\bibitem{keogh2001derivative}
-Keogh, E.J., Pazzani, M.J.: Derivative dynamic time warping. In: Proceedings of the 2001 SIAM International Conference on Data Mining, pp. 1--11 (2001)
+\bibitem{sakoe1978dynamic}
+Sakoe, H., Chiba, S.: Dynamic programming algorithm optimization for spoken word recognition. IEEE Transactions on Acoustics, Speech, and Signal Processing 26(1), 43--49 (1978). \doi{10.1109/TASSP.1978.1163055}
 
-\bibitem{chu1998genetic}
-Chu, P.C., Beasley, J.E.: A genetic algorithm for the multidimensional knapsack problem. Journal of Heuristics 4(1), 63--86 (1998)
+\bibitem{keogh2001derivative}
+Keogh, E.J., Pazzani, M.J.: Derivative dynamic time warping. In: Proceedings of the 2001 SIAM International Conference on Data Mining, pp. 1--11 (2001). \doi{10.1137/1.9781611972719.1}
+
+\bibitem{derrac2011practical}
+Derrac, J., García, S., Sánchez, L., Herrera, F.: A practical tutorial on the use of nonparametric statistical tests as a methodology for comparing evolutionary and swarm intelligence algorithms. Swarm and Evolutionary Computation 1(1), 3--18 (2011). \doi{10.1016/j.swevo.2011.02.002}
+
 \end{thebibliography}
 
 \end{document}
