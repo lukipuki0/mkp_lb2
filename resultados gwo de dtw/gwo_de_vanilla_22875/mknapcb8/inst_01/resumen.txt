@@ -1,0 +1,122 @@
+Resumen de la campaña GWO-DE
+============================
+Estado: completada
+Progreso: 1/1 instancias completadas, 62/62 corridas
+Error: ninguno
+Archivos: mknapcb8.txt
+Índices: 1
+Semillas: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+Modos: vanilla_exploitation, vanilla_exploration
+Binarización: lb2
+Señal: ddtw
+Población: 30
+Iteraciones: 1000
+Ventana W: 40
+Banda: 4
+Meseta máxima: 15
+Paciencia: 8
+G1: 0.5
+G2: 0.5
+G3 explotación: 0.1
+G3 exploración: 0.1
+DTW Kirito: no
+
+El ranking ordena las mejores corridas: mayor fitness primero y, en empate, la semilla menor.
+Si el fitness y la semilla también empatan, se conserva el orden de los modos en la campaña.
+La media se muestra, pero no determina el ranking.
+La desviación estándar es muestral (n - 1). Con una sola corrida: no aplica.
+Si la referencia es desconocida, la brecha es no disponible (no cero).
+
+Instancia mknapcb8.txt [1]
+--------------------------
+Modo vanilla_exploitation
+  Mejor fitness: 56482.0000
+  Peor fitness: 56059.0000
+  Media: 56266.1290
+  Desviación estándar muestral: 108.9755
+  Semilla ganadora: 20
+  Brecha de la semilla ganadora: 3.15%
+  Tiempo medio: 175.2944 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 20  fitness 56482.0000  brecha 3.15%
+    2. semilla 16  fitness 56460.0000  brecha 3.19%
+    3. semilla 10  fitness 56406.0000  brecha 3.28%
+    4. semilla 7  fitness 56382.0000  brecha 3.32%
+    5. semilla 22  fitness 56373.0000  brecha 3.34%
+    6. semilla 13  fitness 56372.0000  brecha 3.34%
+    7. semilla 11  fitness 56354.0000  brecha 3.37%
+    8. semilla 26  fitness 56338.0000  brecha 3.40%
+    9. semilla 1  fitness 56332.0000  brecha 3.41%
+    10. semilla 28  fitness 56307.0000  brecha 3.45%
+    11. semilla 3  fitness 56305.0000  brecha 3.45%
+    12. semilla 12  fitness 56305.0000  brecha 3.45%
+    13. semilla 27  fitness 56297.0000  brecha 3.47%
+    14. semilla 2  fitness 56290.0000  brecha 3.48%
+    15. semilla 29  fitness 56285.0000  brecha 3.49%
+    16. semilla 19  fitness 56278.0000  brecha 3.50%
+    17. semilla 8  fitness 56273.0000  brecha 3.51%
+    18. semilla 6  fitness 56271.0000  brecha 3.51%
+    19. semilla 31  fitness 56258.0000  brecha 3.53%
+    20. semilla 5  fitness 56241.0000  brecha 3.56%
+    21. semilla 30  fitness 56228.0000  brecha 3.58%
+    22. semilla 24  fitness 56227.0000  brecha 3.59%
+    23. semilla 14  fitness 56215.0000  brecha 3.61%
+    24. semilla 4  fitness 56193.0000  brecha 3.64%
+    25. semilla 18  fitness 56181.0000  brecha 3.66%
+    26. semilla 15  fitness 56160.0000  brecha 3.70%
+    27. semilla 25  fitness 56117.0000  brecha 3.77%
+    28. semilla 21  fitness 56103.0000  brecha 3.80%
+    29. semilla 9  fitness 56095.0000  brecha 3.81%
+    30. semilla 23  fitness 56063.0000  brecha 3.87%
+    31. semilla 17  fitness 56059.0000  brecha 3.87%
+
+Modo vanilla_exploration
+  Mejor fitness: 56531.0000
+  Peor fitness: 55900.0000
+  Media: 56160.5806
+  Desviación estándar muestral: 160.9138
+  Semilla ganadora: 24
+  Brecha de la semilla ganadora: 3.06%
+  Tiempo medio: 176.1179 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 24  fitness 56531.0000  brecha 3.06%
+    2. semilla 3  fitness 56422.0000  brecha 3.25%
+    3. semilla 26  fitness 56377.0000  brecha 3.33%
+    4. semilla 27  fitness 56362.0000  brecha 3.35%
+    5. semilla 2  fitness 56348.0000  brecha 3.38%
+    6. semilla 30  fitness 56311.0000  brecha 3.44%
+    7. semilla 4  fitness 56299.0000  brecha 3.46%
+    8. semilla 9  fitness 56291.0000  brecha 3.48%
+    9. semilla 19  fitness 56287.0000  brecha 3.48%
+    10. semilla 7  fitness 56260.0000  brecha 3.53%
+    11. semilla 11  fitness 56231.0000  brecha 3.58%
+    12. semilla 12  fitness 56222.0000  brecha 3.59%
+    13. semilla 13  fitness 56222.0000  brecha 3.59%
+    14. semilla 25  fitness 56153.0000  brecha 3.71%
+    15. semilla 15  fitness 56150.0000  brecha 3.72%
+    16. semilla 18  fitness 56135.0000  brecha 3.74%
+    17. semilla 1  fitness 56125.0000  brecha 3.76%
+    18. semilla 5  fitness 56124.0000  brecha 3.76%
+    19. semilla 8  fitness 56102.0000  brecha 3.80%
+    20. semilla 14  fitness 56099.0000  brecha 3.81%
+    21. semilla 10  fitness 56074.0000  brecha 3.85%
+    22. semilla 28  fitness 56069.0000  brecha 3.86%
+    23. semilla 20  fitness 56050.0000  brecha 3.89%
+    24. semilla 17  fitness 56021.0000  brecha 3.94%
+    25. semilla 16  fitness 56004.0000  brecha 3.97%
+    26. semilla 31  fitness 55980.0000  brecha 4.01%
+    27. semilla 6  fitness 55976.0000  brecha 4.02%
+    28. semilla 23  fitness 55975.0000  brecha 4.02%
+    29. semilla 21  fitness 55967.0000  brecha 4.03%
+    30. semilla 29  fitness 55911.0000  brecha 4.13%
+    31. semilla 22  fitness 55900.0000  brecha 4.15%
+
+Ranking final de los modos
+==========================
+Orden por la mejor corrida de cada modo, dentro de cada instancia: mayor fitness y, en empate, semilla menor.
+No se mezclan fitness de instancias distintas. La media se muestra y no determina el orden.
+Incluye todas las instancias completadas.
+
+Instancia mknapcb8.txt [1]
+  1. vanilla_exploration  mejor 56531.0000  semilla 24  brecha 3.06%  media 56160.5806
+  2. vanilla_exploitation  mejor 56482.0000  semilla 20  brecha 3.15%  media 56266.1290

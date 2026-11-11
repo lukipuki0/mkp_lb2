@@ -1,0 +1,206 @@
+Resumen de la campaña GWO-DE
+============================
+Estado: completada
+Progreso: 1/1 instancias completadas, 124/124 corridas
+Error: ninguno
+Archivos: mknapcb2.txt
+Índices: 2
+Semillas: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+Modos: binary_simple, binary_complex, continuous_simple, continuous_complex
+Binarización: lb2
+Señal: ddtw
+Población: 30
+Iteraciones: 1000
+Ventana W: 40
+Banda: 0
+Meseta máxima: 15
+Paciencia: 8
+G1: 0.5
+G2: 0.5
+G3 explotación: 0.1
+G3 exploración: 0.1
+DTW Kirito: no
+
+El ranking ordena las mejores corridas: mayor fitness primero y, en empate, la semilla menor.
+Si el fitness y la semilla también empatan, se conserva el orden de los modos en la campaña.
+La media se muestra, pero no determina el ranking.
+La desviación estándar es muestral (n - 1). Con una sola corrida: no aplica.
+Si la referencia es desconocida, la brecha es no disponible (no cero).
+
+Instancia mknapcb2.txt [2]
+--------------------------
+Modo binary_simple
+  Mejor fitness: 59060.0000
+  Peor fitness: 58522.0000
+  Media: 58777.9032
+  Desviación estándar muestral: 141.2705
+  Semilla ganadora: 6
+  Brecha de la semilla ganadora: 4.94%
+  Tiempo medio: 164.1147 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 6  fitness 59060.0000  brecha 4.94%
+    2. semilla 13  fitness 59027.0000  brecha 4.99%
+    3. semilla 9  fitness 59002.0000  brecha 5.03%
+    4. semilla 26  fitness 58952.0000  brecha 5.12%
+    5. semilla 2  fitness 58942.0000  brecha 5.13%
+    6. semilla 19  fitness 58902.0000  brecha 5.20%
+    7. semilla 23  fitness 58885.0000  brecha 5.22%
+    8. semilla 12  fitness 58869.0000  brecha 5.25%
+    9. semilla 16  fitness 58860.0000  brecha 5.26%
+    10. semilla 20  fitness 58860.0000  brecha 5.26%
+    11. semilla 1  fitness 58843.0000  brecha 5.29%
+    12. semilla 24  fitness 58840.0000  brecha 5.30%
+    13. semilla 15  fitness 58835.0000  brecha 5.30%
+    14. semilla 21  fitness 58827.0000  brecha 5.32%
+    15. semilla 7  fitness 58814.0000  brecha 5.34%
+    16. semilla 3  fitness 58770.0000  brecha 5.41%
+    17. semilla 4  fitness 58767.0000  brecha 5.41%
+    18. semilla 5  fitness 58754.0000  brecha 5.43%
+    19. semilla 29  fitness 58690.0000  brecha 5.54%
+    20. semilla 14  fitness 58689.0000  brecha 5.54%
+    21. semilla 11  fitness 58681.0000  brecha 5.55%
+    22. semilla 22  fitness 58680.0000  brecha 5.55%
+    23. semilla 17  fitness 58675.0000  brecha 5.56%
+    24. semilla 31  fitness 58672.0000  brecha 5.57%
+    25. semilla 27  fitness 58664.0000  brecha 5.58%
+    26. semilla 25  fitness 58657.0000  brecha 5.59%
+    27. semilla 8  fitness 58606.0000  brecha 5.67%
+    28. semilla 28  fitness 58601.0000  brecha 5.68%
+    29. semilla 18  fitness 58588.0000  brecha 5.70%
+    30. semilla 30  fitness 58581.0000  brecha 5.71%
+    31. semilla 10  fitness 58522.0000  brecha 5.81%
+
+Modo binary_complex
+  Mejor fitness: 59005.0000
+  Peor fitness: 58517.0000
+  Media: 58750.9032
+  Desviación estándar muestral: 122.0419
+  Semilla ganadora: 12
+  Brecha de la semilla ganadora: 5.03%
+  Tiempo medio: 164.2454 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 12  fitness 59005.0000  brecha 5.03%
+    2. semilla 17  fitness 58973.0000  brecha 5.08%
+    3. semilla 10  fitness 58915.0000  brecha 5.17%
+    4. semilla 25  fitness 58903.0000  brecha 5.19%
+    5. semilla 30  fitness 58890.0000  brecha 5.21%
+    6. semilla 13  fitness 58871.0000  brecha 5.25%
+    7. semilla 7  fitness 58858.0000  brecha 5.27%
+    8. semilla 3  fitness 58846.0000  brecha 5.29%
+    9. semilla 2  fitness 58827.0000  brecha 5.32%
+    10. semilla 27  fitness 58806.0000  brecha 5.35%
+    11. semilla 26  fitness 58803.0000  brecha 5.35%
+    12. semilla 6  fitness 58789.0000  brecha 5.38%
+    13. semilla 20  fitness 58786.0000  brecha 5.38%
+    14. semilla 8  fitness 58781.0000  brecha 5.39%
+    15. semilla 23  fitness 58752.0000  brecha 5.44%
+    16. semilla 18  fitness 58749.0000  brecha 5.44%
+    17. semilla 16  fitness 58742.0000  brecha 5.45%
+    18. semilla 9  fitness 58716.0000  brecha 5.49%
+    19. semilla 29  fitness 58714.0000  brecha 5.50%
+    20. semilla 11  fitness 58688.0000  brecha 5.54%
+    21. semilla 15  fitness 58687.0000  brecha 5.54%
+    22. semilla 21  fitness 58685.0000  brecha 5.54%
+    23. semilla 22  fitness 58658.0000  brecha 5.59%
+    24. semilla 19  fitness 58654.0000  brecha 5.59%
+    25. semilla 31  fitness 58653.0000  brecha 5.60%
+    26. semilla 24  fitness 58636.0000  brecha 5.62%
+    27. semilla 1  fitness 58630.0000  brecha 5.63%
+    28. semilla 4  fitness 58615.0000  brecha 5.66%
+    29. semilla 14  fitness 58577.0000  brecha 5.72%
+    30. semilla 28  fitness 58552.0000  brecha 5.76%
+    31. semilla 5  fitness 58517.0000  brecha 5.82%
+
+Modo continuous_simple
+  Mejor fitness: 59315.0000
+  Peor fitness: 58408.0000
+  Media: 58781.8710
+  Desviación estándar muestral: 194.5226
+  Semilla ganadora: 8
+  Brecha de la semilla ganadora: 4.53%
+  Tiempo medio: 163.9648 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 8  fitness 59315.0000  brecha 4.53%
+    2. semilla 22  fitness 59123.0000  brecha 4.84%
+    3. semilla 19  fitness 59119.0000  brecha 4.85%
+    4. semilla 2  fitness 58987.0000  brecha 5.06%
+    5. semilla 20  fitness 58895.0000  brecha 5.21%
+    6. semilla 11  fitness 58884.0000  brecha 5.22%
+    7. semilla 5  fitness 58883.0000  brecha 5.23%
+    8. semilla 18  fitness 58867.0000  brecha 5.25%
+    9. semilla 6  fitness 58863.0000  brecha 5.26%
+    10. semilla 30  fitness 58856.0000  brecha 5.27%
+    11. semilla 25  fitness 58854.0000  brecha 5.27%
+    12. semilla 14  fitness 58853.0000  brecha 5.27%
+    13. semilla 24  fitness 58834.0000  brecha 5.31%
+    14. semilla 15  fitness 58833.0000  brecha 5.31%
+    15. semilla 16  fitness 58817.0000  brecha 5.33%
+    16. semilla 27  fitness 58766.0000  brecha 5.41%
+    17. semilla 3  fitness 58748.0000  brecha 5.44%
+    18. semilla 31  fitness 58740.0000  brecha 5.46%
+    19. semilla 26  fitness 58735.0000  brecha 5.46%
+    20. semilla 29  fitness 58728.0000  brecha 5.48%
+    21. semilla 21  fitness 58714.0000  brecha 5.50%
+    22. semilla 4  fitness 58707.0000  brecha 5.51%
+    23. semilla 10  fitness 58688.0000  brecha 5.54%
+    24. semilla 7  fitness 58681.0000  brecha 5.55%
+    25. semilla 28  fitness 58672.0000  brecha 5.57%
+    26. semilla 13  fitness 58609.0000  brecha 5.67%
+    27. semilla 23  fitness 58554.0000  brecha 5.76%
+    28. semilla 12  fitness 58543.0000  brecha 5.77%
+    29. semilla 1  fitness 58484.0000  brecha 5.87%
+    30. semilla 9  fitness 58478.0000  brecha 5.88%
+    31. semilla 17  fitness 58408.0000  brecha 5.99%
+
+Modo continuous_complex
+  Mejor fitness: 59400.0000
+  Peor fitness: 58431.0000
+  Media: 58715.0000
+  Desviación estándar muestral: 193.5405
+  Semilla ganadora: 12
+  Brecha de la semilla ganadora: 4.39%
+  Tiempo medio: 164.1710 s
+  Ranking de semillas (mejor a peor; por fitness, no por la media):
+    1. semilla 12  fitness 59400.0000  brecha 4.39%
+    2. semilla 1  fitness 59004.0000  brecha 5.03%
+    3. semilla 28  fitness 58974.0000  brecha 5.08%
+    4. semilla 11  fitness 58901.0000  brecha 5.20%
+    5. semilla 2  fitness 58859.0000  brecha 5.26%
+    6. semilla 20  fitness 58855.0000  brecha 5.27%
+    7. semilla 8  fitness 58844.0000  brecha 5.29%
+    8. semilla 16  fitness 58837.0000  brecha 5.30%
+    9. semilla 30  fitness 58814.0000  brecha 5.34%
+    10. semilla 25  fitness 58775.0000  brecha 5.40%
+    11. semilla 10  fitness 58756.0000  brecha 5.43%
+    12. semilla 26  fitness 58713.0000  brecha 5.50%
+    13. semilla 27  fitness 58706.0000  brecha 5.51%
+    14. semilla 18  fitness 58700.0000  brecha 5.52%
+    15. semilla 21  fitness 58694.0000  brecha 5.53%
+    16. semilla 31  fitness 58687.0000  brecha 5.54%
+    17. semilla 9  fitness 58686.0000  brecha 5.54%
+    18. semilla 6  fitness 58669.0000  brecha 5.57%
+    19. semilla 3  fitness 58661.0000  brecha 5.58%
+    20. semilla 23  fitness 58655.0000  brecha 5.59%
+    21. semilla 24  fitness 58634.0000  brecha 5.63%
+    22. semilla 7  fitness 58626.0000  brecha 5.64%
+    23. semilla 29  fitness 58594.0000  brecha 5.69%
+    24. semilla 15  fitness 58576.0000  brecha 5.72%
+    25. semilla 17  fitness 58570.0000  brecha 5.73%
+    26. semilla 13  fitness 58554.0000  brecha 5.76%
+    27. semilla 4  fitness 58534.0000  brecha 5.79%
+    28. semilla 19  fitness 58517.0000  brecha 5.82%
+    29. semilla 5  fitness 58507.0000  brecha 5.83%
+    30. semilla 14  fitness 58432.0000  brecha 5.95%
+    31. semilla 22  fitness 58431.0000  brecha 5.95%
+
+Ranking final de los cuatro modos
+=================================
+Orden por la mejor corrida de cada modo, dentro de cada instancia: mayor fitness y, en empate, semilla menor.
+No se mezclan fitness de instancias distintas. La media se muestra y no determina el orden.
+Incluye todas las instancias completadas.
+
+Instancia mknapcb2.txt [2]
+  1. continuous_complex  mejor 59400.0000  semilla 12  brecha 4.39%  media 58715.0000
+  2. continuous_simple  mejor 59315.0000  semilla 8  brecha 4.53%  media 58781.8710
+  3. binary_simple  mejor 59060.0000  semilla 6  brecha 4.94%  media 58777.9032
+  4. binary_complex  mejor 59005.0000  semilla 12  brecha 5.03%  media 58750.9032

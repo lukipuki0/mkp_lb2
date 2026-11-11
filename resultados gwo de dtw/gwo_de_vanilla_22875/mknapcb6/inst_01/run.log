@@ -1,0 +1,74 @@
+campaign files=1 indices=1 seeds=31 policies=2 runs=62 binarization=lb2 signal=ddtw W=40 pop=30 iterations=1000
+[1/62] mknapcb6.txt[1] seed=1 policy=vanilla_exploitation best=113636 gap=4.62% elapsed=309.66s
+[2/62] mknapcb6.txt[1] seed=1 policy=vanilla_exploration best=113087 gap=5.08% elapsed=307.18s
+[3/62] mknapcb6.txt[1] seed=2 policy=vanilla_exploitation best=113430 gap=4.79% elapsed=301.98s
+[4/62] mknapcb6.txt[1] seed=2 policy=vanilla_exploration best=112687 gap=5.42% elapsed=306.02s
+[5/62] mknapcb6.txt[1] seed=3 policy=vanilla_exploitation best=113201 gap=4.98% elapsed=304.34s
+[6/62] mknapcb6.txt[1] seed=3 policy=vanilla_exploration best=112550 gap=5.53% elapsed=305.86s
+[7/62] mknapcb6.txt[1] seed=4 policy=vanilla_exploitation best=113620 gap=4.63% elapsed=302.87s
+[8/62] mknapcb6.txt[1] seed=4 policy=vanilla_exploration best=112468 gap=5.60% elapsed=304.72s
+[9/62] mknapcb6.txt[1] seed=5 policy=vanilla_exploitation best=113670 gap=4.59% elapsed=304.10s
+[10/62] mknapcb6.txt[1] seed=5 policy=vanilla_exploration best=112628 gap=5.47% elapsed=304.83s
+[11/62] mknapcb6.txt[1] seed=6 policy=vanilla_exploitation best=112981 gap=5.17% elapsed=302.18s
+[12/62] mknapcb6.txt[1] seed=6 policy=vanilla_exploration best=113060 gap=5.10% elapsed=305.72s
+[13/62] mknapcb6.txt[1] seed=7 policy=vanilla_exploitation best=113298 gap=4.90% elapsed=303.11s
+[14/62] mknapcb6.txt[1] seed=7 policy=vanilla_exploration best=113311 gap=4.89% elapsed=307.15s
+[15/62] mknapcb6.txt[1] seed=8 policy=vanilla_exploitation best=113424 gap=4.80% elapsed=305.42s
+[16/62] mknapcb6.txt[1] seed=8 policy=vanilla_exploration best=112682 gap=5.42% elapsed=308.77s
+[17/62] mknapcb6.txt[1] seed=9 policy=vanilla_exploitation best=113329 gap=4.88% elapsed=303.33s
+[18/62] mknapcb6.txt[1] seed=9 policy=vanilla_exploration best=113429 gap=4.79% elapsed=306.56s
+[19/62] mknapcb6.txt[1] seed=10 policy=vanilla_exploitation best=113219 gap=4.97% elapsed=303.38s
+[20/62] mknapcb6.txt[1] seed=10 policy=vanilla_exploration best=112683 gap=5.42% elapsed=305.33s
+[21/62] mknapcb6.txt[1] seed=11 policy=vanilla_exploitation best=113883 gap=4.41% elapsed=305.63s
+[22/62] mknapcb6.txt[1] seed=11 policy=vanilla_exploration best=113348 gap=4.86% elapsed=304.99s
+[23/62] mknapcb6.txt[1] seed=12 policy=vanilla_exploitation best=113416 gap=4.80% elapsed=303.30s
+[24/62] mknapcb6.txt[1] seed=12 policy=vanilla_exploration best=113017 gap=5.14% elapsed=305.85s
+[25/62] mknapcb6.txt[1] seed=13 policy=vanilla_exploitation best=113587 gap=4.66% elapsed=304.88s
+[26/62] mknapcb6.txt[1] seed=13 policy=vanilla_exploration best=112926 gap=5.21% elapsed=307.70s
+[27/62] mknapcb6.txt[1] seed=14 policy=vanilla_exploitation best=113185 gap=5.00% elapsed=303.04s
+[28/62] mknapcb6.txt[1] seed=14 policy=vanilla_exploration best=112894 gap=5.24% elapsed=309.92s
+[29/62] mknapcb6.txt[1] seed=15 policy=vanilla_exploitation best=113165 gap=5.01% elapsed=305.69s
+[30/62] mknapcb6.txt[1] seed=15 policy=vanilla_exploration best=112859 gap=5.27% elapsed=308.31s
+[31/62] mknapcb6.txt[1] seed=16 policy=vanilla_exploitation best=113436 gap=4.79% elapsed=306.36s
+[32/62] mknapcb6.txt[1] seed=16 policy=vanilla_exploration best=112964 gap=5.18% elapsed=305.59s
+[33/62] mknapcb6.txt[1] seed=17 policy=vanilla_exploitation best=113953 gap=4.35% elapsed=304.88s
+[34/62] mknapcb6.txt[1] seed=17 policy=vanilla_exploration best=112821 gap=5.30% elapsed=307.48s
+[35/62] mknapcb6.txt[1] seed=18 policy=vanilla_exploitation best=112831 gap=5.29% elapsed=306.44s
+[36/62] mknapcb6.txt[1] seed=18 policy=vanilla_exploration best=113482 gap=4.75% elapsed=308.85s
+[37/62] mknapcb6.txt[1] seed=19 policy=vanilla_exploitation best=113091 gap=5.08% elapsed=304.12s
+[38/62] mknapcb6.txt[1] seed=19 policy=vanilla_exploration best=113017 gap=5.14% elapsed=329.71s
+[39/62] mknapcb6.txt[1] seed=20 policy=vanilla_exploitation best=113330 gap=4.88% elapsed=331.11s
+[40/62] mknapcb6.txt[1] seed=20 policy=vanilla_exploration best=113008 gap=5.15% elapsed=309.21s
+[41/62] mknapcb6.txt[1] seed=21 policy=vanilla_exploitation best=113349 gap=4.86% elapsed=303.74s
+[42/62] mknapcb6.txt[1] seed=21 policy=vanilla_exploration best=112898 gap=5.24% elapsed=306.24s
+[43/62] mknapcb6.txt[1] seed=22 policy=vanilla_exploitation best=113414 gap=4.81% elapsed=304.93s
+[44/62] mknapcb6.txt[1] seed=22 policy=vanilla_exploration best=112763 gap=5.35% elapsed=305.72s
+[45/62] mknapcb6.txt[1] seed=23 policy=vanilla_exploitation best=114160 gap=4.18% elapsed=305.02s
+[46/62] mknapcb6.txt[1] seed=23 policy=vanilla_exploration best=112824 gap=5.30% elapsed=306.08s
+[47/62] mknapcb6.txt[1] seed=24 policy=vanilla_exploitation best=113145 gap=5.03% elapsed=304.77s
+[48/62] mknapcb6.txt[1] seed=24 policy=vanilla_exploration best=113027 gap=5.13% elapsed=306.66s
+[49/62] mknapcb6.txt[1] seed=25 policy=vanilla_exploitation best=113169 gap=5.01% elapsed=303.80s
+[50/62] mknapcb6.txt[1] seed=25 policy=vanilla_exploration best=113213 gap=4.97% elapsed=308.37s
+[51/62] mknapcb6.txt[1] seed=26 policy=vanilla_exploitation best=114241 gap=4.11% elapsed=318.60s
+[52/62] mknapcb6.txt[1] seed=26 policy=vanilla_exploration best=112796 gap=5.32% elapsed=332.72s
+[53/62] mknapcb6.txt[1] seed=27 policy=vanilla_exploitation best=113206 gap=4.98% elapsed=317.53s
+[54/62] mknapcb6.txt[1] seed=27 policy=vanilla_exploration best=113012 gap=5.14% elapsed=306.49s
+[55/62] mknapcb6.txt[1] seed=28 policy=vanilla_exploitation best=113735 gap=4.54% elapsed=303.26s
+[56/62] mknapcb6.txt[1] seed=28 policy=vanilla_exploration best=112625 gap=5.47% elapsed=306.78s
+[57/62] mknapcb6.txt[1] seed=29 policy=vanilla_exploitation best=113252 gap=4.94% elapsed=302.43s
+[58/62] mknapcb6.txt[1] seed=29 policy=vanilla_exploration best=113359 gap=4.85% elapsed=305.99s
+[59/62] mknapcb6.txt[1] seed=30 policy=vanilla_exploitation best=113276 gap=4.92% elapsed=303.72s
+[60/62] mknapcb6.txt[1] seed=30 policy=vanilla_exploration best=112633 gap=5.46% elapsed=305.60s
+[61/62] mknapcb6.txt[1] seed=31 policy=vanilla_exploitation best=113460 gap=4.77% elapsed=294.16s
+[62/62] mknapcb6.txt[1] seed=31 policy=vanilla_exploration best=113089 gap=5.08% elapsed=290.79s
+  [plot] fitness_convergence.png   -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploitation/best_run/fitness_convergence.png'
+  [plot] dtw_delta.png             -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploitation/best_run/dtw_delta.png'
+  [plot] parameters.png -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploitation/best_run/parameters.png'
+  [plot] temporal_diagnostics.png -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploitation/best_run/temporal_diagnostics.png'
+  [plot] fitness_convergence.png   -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploration/best_run/fitness_convergence.png'
+  [plot] dtw_delta.png             -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploration/best_run/dtw_delta.png'
+  [plot] parameters.png -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploration/best_run/parameters.png'
+  [plot] temporal_diagnostics.png -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/vanilla_exploration/best_run/temporal_diagnostics.png'
+  [plot] convergence_comparison.png -> '/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign/mknapcb6/inst_01/convergence_comparison.png'
+status=completed runs=62/62
+output=/work/lucas.erazo/mkp_lb2/resultados/gwo_de_vanilla_22875/.staging/mknapcb6_inst_01/campaign
