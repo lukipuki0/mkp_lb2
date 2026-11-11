@@ -1,0 +1,29 @@
+{
+  "instance": "mknapcb1.txt[15]",
+  "seed": 10,
+  "binarization": "lb2",
+  "policy": "binary_complex",
+  "monitor_config": {
+    "window": 40,
+    "band": 4,
+    "min_slope": 2.0,
+    "plateau_max": 15,
+    "patience": 8,
+    "use_ddtw": true,
+    "adapt_thresholds": true,
+    "p_low": 20.0,
+    "p_high": 60.0,
+    "improvement_tol": 0.0
+  },
+  "best_fitness": 42835.0,
+  "gap_pct": 0.21431732941971254,
+  "evaluations": 120030,
+  "notes": {
+    "s": "Decision after t, used at t+1; 0 exploit, 1 explore.",
+    "mode_used": "Profile that generated iteration t; used for shading.",
+    "X": "Monitor-filtered window; NaN while warming up after each reset.",
+    "parameters": "a, F, CR used at t; G3 is not plotted.",
+    "intensity": "Continuous policies: intensity of the blended profile used at t (0 exploit, 1 explore). NaN for binary policies.",
+    "window_selection": "Rising exploit window with total rise closest to its ramp (fallback any rising); midpoint of longest flat explore run (fallback any flat). Missing categories omitted."
+  }
+}
