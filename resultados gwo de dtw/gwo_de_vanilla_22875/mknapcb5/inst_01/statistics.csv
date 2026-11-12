@@ -1,3 +1,0 @@
-file,index,policy,runs,best_fitness,worst_fitness,mean_fitness,median_fitness,std_fitness,best_seed,known_optimum,best_gap_pct,mean_gap_pct,mean_elapsed_s
-mknapcb5.txt,1,vanilla_exploitation,31,56161.0,55539.0,55839.967741935485,55844.0,174.99266344068403,6,58662.0,4.263407316491085,4.810664924592609,158.5811322580645
-mknapcb5.txt,1,vanilla_exploration,31,55974.0,55208.0,55599.32258064516,55556.0,204.43310023848457,28,58662.0,4.582182673621765,5.220888171823052,160.2068741935484

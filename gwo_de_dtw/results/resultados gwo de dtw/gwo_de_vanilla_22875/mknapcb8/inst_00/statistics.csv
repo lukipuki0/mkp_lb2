@@ -1,0 +1,3 @@
+file,index,policy,runs,best_fitness,worst_fitness,mean_fitness,median_fitness,std_fitness,best_seed,known_optimum,best_gap_pct,mean_gap_pct,mean_elapsed_s
+mknapcb8.txt,0,vanilla_exploitation,31,55345.0,54786.0,55088.51612903226,55089.0,152.83866678467243,1,56693.0,2.3777185895965993,2.8301269485963734,167.0859935483871
+mknapcb8.txt,0,vanilla_exploration,31,55180.0,54689.0,54911.87096774193,54885.0,156.733476946372,7,56693.0,2.6687598116169546,3.141708909844363,167.32255806451613

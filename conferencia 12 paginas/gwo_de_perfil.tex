@@ -1,8 +1,13 @@
 \documentclass[runningheads]{llncs}
 
 \usepackage[T1]{fontenc}
-\usepackage{newtxtext}
-\usepackage[varvw]{newtxmath}
+\IfFileExists{newtxtext.sty}{%
+  \usepackage{newtxtext}
+  \usepackage[varvw]{newtxmath}
+}{%
+  \usepackage{mathptmx}
+  \usepackage{amssymb}
+}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -30,15 +35,33 @@ El cambio de perfil de GWO--DE sale de esa lectura, no de un contador fijo ni de
 \end{abstract}
 
 \section{Introducción}
-Durante la búsqueda, la curva de convergencia se usa como señal mientras el proceso sigue, no solo como gráfico final.
 
-\section{Trabajo relacionado}
-% PENDIENTE: trabajo relacionado
+La curva del mejor valor encontrado se produce en cada iteración. Mientras la corrida sigue, el control no la lee: la amplitud del paso y el paso entre exploración y explotación quedan en un calendario o en un contador de iteraciones sin mejora.
 
-\section{El problema y el híbrido GWO--DE}
-\label{sec:hibrido}
+En el Grey Wolf Optimizer el coeficiente que fija esa amplitud decrece con el avance de la corrida, haya o no mejora del incumbente~\cite{mirjalili2014grey}. Un contador de estancamiento solo mide cuántas iteraciones pasaron desde el último aumento estricto. No distingue una ventana plana de una que todavía sube, ni registra en qué momento ocurrió el ascenso. El cambio de perfil de este híbrido no sale de ese contador ni de una política entrenada: sale de la forma reciente de la curva.
 
-El monitor de la sección~\ref{sec:monitor} no elige una metaheurística: regula los parámetros de un híbrido que mantiene una sola población y, por lo tanto, un solo incumbente y una sola curva de convergencia. Esa propiedad es la que permite describir el estado de toda la búsqueda con una única ventana. Los dos operadores que compiten dentro de esa población son el Grey Wolf Optimizer y la evolución diferencial, y conviene fijar sus ecuaciones antes de describir cómo se combinan.
+Dynamic time warping compara una ventana con una referencia aunque la mejora no caiga en el mismo instante~\cite{berndt1994using}. La versión derivada trabaja sobre las diferencias de primer orden, de modo que un desplazamiento vertical de la serie no se penaliza~\cite{keogh2001derivative}. Esa lectura está disponible en cuanto la ventana se completa, y no exige otra corrida ni un modelo del problema.
+
+El híbrido mantiene una sola población y hace competir, sobre cada individuo, al Grey Wolf Optimizer con la evolución diferencial~\cite{storn1997differential}. El monitor no elige el operador. Cambia el perfil de los parámetros que ambos comparten, y con eso pasa de explotación a exploración o vuelve, sin reiniciar la población ni el mejor valor. La pregunta es si ese perfil adaptativo supera, en calidad final, a la explotación fija y a la exploración fija sobre la mochila multidimensional~\cite{chu1998genetic}. La sección~\ref{sec:antecedentes} fija el problema, los operadores y la distancia. La sección~\ref{sec:propuesta} fija la población compartida, los dos perfiles y la regla de cambio. El contraste que aísla esa regla está en la sección~\ref{sec:diseno}.
+
+\section{Estado del arte}
+% PENDIENTE: estado del arte
+
+\section{Antecedentes}
+\label{sec:antecedentes}
+
+La propuesta regula un híbrido sobre la mochila multidimensional. Aquí se fijan el problema, los dos operadores y la distancia. El híbrido y la regla de cambio quedan en la sección~\ref{sec:propuesta}.
+
+\subsection{Mochila multidimensional}
+\label{sec:mochila}
+
+La mochila multidimensional pide elegir un subconjunto de ítems para maximizar el beneficio sin exceder ninguna de varias capacidades compartidas~\cite{chu1998genetic}:
+\begin{align}
+\max \quad & f(\mathbf{x}) = \sum_{j=1}^{n} p_j x_j \label{eq:mkp} \\
+\text{sujeto a} \quad & \sum_{j=1}^{n} r_{ij} x_j \le b_i, \quad i \in \{1, \ldots, m\}, \nonumber \\
+& x_j \in \{0,1\}, \quad j \in \{1, \ldots, n\}, \nonumber
+\end{align}
+con $p_j > 0$, $r_{ij} \ge 0$ y $b_i > 0$.
 
 \subsection{Operadores}
 \label{sec:operadores}
@@ -48,7 +71,7 @@ El Grey Wolf Optimizer guía cada candidato a partir de las tres mejores solucio
 \mathbf{D}_k &= \bigl|\mathbf{C}_k \odot \mathbf{x}_k - \mathbf{x}_i\bigr|, &
 \mathbf{y}_k &= \mathbf{x}_k - \mathbf{A}_k \odot \mathbf{D}_k, \label{eq:gwo}
 \end{align}
-donde $\mathbf{A}_k = 2a\,\mathbf{r}_{1,k} - a\,\mathbf{1}$, $\mathbf{C}_k = 2\,\mathbf{r}_{2,k}$, los vectores aleatorios tienen componentes independientes uniformes en $[0,1]$ y $\odot$ es el producto elemento a elemento. El candidato del operador es el promedio de las tres posiciones dirigidas, $(\mathbf{y}_\alpha + \mathbf{y}_\beta + \mathbf{y}_\delta)/3$. El parámetro $a$ fija el rango de los coeficientes de atracción: con valores mayores que uno, alguna componente de $\mathbf{A}_k$ puede superar la unidad en magnitud y el paso se aleja del líder, mientras que valores menores lo confinan cerca de los líderes. En la formulación original $a$ decrece a lo largo de la corrida; aquí lo entrega el perfil activo, de modo que la amplitud de la búsqueda deja de ser un calendario y pasa a depender de lo que la curva muestra.
+donde $\mathbf{A}_k = 2a\,\mathbf{r}_{1,k} - a\,\mathbf{1}$, $\mathbf{C}_k = 2\,\mathbf{r}_{2,k}$, los vectores aleatorios tienen componentes independientes uniformes en $[0,1]$ y $\odot$ es el producto elemento a elemento. El candidato del operador es el promedio de las tres posiciones dirigidas, $(\mathbf{y}_\alpha + \mathbf{y}_\beta + \mathbf{y}_\delta)/3$. El parámetro $a$ fija el rango de los coeficientes de atracción: con valores mayores que uno, alguna componente de $\mathbf{A}_k$ puede superar la unidad en magnitud y el paso se aleja del líder, mientras que valores menores lo confinan cerca de los líderes. En la formulación original $a$ decrece a lo largo de la corrida.
 
 La evolución diferencial construye la dirección de búsqueda a partir de diferencias entre miembros de la población~\cite{storn1997differential}. El esquema DE/rand/1/bin elige tres individuos distintos entre sí y distintos del individuo objetivo, y forma el vector mutante
 \begin{equation}
@@ -64,7 +87,30 @@ x_{i,j}, & \text{en caso contrario},
 \end{cases}
 \label{eq:de_cruce}
 \end{equation}
-con $r_j$ uniforme en $[0,1]$ y con $j_{\mathrm{rand}}$ elegido al azar para garantizar que al menos una componente provenga del mutante. Un $CR$ alto aumenta la cantidad esperada de componentes tomadas del mutante, así que el mismo operador puede copiar al objetivo o apartarse de él según el valor que le entregue el perfil.
+con $r_j$ uniforme en $[0,1]$ y con $j_{\mathrm{rand}}$ elegido al azar para garantizar que al menos una componente provenga del mutante. Un $CR$ alto aumenta la cantidad esperada de componentes tomadas del mutante, así que el mismo operador puede copiar al objetivo o apartarse de él según ese valor.
+
+\subsection{Alineamiento temporal}
+\label{sec:alineamiento}
+
+La distancia entre dos series del mismo largo se calcula con dynamic time warping, que tolera que un patrón no caiga en el mismo instante~\cite{berndt1994using}. La recurrencia acumula el costo absoluto,
+\begin{equation}
+D(i,j) = \bigl|x_i - y_j\bigr| + \min\bigl\{D(i-1,j),\; D(i,j-1),\; D(i-1,j-1)\bigr\},
+\label{eq:dtw}
+\end{equation}
+con $D(0,0) = 0$ y con el resto de la primera fila y de la primera columna en infinito. El alineamiento queda dentro de una banda de Sakoe--Chiba,
+\begin{equation}
+|i-j| \le w,
+\label{eq:banda}
+\end{equation}
+para que una deformación extrema no cuente como semejanza~\cite{sakoe1978dynamic}. La banda limita las actualizaciones de la recurrencia, pero la matriz de costo se asigna completa, de modo que la memoria sigue siendo cuadrática en el largo de la serie.
+
+La versión derivada no aplica esa distancia a los valores crudos sino a sus diferencias de primer orden, $\nabla x_k = x_k - x_{k-1}$ con $\nabla x_1 = 0$~\cite{keogh2001derivative}. Un desplazamiento vertical se cancela en esas diferencias, así que una serie trasladada no se penaliza por estar más arriba o más abajo que la otra. Un reescalado multiplicativo, en cambio, no se cancela, y la distancia no es invariante de escala.
+
+\section{Propuesta}
+\label{sec:propuesta}
+\label{sec:monitor}
+
+El monitor no sustituye los operadores. Ajusta los parámetros de un híbrido con una sola población, un solo incumbente y una sola curva de convergencia. Esa propiedad permite describir el estado de toda la búsqueda con una única ventana. Los operadores son los de la sección~\ref{sec:operadores}.
 
 \subsection{Población compartida}
 \label{sec:poblacion}
@@ -78,7 +124,7 @@ Ese diseño tiene una consecuencia contable que importa para el contraste de la 
 \subsection{Dos perfiles}
 \label{sec:perfiles}
 
-La capa de control no selecciona algoritmos: fija los parámetros que comparten ambos operadores. La Tabla~\ref{tab:perfiles} define dos perfiles. Explotación usa un $a$ pequeño, que confina los candidatos del Grey Wolf Optimizer cerca de los líderes, junto con un peso diferencial bajo y una tasa de cruce alta, de modo que la evolución diferencial toma la mayor parte de sus componentes del mutante. Exploración invierte ese balance: el $a$ grande admite pasos que se alejan de los líderes, el $F$ alto amplifica el desplazamiento diferencial y el $CR$ bajo conserva más componentes del vector objetivo.
+La capa de control no selecciona algoritmos: fija los parámetros que comparten ambos operadores. Esos valores sustituyen el calendario original de $a$ y dejan de ser constantes de la evolución diferencial, de modo que la amplitud de la búsqueda pasa a depender de lo que la curva muestra. La Tabla~\ref{tab:perfiles} define dos perfiles. Explotación usa un $a$ pequeño, que confina los candidatos del Grey Wolf Optimizer cerca de los líderes, junto con un peso diferencial bajo y una tasa de cruce alta, de modo que la evolución diferencial toma la mayor parte de sus componentes del mutante. Exploración invierte ese balance: el $a$ grande admite pasos que se alejan de los líderes, el $F$ alto amplifica el desplazamiento diferencial y el $CR$ bajo conserva más componentes del vector objetivo.
 
 \begin{table}
 \caption{Perfiles de parámetros compartidos por ambos operadores. La búsqueda empieza en explotación.}
@@ -95,10 +141,7 @@ Exploración & 2 & 0,9 & 0,3 \\
 
 Una corrida adaptativa empieza en explotación y permanece ahí hasta completar la ventana de la sección~\ref{sec:monitor}, porque antes de reunir $W$ observaciones no hay decisión posible. El cambio decidido al cierre de la generación $g$ rige desde $g+1$. Ni la población ni el mejor global se reinician, así que un cambio de perfil altera la forma de generar candidatos nuevos sin descartar lo que la búsqueda ya acumuló.
 
-\section{Lectura de la curva y cambio de perfil}
-\label{sec:monitor}
-
-% PENDIENTE - Figura: ventana reciente superpuesta a la rampa de progreso y a la referencia constante, ambas ancladas en el primer valor de la ventana, con la banda de Sakoe--Chiba marcada sobre la matriz de alineamiento. Ubicación: inicio de la sección Lectura de la curva y cambio de perfil. Propósito: hacer visible que las dos referencias se construyen para la ventana observada y no se traen de corridas anteriores, y que la banda acota la deformación admitida. Fuentes: ecuaciones (eq:ventana), (eq:rampa), (eq:constante) y (eq:banda) de esta sección. El diagrama gwo_de_dtw_paper/figs/monitor-dtw/ ya cubre este contenido y puede adaptarse.
+% PENDIENTE - Figura: ventana reciente superpuesta a la rampa de progreso y a la referencia constante, ambas ancladas en el primer valor de la ventana, con la banda de Sakoe--Chiba marcada sobre la matriz de alineamiento. Ubicación: inicio de la lectura de la curva, dentro de Propuesta. Propósito: hacer visible que las dos referencias se construyen para la ventana observada y no se traen de corridas anteriores, y que la banda acota la deformación admitida. Fuentes: ecuaciones (eq:ventana), (eq:rampa), (eq:constante) y (eq:banda). El diagrama gwo_de_dtw_paper/figs/monitor-dtw/ ya cubre este contenido y puede adaptarse.
 
 \subsection{Serie y ventana}
 \label{sec:ventana}
@@ -128,19 +171,7 @@ y representa una mejora sostenida y uniforme. Esa pendiente dibuja la referencia
 \subsection{Distancias}
 \label{sec:distancias}
 
-La distancia entre la ventana y cada referencia se calcula con dynamic time warping, que tolera que la mejora no caiga en el mismo instante~\cite{berndt1994using}. La recurrencia acumula el costo absoluto,
-\begin{equation}
-D(i,j) = \bigl|x_i - y_j\bigr| + \min\bigl\{D(i-1,j),\; D(i,j-1),\; D(i-1,j-1)\bigr\},
-\label{eq:dtw}
-\end{equation}
-con $D(0,0) = 0$ y con el resto de la primera fila y de la primera columna en infinito. El alineamiento queda dentro de una banda de Sakoe--Chiba,
-\begin{equation}
-|i-j| \le w,
-\label{eq:banda}
-\end{equation}
-para que una deformación extrema no cuente como semejanza~\cite{sakoe1978dynamic}. Con $W = 40$, la regla $w = \lfloor 0{,}1\,W \rfloor$ da $w = 4$, que es el valor de la Tabla~\ref{tab:monitor}. La banda limita las actualizaciones de la recurrencia, pero la matriz de costo se asigna completa, de modo que la memoria sigue siendo cuadrática en $W$; con ventanas de este tamaño ese costo es despreciable frente a una evaluación del problema.
-
-La configuración de la Tabla~\ref{tab:monitor} no aplica esa distancia a los valores crudos sino a sus diferencias de primer orden, $\nabla x_k = x_k - x_{k-1}$ con $\nabla x_1 = 0$, que es la versión derivada de la distancia~\cite{keogh2001derivative}. Un desplazamiento vertical se cancela en esas diferencias, así que una ventana trasladada no se penaliza por estar más arriba o más abajo que la referencia; un reescalado multiplicativo, en cambio, no se cancela, y la distancia no es invariante de escala. $D_1$ es la distancia a la rampa, $D_2$ la distancia a la constante y
+La distancia entre la ventana y cada referencia es la versión derivada de la sección~\ref{sec:alineamiento}. Con $W = 40$, la regla $w = \lfloor 0{,}1\,W \rfloor$ da $w = 4$, que es el valor de la Tabla~\ref{tab:monitor}. Con ventanas de este tamaño el costo cuadrático de la matriz es despreciable frente a una evaluación del problema. $D_1$ es la distancia a la rampa, $D_2$ la distancia a la constante y
 \begin{equation}
 \Delta = D_1 - D_2.
 \label{eq:delta}
@@ -237,13 +268,7 @@ Exploración fija & Nada de la curva & No cambia \\
 \subsection{Instancias}
 \label{sec:dominios}
 
-El contraste se ejecuta sobre la mochila multidimensional, que pide elegir un subconjunto de ítems para maximizar el beneficio sin exceder ninguna de varias capacidades compartidas~\cite{chu1998genetic}:
-\begin{align}
-\max \quad & f(\mathbf{x}) = \sum_{j=1}^{n} p_j x_j \label{eq:mkp} \\
-\text{sujeto a} \quad & \sum_{j=1}^{n} r_{ij} x_j \le b_i, \quad i \in \{1, \ldots, m\}, \nonumber \\
-& x_j \in \{0,1\}, \quad j \in \{1, \ldots, n\}, \nonumber
-\end{align}
-con $p_j > 0$, $r_{ij} \ge 0$ y $b_i > 0$. El conjunto de instancias es el MKNAPCB de la OR-Library, que combina $n \in \{100, 250, 500\}$ ítems con $m \in \{5, 10, 30\}$ restricciones. De cada uno de los nueve grupos se toman las dos primeras instancias, con índices de base cero $0$ y $1$, lo que da 18 instancias. La selección está fijada de antemano y no es una muestra aleatoria de las 30 instancias disponibles en cada archivo. Cada instancia trae un mejor valor factible conocido, tomado de \texttt{mkcbres.txt}, que se usa como referencia del gap; son las mejores soluciones factibles registradas, no óptimos certificados, y el encabezado de los archivos de instancias deja en cero el campo reservado al óptimo.
+El contraste se ejecuta sobre la mochila de la sección~\ref{sec:mochila}. El conjunto de instancias es el MKNAPCB de la OR-Library, que combina $n \in \{100, 250, 500\}$ ítems con $m \in \{5, 10, 30\}$ restricciones. De cada uno de los nueve grupos se toman las dos primeras instancias, con índices de base cero $0$ y $1$, lo que da 18 instancias. La selección está fijada de antemano y no es una muestra aleatoria de las 30 instancias disponibles en cada archivo. Cada instancia trae un mejor valor factible conocido, tomado de \texttt{mkcbres.txt}, que se usa como referencia del gap; son las mejores soluciones factibles registradas, no óptimos certificados, y el encabezado de los archivos de instancias deja en cero el campo reservado al óptimo.
 
 El híbrido opera sobre vectores continuos, así que hace falta una correspondencia con las decisiones binarias. En lugar de derivar los bits desde cero en cada generación, la regla LB2 trata el vector continuo como una fuente de probabilidades de volteo que se aplican a los bits que el individuo ya tiene. Las dos funciones de transferencia complementarias son
 \begin{equation}

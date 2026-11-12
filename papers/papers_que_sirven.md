@@ -2,9 +2,9 @@
 
 Selección histórica de `savedrecs (2).xls`, `savedrecs (3).xls` y `savedrecs (4).xls`. Ventana 2021–2026, más Drake et al. (2020) como única encuesta anterior en aquella criba. El enlace de cada paper es su DOI.
 
-El catálogo vigente de los PDF leídos está en [Papers Seminario](Papers%20Seminario/README.md): 75 estudios en seis secciones, cuatro copias aparte, fichas con páginas físicas del PDF y [síntesis de trabajo](Papers%20Seminario/ESTADO_DEL_ARTE.md). La bibliografía [referencias.bib](referencias.bib) (81 claves) manda sobre el año del nombre de archivo y sobre el año de esta lista cuando discrepan. Seis claves de la selección original no tienen PDF en el catálogo y no se reescribieron como fichas: `Aydin_2025`, `Biedenkapp_2022`, `Doerr_2021`, `Guo_2024`, `Ming_2024`, `Sun_2021`.
+El catálogo vigente de los PDF leídos está en [catálogo](README.md): 95 estudios en seis secciones, fichas con páginas físicas del PDF y [síntesis de trabajo](ESTADO_DEL_ARTE.md). La bibliografía [referencias.bib](referencias.bib) (95 claves) manda sobre el año del nombre de archivo y sobre el año de esta lista cuando discrepan. Las seis claves que estaban sin PDF ya tienen ficha: `Aydin_2025`, `Biedenkapp_2022`, `Doerr_2021`, `Guo_2024`, `Ming_2024`, `Sun_2021`.
 
-La búsqueda de hibridación GWO–DE no está en estos Excel. Esa frase describe las tres exportaciones, no el resto de la literatura ni el catálogo de 75 estudios.
+La búsqueda de hibridación GWO–DE no está en estos Excel. Esa frase describe las tres exportaciones, no el resto de la literatura ni el catálogo de 95 estudios.
 
 ## Introducción
 
