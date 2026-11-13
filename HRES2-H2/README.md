@@ -106,6 +106,61 @@ O dentro de un entorno Jupyter/Colab:
 
 ---
 
+## Campaña ASOC DDTW sin ABC (`run_asoc_ddtw_noabc.py`)
+
+Para repetir únicamente DDTW con el pool del manuscrito, desde la raíz:
+
+```bash
+python HRES2-H2/run_asoc_ddtw_noabc.py --help
+python HRES2-H2/run_asoc_ddtw_noabc.py --output HRES2-H2/resultados/asoc_ddtw_noabc_fresh
+```
+
+El destino debe ser nuevo; si existe se rechaza antes de construir el modelo.
+Sin `--output` se crea un directorio nuevo automáticamente. Este entrypoint fija
+31 runs DDTW sin baselines (31 registros), con 1000 iteraciones nominales.
+El pool poblacional es PSO, GWO, WOA, EHO, ACO; el de trayectoria sigue siendo
+ILS, SA, TS, VNS. No se ejecutan comparadores standalone.
+`manifest.json` registra el pool efectivo, sin ABC. No se modifican resultados
+históricos ni el paper; la campaña genérica y la implementación ABC siguen intactas.
+
+Se reutiliza el benchmark: clima sintético de 8760 horas con semilla 2008,
+semillas híbridas 43–73, monitor W=40, band=4,
+patience=8, min_slope=0.1, plateau=15, adaptativo 30/70 y DDTW activado.
+No se fuerza `max_epoch_iters`: se conserva el presupuesto nominal y su posible
+overshoot. El benchmark acepta `pool_poblacional` como argumento Python opcional;
+`None` conserva el pool original con ABC. El CLI genérico no cambia.
+La ejecución completa es larga; `--help` no inicia optimización.
+
+### Recuperación sin optimización (`report_asoc_ddtw_noabc.py`)
+
+La campaña interrumpida `asoc_ddtw_noabc_fresh` conserva 102 registros: los 31
+DDTW completos y 71 baselines. No se modifica ni se presenta como campaña original
+completada. Para extraer solo los escalares DDTW a un destino nuevo:
+
+```bash
+py -3.11 -B HRES2-H2/report_asoc_ddtw_noabc.py --source HRES2-H2/resultados/asoc_ddtw_noabc_fresh --output HRES2-H2/resultados/asoc_ddtw_noabc_only
+```
+
+El informe valida el pool sin ABC, métodos, IDs, semillas y métricas finitas antes
+de crear salida. Rechaza destinos existentes (código 2). Exporta `runs.jsonl`,
+`runs.csv`, `summary.json` y `summary.md`; conserva los registros originales.
+Incluye procedencia SHA-256, baselines excluidos, factibilidad y LCOE físico
+(media, desviación **muestral**, mínimo, máximo); el mejor factible se elige por
+LCOE y luego ID. No importa el optimizador ni calcula inferencia. Convergencia,
+DDTW, Gantt y switches no están disponibles en esos registros; no se reconstruyen.
+
+Para obtener trazas se autorizó por separado **una** ejecución con semilla 43,
+1000 iteraciones nominales, sin ABC ni baselines, mediante la función Python
+`ejecutar_benchmark_hres2(n_runs=1, max_iters=1000, seed_base=42, modes=['ddtw'],
+baselines=[], pool_poblacional=['PSO','GWO','WOA','EHO','ACO'],
+output_dir='HRES2-H2/resultados/asoc_ddtw_noabc_trace_seed43')`.
+El padre/orquestador lanza esa ejecución; no usar el wrapper de 31 runs para ella.
+`best_run_01/` es el único run de esa nueva ejecución, **no** el mejor de los 31
+anteriores. La igualdad de reproducción requiere comparación posterior. El
+exportador guarda `fitness_convergence.png`, `dtw_delta.png` (si hay deltas válidos)
+y `historial_dtw.csv`/`historial_dtw_detalle.txt`. Los títulos legacy dicen DTW y
+el boxplot legacy dice 31 runs incluso con n=1; el manifest identifica DDTW y n=1.
+
 ## Benchmark reproducible (`benchmark_hres2.py`)
 
 No hay un wrapper `reproduce_campaign.py`. Los defaults del monitor nominal son W=40, band=4, patience=8, min_slope=0.1, plateau=15, adaptativo y percentiles 30/70. El protocolo de paper es 31 runs y 1000 iteraciones nominales, en modos `dtw` y `ddtw`, con nueve baselines ejecutados una sola vez: PSO, GWO, WOA, EHO, ACO, ILS, SA, TS y VNS. ABC permanece en el portafolio híbrido y no es un baseline del paper.

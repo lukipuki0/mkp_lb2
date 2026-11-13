@@ -128,6 +128,7 @@ class PublicPersistenceTests(unittest.TestCase):
             events.append("pipeline")
             seen["stag"] = kwargs["stag_cfg"]
             self.assertNotIn("max_epoch_iters", kwargs)
+            self.assertNotIn("pool_poblacional", kwargs)  # legacy DTW call is unchanged
             self.assertEqual(kwargs["max_iters"], 2)
             return fake_result(value=1.0 / 3.0, history=5)
 
@@ -169,6 +170,8 @@ class PublicPersistenceTests(unittest.TestCase):
             self.assertIn("does not by itself prove paired", record["seed_note"])
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertIn("effective_monitor", manifest)
+            self.assertEqual(manifest["effective_configuration"]["hybrid_population"],
+                             ["PSO", "GWO", "WOA", "EHO", "ACO", "ABC"])
             self.assertIn("weather", manifest)
             self.assertIn("runtime", manifest)
             self.assertIn("git_sha", manifest["source"])
@@ -327,6 +330,7 @@ class PublicPersistenceTests(unittest.TestCase):
         self.assertEqual(list(signature.parameters), [
             "n_runs", "max_iters", "output_dir", "modes", "baselines", "nonpaper",
             "pipeline", "standalone", "function_factory", "seed_globals", "seed_base",
+            "pool_poblacional",
         ])
         self.assertEqual(signature.parameters["modes"].kind, inspect.Parameter.KEYWORD_ONLY)
         with tempfile.TemporaryDirectory() as scratch:

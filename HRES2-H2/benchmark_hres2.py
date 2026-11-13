@@ -360,8 +360,17 @@ def ejecutar_benchmark_hres2(
     function_factory=None,
     seed_globals=None,
     seed_base: int = RANDOM_SEED,
+    pool_poblacional: list[str] | None = None,
 ) -> dict:
-    """Ejecuta el pipeline híbrido y baselines, guardando cada observación."""
+    """Ejecuta el pipeline híbrido y baselines, guardando cada observación.
+
+    pool_poblacional permite una campaña acotada sin cambiar el pool genérico.
+    None conserva el portafolio HRES2 original, incluido ABC.
+    """
+    effective_population = list(
+        _orch_mod.POOL_POBLACIONAL_HRES2 if pool_poblacional is None else pool_poblacional
+    )
+    pipeline_options = {} if pool_poblacional is None else {"pool_poblacional": effective_population}
     selected_modes = list(modes) if modes is not None else ["ddtw" if STAG_USE_DDTW else "dtw"]
     selected_baselines = list(PAPER_BASELINES if baselines is None else baselines)
     unknown = [name for name in selected_baselines if name not in PAPER_BASELINES]
@@ -385,7 +394,7 @@ def ejecutar_benchmark_hres2(
             "n_runs": n_runs, "nominal_iterations": max_iters, "modes": selected_modes,
             "baselines": selected_baselines, "nonpaper": nonpaper, "seed_base": seed_base,
             "iteration_note": ITERATION_NOTE, "seed_note": SEED_NOTE,
-            "hybrid_population": list(getattr(_orch_mod, "POOL_POBLACIONAL_HRES2", [])),
+            "hybrid_population": effective_population,
             "hybrid_trajectory": list(getattr(_orch_mod, "POOL_TRAYECTORIA_HRES2", [])),
         },
         "model": {"type": type(func).__name__, "config": getattr(func, "config", None)},
@@ -418,7 +427,10 @@ def ejecutar_benchmark_hres2(
                 seed_fn(seed)
                 print(f"  >>> {method} [{run:02d}/{n_runs:02d}] seed={seed}")
                 started = time.perf_counter()
-                result = pipeline_fn(func=func, max_iters=max_iters, stag_cfg=stag_cfg, verbose=False)
+                result = pipeline_fn(
+                    func=func, max_iters=max_iters, stag_cfg=stag_cfg, verbose=False,
+                    **pipeline_options,
+                )
                 record = build_run_record(
                     func, result, run=run, method=method, mode=mode, seed=seed,
                     role="hybrid", nominal=max_iters, elapsed=time.perf_counter() - started,

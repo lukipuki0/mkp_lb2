@@ -1,0 +1,2 @@
+rank,algoritmo,mean_rank,mean_lcoe,std_lcoe,median_lcoe,best_lcoe,iqr_lcoe,ci95_low,ci95_high,shapiro_pvalue,wilcoxon_pvalue,mannwhitney_pvalue,holm_pvalue,n_records,n_finite_feasible,wtl,inference_reason,significancia
+1,Hybrid DDTW,,0.267159,0.000000,0.267159,0.267159,0.000000,0.267159,0.267159,nan,nan,nan,,1,1,reference,,reference

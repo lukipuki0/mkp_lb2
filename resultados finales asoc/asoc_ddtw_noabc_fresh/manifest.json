@@ -1,0 +1,109 @@
+{
+  "effective_monitor": {
+    "ddtw": {
+      "window": 40,
+      "band": 4,
+      "min_slope": 0.1,
+      "plateau_max": 15,
+      "patience": 8,
+      "use_ddtw": true,
+      "adapt_thresholds": true,
+      "p_low": 30.0,
+      "p_high": 70.0
+    }
+  },
+  "effective_configuration": {
+    "n_runs": 31,
+    "nominal_iterations": 1000,
+    "modes": [
+      "ddtw"
+    ],
+    "baselines": [
+      "PSO",
+      "GWO",
+      "WOA",
+      "EHO",
+      "ACO",
+      "ILS",
+      "SA",
+      "TS",
+      "VNS"
+    ],
+    "nonpaper": false,
+    "seed_base": 42,
+    "iteration_note": "nominal_iterations is the requested max_iters budget, not an evaluation budget; actual_iterations may overshoot because epoch length is unchanged and max_epoch_iters is not forced.",
+    "seed_note": "A repeated seed does not by itself prove paired initial conditions; solvers consume the RNG differently and weather is constructed first.",
+    "hybrid_population": [
+      "PSO",
+      "GWO",
+      "WOA",
+      "EHO",
+      "ACO"
+    ],
+    "hybrid_trajectory": [
+      "ILS",
+      "SA",
+      "TS",
+      "VNS"
+    ]
+  },
+  "model": {
+    "type": "HRES2Function",
+    "config": {
+      "lat": 41.7,
+      "lon": 110.43,
+      "total_generation_capacity_mw": 200.0,
+      "agsr_max": 0.2,
+      "electrolyzer_ratio_max": 0.5,
+      "electrolyzer_unit_mw": 5.0,
+      "min_electrolyzer_units": 10,
+      "max_electrolyzer_units": 20,
+      "battery_power_min_mw": 0.0,
+      "battery_power_max_mw": 50.0,
+      "battery_duration_candidates_h": [
+        1.0,
+        2.0,
+        4.0
+      ],
+      "h2_hhv_kwh_per_kg": 39.4,
+      "electrolyzer_efficiency": 0.75,
+      "electrolyzer_min_load_ratio": 0.3,
+      "project_lifetime_years": 25,
+      "real_discount_rate": 0.0435,
+      "wind_turbine_rated_mw": 5.0,
+      "wind_cut_in_ms": 2.5,
+      "wind_rated_ms": 10.5,
+      "wind_cut_out_ms": 25.0,
+      "pv_dc_ac_ratio": 1.2,
+      "pv_temp_coeff_pct_per_c": -0.5,
+      "pv_noct_c": 47.0,
+      "pv_stc_efficiency_pct": 13.0,
+      "pv_derating_factor": 0.9,
+      "converter_efficiency": 0.95,
+      "battery_roundtrip_efficiency": 0.9
+    }
+  },
+  "weather": {
+    "constructed_before_campaign_seeds": true,
+    "default_factory": true,
+    "default_generator": "generate_synthetic_tmy_8760",
+    "rows": 8760,
+    "columns": [
+      "timestamp",
+      "ws50m",
+      "ghi_kwh_m2",
+      "t2m_c"
+    ],
+    "note": "Campaign seeds are applied only after weather construction."
+  },
+  "runtime": {
+    "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "platform": "Windows-10-10.0.22631-SP0",
+    "numpy": "2.2.6"
+  },
+  "source": {
+    "benchmark_path": "C:\\Users\\Abduzcan0\\Desktop\\mkp_lb2\\HRES2-H2\\benchmark_hres2.py",
+    "git_sha": "95fc6a134cb5c11203e7eeae1759e1ef3d743771",
+    "git_error": null
+  }
+}

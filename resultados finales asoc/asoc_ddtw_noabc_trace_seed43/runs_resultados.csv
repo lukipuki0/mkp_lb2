@@ -1,0 +1,2 @@
+run,lcoe_cny_kwh,lcoh_cny_kg,agsr_pct,total_h2_kg,electrolyzer_cf_pct,n_switches,wind_mw,pv_mw,n_el_units,electrolyzer_mw,battery_mw,battery_duration_h
+1,0.267159,17.631389,20.0000,8862879.45,75.9290,16,174.47315399420154,25.52684600579846,14,70.0,50.0,4.0
