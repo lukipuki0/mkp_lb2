@@ -3,63 +3,63 @@ import argparse
 import sys
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "SKILLS" / "diagramas-drawio-onebyte" / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[2] / "SKILLS" / "diagramas-drawio-onebyte" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 from dgen import AMBER, BLUE, D, GREEN, GREEN_T, TINT_B, TINT_C  # noqa: E402
 
 
 def generate(out):
-    d = D("hres2-dtw-integracion-v3", "Del HRES2 al DTW · version 3")
+    d = D("hres2-dtw-integracion-v3", "From HRES2 to DTW · version 3")
     d.text(40, 12, 520, 40, "HRES2", size=24, color="#0B2252", bold=True)
     d.text(700, 12, 520, 40, "DTW", size=24, color="#0B2252", bold=True)
     d.P("base")
 
     design = d.box(
         40, 70, 500, 110,
-        title="Diseño", sub="P_WT, N_el, P_bat, tau_bat",
+        title="Design", sub="P_WT, N_el, P_bat, tau_bat",
         icons=[("tag:x:#1E4FD0", 48, 36)],
         fill=TINT_B, stroke=BLUE,
     )
     gen = d.box(
         40, 230, 500, 110,
-        title="Generación", sub="P_PV = 200 − P_WT",
+        title="Generation", sub="P_PV = 200 − P_WT",
         icons=[("tag:GEN:#1E4FD0", 64, 36)],
         fill=TINT_B, stroke=BLUE,
     )
     sim = d.box(
         40, 390, 500, 120,
-        title="Simulación horaria", sub="8760 h, despacho PEM y BESS",
+        title="Hourly simulation", sub="8760 h, PEM and BESS dispatch",
         icons=[("tag:8760:#0B2252", 72, 36)],
         fill="#FFFFFF", stroke=BLUE, sw=3,
     )
     agsr = d.box(
         40, 560, 500, 110,
-        title="Restricción", sub="AGSR ≤ 0,20",
+        title="Constraint", sub="AGSR ≤ 0.20",
         icons=[("tag:AGSR:#B26A00", 72, 36)],
         fill="#FFF3DC", stroke=AMBER,
     )
     lcoe = d.box(
         40, 720, 500, 110,
-        title="LCOE", sub="f factible, o penalización",
+        title="LCOE", sub="feasible f, or penalty",
         icons=[("tag:f:#B26A00", 48, 36)],
         fill="#FFF3DC", stroke=AMBER,
     )
 
     handoff = d.box(
         700, 70, 500, 110,
-        title="Paso a DTW", sub="q = −f, ventana X",
+        title="Handoff to DTW", sub="q = −f, window X",
         icons=[("tag:X:#0B2252", 48, 36)],
         fill="#FFFFFF", stroke=BLUE, sw=3,
     )
     ramp = d.box(
         700, 230, 230, 110,
-        title="Rampa R", sub="progreso",
+        title="Ramp R", sub="progress",
         icons=[("tag:R:#0E6E86", 48, 36)],
         fill=TINT_C, stroke="#18A9CC",
     )
     plateau = d.box(
         970, 230, 230, 110,
-        title="Meseta C", sub="constante",
+        title="Plateau C", sub="constant",
         icons=[("tag:C:#0E6E86", 48, 36)],
         fill=TINT_C, stroke="#18A9CC",
     )
@@ -71,13 +71,13 @@ def generate(out):
     )
     rule = d.box(
         700, 560, 500, 120,
-        title="Condición", sub="contador, D2 bajo, D1 o Delta alto",
+        title="Condition", sub="counter, low D2, high D1 or Delta",
         icons=[("tag:D:#B26A00", 48, 36)],
         fill="#FFF3DC", stroke=AMBER,
     )
     stag = d.box(
         700, 730, 500, 110,
-        title="Estancamiento", sub="racha S_t ≥ P",
+        title="Stagnation", sub="streak S_t ≥ P",
         icons=[("tag:S:#1F7A45", 48, 36)],
         fill=GREEN_T, stroke=GREEN, sw=3,
     )

@@ -3,24 +3,22 @@ import argparse
 import sys
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "SKILLS" / "diagramas-drawio-onebyte" / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[2] / "SKILLS" / "diagramas-drawio-onebyte" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 from dgen import AMBER, BLUE, D, GREEN, GREEN_T, TINT_B, TINT_C  # noqa: E402
 
 
 def generate(out):
-    d = D("hres2-flujo-energetico-v3", "Flujo energético HRES2 · versión 3")
+    d = D("hres2-flujo-energetico-v3", "HRES2 energy flow · version 3")
     d.P("base")
 
-    # Tight 3-column flow. Wind/solar centers sit 135 from Generación
-    # (30 closer than the previous 165). They share width, x, and a mirror
-    # about Generación's centerline. BESS is widened so "almacena excedentes"
-    # stays one line, and shifted left into the gap above the PEM approach.
-    # H2 sits under PEM; Red sits under Generación.
+    # Tight 3-column flow. Wind and solar share width and x, mirrored
+    # about renewable generation. BESS is wide enough for one subtitle line.
+    # Green H2 sits under the PEM electrolyzer; grid sits under generation.
     eolica = d.box(
         16, 51, 400, 110,
-        title="Eólica", sub="P<sub>WT</sub>",
-        icons=[("tag:EOL:#1E4FD0", 64, 36)],
+        title="Wind", sub="P<sub>WT</sub>",
+        icons=[("tag:WT:#1E4FD0", 48, 36)],
         fill=TINT_B, stroke=BLUE,
     )
     solar = d.box(
@@ -31,31 +29,31 @@ def generate(out):
     )
     bess = d.box(
         825, 16, 350, 120,
-        title="BESS", sub="almacena excedentes",
+        title="BESS", sub="stores surplus",
         icons=[("tag:BAT:#B26A00", 56, 36)],
         fill="#FFF3DC", stroke=AMBER,
     )
     gen = d.box(
         464, 181, 400, 120,
-        title="Generación renovable",
+        title="Renewable generation",
         icons=[("tag:GEN:#0B2252", 64, 36)],
         fill="#FFFFFF", stroke=BLUE, sw=3,
     )
     red = d.box(
         539, 346, 250, 120,
-        title="Red", sub="vende excedentes",
-        icons=[("tag:RED:#0E6E86", 56, 36)],
+        title="Grid", sub="sells surplus",
+        icons=[("tag:GRID:#0E6E86", 64, 36)],
         fill=TINT_C, stroke="#18A9CC",
     )
     el = d.box(
         912, 181, 440, 120,
-        title="Electrolizador PEM", sub="P<sub>el</sub> = 5N<sub>el</sub>",
+        title="PEM electrolyzer", sub="P<sub>el</sub> = 5N<sub>el</sub>",
         icons=[("tag:PEM:#B26A00", 64, 36)],
         fill="#FFFFFF", stroke=BLUE, sw=3,
     )
     h2 = d.box(
         912, 351, 440, 110,
-        title="H<sub>2</sub> verde", sub="producto final",
+        title="Green H<sub>2</sub>", sub="final product",
         icons=[("tag:H2:#1F7A45", 48, 36)],
         fill=GREEN_T, stroke=GREEN, sw=3,
     )
