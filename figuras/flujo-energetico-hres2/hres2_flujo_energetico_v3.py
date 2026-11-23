@@ -60,12 +60,16 @@ def generate(out):
 
     d.edge(eolica, gen, straight=True, ex=1, ey=0.5, nx=0, ny=0.25)
     d.edge(solar, gen, straight=True, ex=1, ey=0.5, nx=0, ny=0.75)
-    d.edge(gen, bess, straight=True, ex=0.82, ey=0, nx=0.25, ny=1)
+    d.edge(gen, bess, ex=0.5, ey=0, nx=0, ny=0.5)
     d.edge(gen, red, straight=True, ex=0.5, ey=1, nx=0.5, ny=0)
     d.edge(gen, el, straight=True, ex=1, ey=0.5, nx=0, ny=0.5)
     d.edge(bess, el, straight=True, ex=0.5, ey=1, nx=0.2, ny=0)
     d.edge(el, h2, color=GREEN, straight=True, ex=0.5, ey=1, nx=0.5, ny=0)
     d.save(out)
+    # White page background instead of the shared #F4F7FB, so the figure blends into white slides.
+    for page in Path(out).glob("*.drawio"):
+        page.write_text(page.read_text(encoding="utf-8").replace('background="#F4F7FB"', 'background="#FFFFFF"'),
+                        encoding="utf-8")
 
 
 if __name__ == "__main__":
