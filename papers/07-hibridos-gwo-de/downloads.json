@@ -1,0 +1,80 @@
+[
+  {
+    "name": "2023-adaptive-gwo-de-knapsack",
+    "doi": "10.1007/s00521-023-09075-x",
+    "url": "https://link.springer.com/content/pdf/10.1007/s00521-023-09075-x.pdf",
+    "status": "unavailable",
+    "error": "Response is not PDF: text/html; charset=utf-8",
+    "alternative_attempts": []
+  },
+  {
+    "name": "2026-hybrid-gwo-de-capacitor",
+    "doi": "10.1038/s41598-026-62604-1",
+    "url": "https://www.nature.com/articles/s41598-026-62604-1.pdf",
+    "status": "unavailable",
+    "error": "Response is not PDF: text/html; charset=utf-8",
+    "alternative_attempts": [
+      {
+        "url": "https://www.nature.com/articles/s41598-026-62604-1_reference.pdf",
+        "error": "Response is not bounded valid PDF"
+      }
+    ]
+  },
+  {
+    "name": "2024-igwo-de-harmonic-elimination",
+    "doi": "10.1002/eng2.12883",
+    "url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/eng2.12883",
+    "status": "unavailable",
+    "error": "HTTP Error 403: Forbidden",
+    "alternative_attempts": []
+  },
+  {
+    "name": "2023-hybrid-gwo-hydraulic-actuator",
+    "doi": "10.3390/act12060220",
+    "url": "https://www.mdpi.com/2076-0825/12/6/220/pdf",
+    "status": "downloaded",
+    "error": "HTTP Error 403: Forbidden",
+    "alternative_attempts": [
+      {
+        "url": "https://mdpi-res.com/d_attachment/actuators/actuators-12-00220/article_deploy/actuators-12-00220.pdf",
+        "status": "downloaded"
+      }
+    ],
+    "file": "2023-hybrid-gwo-hydraulic-actuator.pdf",
+    "bytes": 11151400,
+    "download_url": "https://mdpi-res.com/d_attachment/actuators/actuators-12-00220/article_deploy/actuators-12-00220.pdf"
+  },
+  {
+    "name": "2026-adaptive-gwo-rl-irrigation",
+    "doi": "10.3390/a19030168",
+    "url": "https://www.mdpi.com/1999-4893/19/3/168/pdf",
+    "status": "downloaded",
+    "error": "HTTP Error 403: Forbidden",
+    "alternative_attempts": [
+      {
+        "url": "https://mdpi-res.com/d_attachment/algorithms/algorithms-19-00168/article_deploy/algorithms-19-00168.pdf",
+        "status": "downloaded"
+      }
+    ],
+    "file": "2026-adaptive-gwo-rl-irrigation.pdf",
+    "bytes": 2181785,
+    "download_url": "https://mdpi-res.com/d_attachment/algorithms/algorithms-19-00168/article_deploy/algorithms-19-00168.pdf"
+  },
+  {
+    "name": "2023-hybridizing-enhanced-de",
+    "doi": "10.7717/peerj-cs.1420",
+    "url": "https://peerj.com/articles/cs-1420.pdf",
+    "status": "unavailable",
+    "error": "HTTP Error 403: Forbidden",
+    "alternative_attempts": [
+      {
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10280462/pdf/peerj-cs-09-1420.pdf",
+        "error": "Response is not bounded valid PDF"
+      },
+      {
+        "url": "https://peerj.com/articles/cs-1420.pdf?download=1",
+        "error": "HTTP Error 403: Forbidden"
+      }
+    ]
+  }
+]
